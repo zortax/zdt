@@ -1,0 +1,78 @@
+/* The window's own frame.
+ *
+ * The desktop draws nothing, so everything a title bar would have given the user is asked of the
+ * compositor from inside: the header strip starts a move, and eight invisible strips around the
+ * edge start a resize. A Wayland window can never place itself, which is why each affordance is a
+ * request rather than a move. */
+
+.frame {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-window);
+    border: 1px solid var(--zui-color-border);
+    background-color: var(--zui-color-background);
+    overflow: hidden;
+}
+
+/* No corners and no border while the window fills the screen: a rounded corner there is a notch
+ * cut out of the desktop. */
+.frame[data-flush="true"] {
+    border-radius: 0;
+    border-width: 0;
+}
+
+/* The three rows the window is: the header, the body, the status line. */
+.frame__body {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* One strip per edge and corner, each asking the desktop to resize from its own side. They sit
+ * over everything so a drag near the edge is a resize rather than a selection. */
+.edges {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 40;
+}
+
+.edge { position: absolute; pointer-events: auto; }
+
+.edge--n { top: 0; left: var(--grab); right: var(--grab); height: var(--grab); }
+.edge--s { bottom: 0; left: var(--grab); right: var(--grab); height: var(--grab); }
+.edge--w { left: 0; top: var(--grab); bottom: var(--grab); width: var(--grab); }
+.edge--e { right: 0; top: var(--grab); bottom: var(--grab); width: var(--grab); }
+
+.edge--nw { top: 0; left: 0; width: var(--grab); height: var(--grab); }
+.edge--ne { top: 0; right: 0; width: var(--grab); height: var(--grab); }
+.edge--sw { bottom: 0; left: 0; width: var(--grab); height: var(--grab); }
+.edge--se { bottom: 0; right: 0; width: var(--grab); height: var(--grab); }
+
+/* The window buttons. Square, unfilled, and only tinted under the pointer — the close one red,
+ * because that is the one press that cannot be taken back. */
+.wincontrols {
+    align-items: center;
+    gap: 1px;
+    padding-right: 3px;
+    flex: none;
+}
+
+.wincontrol {
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--zui-radius-sm);
+    color: var(--zui-color-muted-foreground);
+}
+
+.wincontrol:hover {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.wincontrol--close:hover {
+    background-color: var(--zdt-danger, oklch(0.6 0.19 25));
+    color: oklch(0.99 0 0);
+}

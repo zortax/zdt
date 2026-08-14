@@ -1,0 +1,67 @@
+/* The measurements and the shared vocabulary the whole window is drawn by.
+ *
+ * The design language: flat, tight, and almost line-free. Planes are told apart by tone rather
+ * than by borders; the only things that carry a border and a shadow are the ones that float over
+ * the page. Every gap and every corner is a multiple of one unit, so density is one declaration.
+ *
+ * Colour lives in the theme files under `assets/themes`, never here. */
+
+:root {
+    /* The component library ships four. Three is what makes it compact. */
+    --zui-space-base: 3px;
+    --zui-radius-base: 6px;
+
+    /* Nothing on the page carries elevation. Keep the lift for what floats over it. */
+    --zui-shadow-xs: none;
+    --zui-shadow-sm: none;
+    --zui-shadow-md: 0 6px 24px oklch(0 0 0 / 22%);
+
+    --zui-icon-sm: 12px;
+    --zui-icon-md: 14px;
+    --zui-icon-lg: 16px;
+
+    /* What this application measures itself by. */
+    --chrome: 30px;      /* the combined header, buffer line and title bar */
+    --status: 22px;      /* the status line */
+    --row: 22px;         /* one row in the tree, the picker, any list */
+    --grab: 6px;         /* how wide the invisible window-resize strips are */
+    --radius-window: 10px;
+    --sidebar: 250px;
+
+    /* The window is transparent so the frame's own rounded corners show the desktop through. */
+    background-color: transparent;
+    color: var(--zui-color-foreground);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: 12px;
+    line-height: 16px;
+    display: block;
+    overflow: hidden;
+}
+
+/* Icons are outlines that take the colour of the text they sit in. Lucide art is stroked and
+ * unfilled, so both properties have to be said; the stroke width is in the icon's own 24-unit
+ * space, not in pixels. */
+.icon {
+    flex: none;
+    width: var(--zui-icon-md);
+    height: var(--zui-icon-md);
+    --zgui-fill: none;
+    --zgui-stroke: currentColor;
+    --zgui-stroke-width: 2px;
+}
+
+.icon--sm { width: var(--zui-icon-sm); height: var(--zui-icon-sm); }
+.icon--lg { width: var(--zui-icon-lg); height: var(--zui-icon-lg); }
+
+/* A glyph icon: one character from the interface font, sized like an icon and boxed like one so a
+ * row does not move when the glyph beside it is wider. */
+.glyph {
+    flex: none;
+    width: 14px;
+    text-align: center;
+    font-size: 13px;
+}
+
+.muted { color: var(--zui-color-muted-foreground); }
+.fill { flex: 1 1 auto; min-width: 0; min-height: 0; }
+.nowrap { text-wrap-mode: nowrap; text-overflow: ellipsis; overflow: hidden; }

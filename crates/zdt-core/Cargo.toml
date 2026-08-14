@@ -1,0 +1,31 @@
+[package]
+name = "zdt-core"
+description = "Documents, project state, configuration and search for zdt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+compact_str.workspace = true
+dirs.workspace = true
+grep-matcher.workspace = true
+grep-regex.workspace = true
+grep-searcher.workspace = true
+ignore.workspace = true
+notify.workspace = true
+notify-debouncer-full.workspace = true
+nucleo.workspace = true
+ropey.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+slotmap.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+tracing.workspace = true

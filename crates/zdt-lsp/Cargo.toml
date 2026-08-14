@@ -1,0 +1,24 @@
+[package]
+name = "zdt-lsp"
+description = "The language-server client pool for zdt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-lsp.workspace = true
+lsp-types.workspace = true
+ropey.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tracing.workspace = true
+zdt-core.workspace = true

@@ -1,0 +1,79 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["Leonard Seibold"]
+repository = "https://github.com/zortax/zdt"
+
+[workspace.dependencies]
+
+# --- the framework and the two components it is built from -------------------------------
+zgui = { git = "https://github.com/zortax/zgui", features = ["tokio"] }
+zgui-ui = { git = "https://github.com/zortax/zgui" }
+zgui-ui-tokens = { git = "https://github.com/zortax/zgui" }
+zgui-ui-icons = { git = "https://github.com/zortax/zgui" }
+zgui-ui-primitives = { git = "https://github.com/zortax/zgui" }
+zgui-editor = { path = "/home/leo/Projects/zgui-editor" }
+zgui-terminal = { path = "/home/leo/Projects/zgui-terminal", features = ["pty"] }
+
+# --- this workspace ----------------------------------------------------------------------
+zdt-core = { path = "crates/zdt-core" }
+zdt-vim = { path = "crates/zdt-vim" }
+zdt-lsp = { path = "crates/zdt-lsp" }
+
+# --- text --------------------------------------------------------------------------------
+ropey = "1.6"
+regex = "1"
+unicode-segmentation = "1"
+unicode-width = "0.2"
+
+# --- search ------------------------------------------------------------------------------
+nucleo = "0.5"
+nucleo-matcher = "0.3"
+ignore = "0.4"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+grep-matcher = "0.1"
+
+# --- language ----------------------------------------------------------------------------
+tree-sitter = "0.26"
+async-lsp = { version = "0.2", features = ["tokio"] }
+lsp-types = "0.95"
+tower = "0.5"
+
+# --- platform ----------------------------------------------------------------------------
+tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync"] }
+notify = "8"
+notify-debouncer-full = "0.5"
+dirs = "6"
+libloading = "0.8"
+
+# --- data --------------------------------------------------------------------------------
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+slotmap = "1"
+smallvec = "1"
+rustc-hash = "2"
+compact_str = "0.10"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[workspace.lints.clippy]
+uninlined_format_args = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

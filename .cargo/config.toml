@@ -1,0 +1,20 @@
+# Local development: build against the framework checkout instead of fetching the git
+# dependency.
+#
+# Every zgui crate that this workspace, `zgui-editor` or `zgui-terminal` names has to appear
+# here. Leaving one out makes cargo resolve two source ids for it, and the duplicate
+# `KeyEvent` / `Modifiers` / `CustomElement` types then fail to unify at the call sites where
+# the component crates and this one meet.
+[patch."https://github.com/zortax/zgui"]
+zgui = { path = "/home/leo/Projects/zgui/crates/zgui" }
+zgui-ui = { path = "/home/leo/Projects/zgui/crates/zgui-ui" }
+zgui-ui-tokens = { path = "/home/leo/Projects/zgui/crates/zgui-ui-tokens" }
+zgui-ui-icons = { path = "/home/leo/Projects/zgui/crates/zgui-ui-icons" }
+zgui-ui-primitives = { path = "/home/leo/Projects/zgui/crates/zgui-ui-primitives" }
+zgui-interned = { path = "/home/leo/Projects/zgui/crates/zgui-interned" }
+zgui-css = { path = "/home/leo/Projects/zgui/crates/zgui-css" }
+zgui-text-style = { path = "/home/leo/Projects/zgui/crates/zgui-text-style" }
+zgui-testkit-view = { path = "/home/leo/Projects/zgui/crates/zgui-testkit-view" }
+zgui-testkit-scene = { path = "/home/leo/Projects/zgui/crates/zgui-testkit-scene" }
+zgui-platform-headless = { path = "/home/leo/Projects/zgui/crates/zgui-platform-headless" }
+zgui-layout = { path = "/home/leo/Projects/zgui/crates/zgui-layout" }

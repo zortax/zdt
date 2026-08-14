@@ -1,0 +1,166 @@
+/* Oldworld, for a light surface.
+ *
+ * The dark theme has no light counterpart upstream, so this is one cut to the same brief: a warm
+ * near-white ground, the same eight hues taken down in lightness and up a little in chroma so
+ * they hold against paper, and no line anywhere a tone would do.
+ *
+ * Read alongside `oldworld-dark.css`; every property here answers one there. */
+
+/* --- the component library ------------------------------------------------------------- */
+
+--zui-color-background: #faf9f7;
+--zui-color-foreground: #2c2a30;
+--zui-color-card: #faf9f7;
+--zui-color-card-foreground: #2c2a30;
+--zui-color-popover: #ffffff;
+--zui-color-popover-foreground: #2c2a30;
+
+--zui-color-primary: #4a5a8f;
+--zui-color-primary-foreground: #faf9f7;
+--zui-color-secondary: #eceae6;
+--zui-color-secondary-foreground: #2c2a30;
+
+--zui-color-muted: #f2f0ec;
+--zui-color-muted-foreground: #6f6a76;
+--zui-color-accent: #ecebe6;
+--zui-color-accent-foreground: #2c2a30;
+
+--zui-color-destructive: #a63d61;
+--zui-color-destructive-foreground: #faf9f7;
+--zui-color-success: #3f7a58;
+--zui-color-success-foreground: #faf9f7;
+--zui-color-warning: #9a6a3c;
+--zui-color-warning-foreground: #faf9f7;
+--zui-color-info: #4a5a8f;
+--zui-color-info-foreground: #faf9f7;
+
+--zui-color-border: oklch(0 0 0 / 9%);
+--zui-color-input: oklch(0 0 0 / 12%);
+--zui-color-ring: #4a5a8f;
+--zui-color-scrim: oklch(0 0 0 / 30%);
+
+--zui-color-sidebar: #f3f1ed;
+--zui-color-sidebar-foreground: #3a373f;
+--zui-color-sidebar-primary: #4a5a8f;
+--zui-color-sidebar-primary-foreground: #faf9f7;
+--zui-color-sidebar-accent: #e8e6e1;
+--zui-color-sidebar-accent-foreground: #2c2a30;
+--zui-color-sidebar-border: oklch(0 0 0 / 7%);
+--zui-color-sidebar-ring: #4a5a8f;
+
+/* --- the application ------------------------------------------------------------------- */
+
+--zdt-danger: #a63d61;
+--zdt-warning: #9a6a3c;
+--zdt-info: #4a5a8f;
+--zdt-hint: #3d7076;
+--zdt-added: #3f7a58;
+--zdt-changed: #9a6a3c;
+--zdt-removed: #a63d61;
+--zdt-leap-label: #9a6a3c;
+--zdt-leap-label-fg: #faf9f7;
+--zdt-match: #9a6a3c;
+
+--zdt-mode-normal: #4a5a8f;
+--zdt-mode-insert: #3f7a58;
+--zdt-mode-visual: #6a5a94;
+--zdt-mode-replace: #a63d61;
+--zdt-mode-command: #9a6a3c;
+--zdt-mode-terminal: #3d7076;
+
+
+/* --- devicon tints ------------------------------------------------------------------------ */
+
+--zdt-icon-rust: #a8542f;
+--zdt-icon-python: #8a5a2c;
+--zdt-icon-ts: #3a5486;
+--zdt-icon-js: #8a5a2c;
+--zdt-icon-go: #2f6d74;
+--zdt-icon-c: #3a5486;
+--zdt-icon-lua: #3a5486;
+--zdt-icon-shell: #35704f;
+--zdt-icon-html: #a8542f;
+--zdt-icon-css: #3a5486;
+--zdt-icon-config: #8a5a2c;
+--zdt-icon-doc: #4a4550;
+--zdt-icon-image: #6a4f9c;
+--zdt-icon-git: #a8542f;
+
+/* --- the editor element ----------------------------------------------------------------- */
+
+--editor-bg: #faf9f7;
+--editor-fg: #2c2a30;
+--editor-selection: #d9d6cf;
+--editor-cursor: #2c2a30;
+--editor-cursor-text: #faf9f7;
+--editor-current-line: #f2f0ec;
+--editor-gutter-bg: #faf9f7;
+--editor-gutter-fg: #b9b4ad;
+--editor-gutter-current-fg: #5a5560;
+--editor-scrollbar-thumb: oklch(0 0 0 / 12%);
+--editor-scrollbar-track: transparent;
+--editor-search: #e8e4d8;
+--editor-search-current: #d8a75f;
+--editor-search-current-text: #2c2a30;
+--editor-indent-guide: #e8e6e1;
+
+/* --- syntax ------------------------------------------------------------------------------ */
+
+--syntax-attribute: #a63d61;
+--syntax-comment: #8d8892;
+--syntax-comment-doc: #a09ba6;
+--syntax-constant: #a63d61;
+--syntax-constant-builtin: #8a5a2c;
+--syntax-constructor: #8a5a2c;
+--syntax-embedded: #2c2a30;
+--syntax-escape: #8a5a2c;
+--syntax-function: #3a5486;
+--syntax-function-builtin: #3a5486;
+--syntax-function-macro: #a63d61;
+--syntax-function-method: #3a5486;
+--syntax-keyword: #6a4f9c;
+--syntax-label: #6a4f9c;
+--syntax-module: #2f6d74;
+--syntax-number: #9c4a86;
+--syntax-operator: #8a5a2c;
+--syntax-property: #4a4550;
+--syntax-punctuation: #6f6a76;
+--syntax-punctuation-bracket: #6f6a76;
+--syntax-punctuation-delimiter: #8d8892;
+--syntax-punctuation-special: #8a5a2c;
+--syntax-string: #35704f;
+--syntax-string-special: #8a5a2c;
+--syntax-tag: #a63d61;
+--syntax-type: #8a5a2c;
+--syntax-type-builtin: #8a5a2c;
+--syntax-variable: #2c2a30;
+--syntax-variable-builtin: #a8542f;
+--syntax-variable-parameter: #a8542f;
+
+/* --- the terminal element ---------------------------------------------------------------- */
+
+--terminal-background: #faf9f7;
+--terminal-foreground: #2c2a30;
+--terminal-cursor: #2c2a30;
+--terminal-cursor-text: #faf9f7;
+--terminal-selection: #d9d6cf;
+--terminal-match: #e8e4d8;
+--terminal-match-current: #d8a75f;
+
+--terminal-black: #2c2a30;
+--terminal-red: #a63d61;
+--terminal-green: #35704f;
+--terminal-yellow: #8a5a2c;
+--terminal-blue: #3a5486;
+--terminal-magenta: #9c4a86;
+--terminal-cyan: #2f6d74;
+--terminal-white: #d9d6cf;
+
+--terminal-bright-black: #6f6a76;
+--terminal-bright-red: #c04d74;
+--terminal-bright-green: #418a61;
+--terminal-bright-yellow: #a8542f;
+--terminal-bright-blue: #4a68a4;
+--terminal-bright-magenta: #b45a9c;
+--terminal-bright-cyan: #3a848c;
+--terminal-bright-white: #ffffff;

@@ -1,0 +1,69 @@
+/* The windows, and the editors in them.
+ *
+ * A pane holds every buffer it has recently shown; all but the current one are taken out of the
+ * flow with `display: none`, so switching is a style change rather than a mount. */
+
+.panes {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+}
+
+.panes > * {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+.pane {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.pane__buffer {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.pane__buffer--pending {
+    align-items: center;
+    justify-content: center;
+}
+
+.pane__editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 14px;
+    line-height: 1.45;
+    tab-size: 4;
+    background-color: var(--editor-bg);
+    color: var(--editor-fg);
+}
+
+/* The window with the keyboard is told apart by the one thing that costs nothing to draw: the
+ * gutter of the others recedes. No border, no tint, no glow. */
+.pane[data-focused="true"] .pane__editor {
+    --editor-gutter-current-fg: var(--editor-gutter-current-fg);
+}
+
+.pane:not([data-focused="true"]) .pane__editor {
+    --editor-current-line: transparent;
+}
+
+/* The divider between two windows is one hairline that thickens under the pointer. */
+.zui-resizable-handle {
+    background-color: var(--zui-color-border);
+}
+
+.zui-resizable-handle:hover,
+.zui-resizable-handle:focus-visible {
+    background-color: var(--zui-color-primary);
+}

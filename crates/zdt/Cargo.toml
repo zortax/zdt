@@ -1,0 +1,53 @@
+[package]
+name = "zdt"
+description = "A fast, vim-native code editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+default-run = "zdt"
+
+[lib]
+name = "zdt"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zdt"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+compact_str.workspace = true
+ropey.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+slotmap.workspace = true
+smallvec.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+zdt-core.workspace = true
+zdt-lsp.workspace = true
+zdt-vim.workspace = true
+
+zgui.workspace = true
+zgui-editor.workspace = true
+zgui-terminal.workspace = true
+zgui-ui.workspace = true
+zgui-ui-icons.workspace = true
+zgui-ui-primitives.workspace = true
+zgui-ui-tokens.workspace = true
+
+[features]
+default = ["lang-common"]
+# Grammars compiled into the binary. Anything outside this set is loaded at run time from
+# the configuration directory instead.
+lang-common = ["zgui-editor/all-languages"]
+
+[dev-dependencies]
+zgui-testkit-view = { git = "https://github.com/zortax/zgui" }
+zgui-platform-headless = { git = "https://github.com/zortax/zgui" }
+zgui-editor.workspace = true

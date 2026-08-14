@@ -1,0 +1,147 @@
+/* The two bars.
+ *
+ * One strip across the top carries the menu, the open buffers and the window buttons, and is also
+ * the handle the desktop moves the window by — so it looks like part of the page and behaves like
+ * a title bar. One strip across the bottom says what mode the editor is in and where the cursor
+ * is. Neither carries a line: what separates them from the page is the content, not a border. */
+
+.chrome {
+    flex: none;
+    height: var(--chrome);
+    align-items: center;
+    gap: var(--zui-space-sm);
+    padding: 0 0 0 var(--zui-space-sm);
+    min-width: 0;
+}
+
+.chrome__button {
+    width: 22px;
+    height: 22px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--zui-radius-sm);
+    color: var(--zui-color-muted-foreground);
+}
+
+.chrome__button:hover {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.chrome__branch {
+    flex: none;
+    align-items: center;
+    gap: var(--zui-space-xs);
+    padding: 0 var(--zui-space-sm);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zui-type-size-xs);
+    text-wrap-mode: nowrap;
+}
+
+/* The buffer line. Tabs shrink before they scroll, and the row never pushes the window buttons
+ * off the end. */
+.bufferline {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-sm);
+    height: 24px;
+    padding: 0 var(--zui-space-md);
+    border-radius: var(--zui-radius-sm);
+    color: var(--zui-color-muted-foreground);
+    min-width: 0;
+    text-wrap-mode: nowrap;
+}
+
+.tab:hover {
+    background-color: var(--zui-color-accent);
+}
+
+/* The current buffer is the one thing on this strip that carries the foreground colour. */
+.tab[data-current="true"] {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.tab__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Always in the row, so a buffer becoming dirty does not move the name beside it. */
+.tab__mark {
+    flex: none;
+    width: 10px;
+    font-size: 9px;
+    color: var(--zdt-warning);
+}
+
+.statusline {
+    flex: none;
+    height: var(--status);
+    align-items: center;
+    gap: var(--zui-space-md);
+    padding: 0 var(--zui-space-md) 0 0;
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zui-type-size-xs);
+    min-width: 0;
+}
+
+/* The mode block is the one place in the window that carries a solid fill, because it is the one
+ * thing a modal editor must never leave the reader guessing about. */
+.statusline__mode {
+    flex: none;
+    padding: 0 var(--zui-space-md);
+    height: var(--status);
+    line-height: var(--status);
+    color: var(--zui-color-background);
+    background-color: var(--zdt-mode-normal);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.statusline__mode[data-mode="insert"]   { background-color: var(--zdt-mode-insert); }
+.statusline__mode[data-mode="visual"]   { background-color: var(--zdt-mode-visual); }
+.statusline__mode[data-mode="replace"]  { background-color: var(--zdt-mode-replace); }
+.statusline__mode[data-mode="command"]  { background-color: var(--zdt-mode-command); }
+.statusline__mode[data-mode="terminal"] { background-color: var(--zdt-mode-terminal); }
+
+.statusline__name {
+    min-width: 0;
+    color: var(--zui-color-foreground);
+}
+
+.statusline__mark {
+    flex: none;
+    color: var(--zdt-warning);
+}
+
+.statusline__message {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-wrap-mode: nowrap;
+}
+
+.statusline__message[data-error="true"] {
+    color: var(--zdt-danger);
+}
+
+.statusline__spelling,
+.statusline__type,
+.statusline__pos {
+    flex: none;
+}
+
+.statusline__pos {
+    color: var(--zui-color-foreground);
+}

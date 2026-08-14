@@ -1,0 +1,22 @@
+[package]
+name = "zdt-vim"
+description = "The modal editing engine and keymap for zdt — pure, with no UI dependency"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+compact_str.workspace = true
+regex.workspace = true
+ropey.workspace = true
+rustc-hash.workspace = true
+serde.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+tracing.workspace = true
+unicode-segmentation.workspace = true
