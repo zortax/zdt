@@ -11,5 +11,6 @@ pub mod files;
 // it, and the props of `Icon` are its contract whether or not a caller has needed one yet.
 #[allow(dead_code)]
 pub mod icons;
+pub mod keys;
 pub mod ui;
 pub mod workspace;

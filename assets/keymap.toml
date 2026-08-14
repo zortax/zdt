@@ -1,0 +1,1722 @@
+# The keymap zdt starts with.
+#
+# Everything is here, including the motions and the operators: `w` is a row in this file exactly
+# as `<Leader>ff` is, so any of it can be moved or taken away without recompiling. Your own
+# `keymap.toml` in the configuration directory is read after this one, and a row in it that names
+# the same keys in the same modes replaces the one here. `action = false` takes a binding away.
+#
+# Modes are vim's letters: n normal, i insert, r replace, v every visual mode, x the character and
+# line ones, b the block one, s select, o operator-pending, c the command line, t terminal, a all
+# of them.
+#
+# Two things are *not* here, because they are grammar rather than bindings: a count typed before a
+# command, and the `"x` that picks a register. Making digits rebindable would mean nothing.
+#
+# The leader is <Space> and the local leader is , — both set in `config.toml`.
+
+[groups]
+"<Leader>b" = "Buffers"
+"<Leader>bs" = "Sort Buffers"
+"<Leader>d" = "Debugger"
+"<Leader>f" = "Find"
+"<Leader>g" = "Git"
+"<Leader>l" = "Language Tools"
+"<Leader>p" = "Packages"
+"<Leader>S" = "Session"
+"<Leader>t" = "Terminal"
+"<Leader>u" = "UI/UX"
+"<Leader>x" = "Quickfix/Lists"
+"g" = "Go to"
+"z" = "View"
+"[" = "Previous"
+"]" = "Next"
+
+# ---- Motions ---------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "h"
+action = "motion.left"
+desc = "Left"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "l"
+action = "motion.right"
+desc = "Right"
+
+# Down and up move by what is on screen when no count was typed, which is what makes a wrapped
+# line one press rather than one press per screen row.
+[[map]]
+mode = ["n", "x", "o"]
+keys = "j"
+action = "motion.down"
+desc = "Down"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "k"
+action = "motion.up"
+desc = "Up"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "w"
+action = "motion.word_forward"
+desc = "Next word"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "W"
+action = "motion.word_forward"
+args = { big = true }
+desc = "Next WORD"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "b"
+action = "motion.word_backward"
+desc = "Previous word"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "B"
+action = "motion.word_backward"
+args = { big = true }
+desc = "Previous WORD"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "e"
+action = "motion.word_end"
+desc = "End of word"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "E"
+action = "motion.word_end"
+args = { big = true }
+desc = "End of WORD"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "ge"
+action = "motion.word_end"
+args = { backward = true }
+desc = "End of previous word"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "0"
+action = "motion.line_start"
+desc = "Start of line"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "^"
+action = "motion.first_non_blank"
+desc = "First non-blank"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "$"
+action = "motion.line_end"
+desc = "End of line"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "g_"
+action = "motion.last_non_blank"
+desc = "Last non-blank"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "gg"
+action = "motion.document_start"
+desc = "Start of file"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "G"
+action = "motion.document_end"
+desc = "End of file"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "{"
+action = "motion.paragraph_backward"
+desc = "Previous paragraph"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "}"
+action = "motion.paragraph_forward"
+desc = "Next paragraph"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "%"
+action = "motion.matching_bracket"
+desc = "Matching bracket"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "f"
+action = "motion.find_char"
+desc = "Find character"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "F"
+action = "motion.find_char"
+args = { backward = true }
+desc = "Find character backwards"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "t"
+action = "motion.find_char"
+args = { till = true }
+desc = "Till character"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "T"
+action = "motion.find_char"
+args = { till = true, backward = true }
+desc = "Till character backwards"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = ";"
+action = "motion.repeat_find"
+desc = "Repeat find"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = ","
+action = "motion.repeat_find"
+args = { reverse = true }
+desc = "Repeat find backwards"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "H"
+action = "motion.screen_top"
+desc = "Top of screen"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "M"
+action = "motion.screen_middle"
+desc = "Middle of screen"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "L"
+action = "motion.screen_bottom"
+desc = "Bottom of screen"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<C-d>"
+action = "motion.half_page_down"
+desc = "Half page down"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<C-u>"
+action = "motion.half_page_up"
+desc = "Half page up"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<C-f>"
+action = "motion.page_down"
+desc = "Page down"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<C-b>"
+action = "motion.page_up"
+desc = "Page up"
+
+# The arrows do what the letters do, so a hand that has left the home row still works.
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<Left>"
+action = "motion.left"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<Right>"
+action = "motion.right"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<Down>"
+action = "motion.down"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<Up>"
+action = "motion.up"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<Home>"
+action = "motion.first_non_blank"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "<End>"
+action = "motion.line_end"
+
+# ---- Text objects ----------------------------------------------------------------------------
+
+[[map]]
+mode = ["o", "x"]
+keys = "iw"
+action = "textobject.word"
+desc = "Inner word"
+
+[[map]]
+mode = ["o", "x"]
+keys = "aw"
+action = "textobject.word"
+args = { around = true }
+desc = "A word"
+
+[[map]]
+mode = ["o", "x"]
+keys = "iW"
+action = "textobject.word"
+args = { big = true }
+desc = "Inner WORD"
+
+[[map]]
+mode = ["o", "x"]
+keys = "aW"
+action = "textobject.word"
+args = { big = true, around = true }
+desc = "A WORD"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ip"
+action = "textobject.paragraph"
+desc = "Inner paragraph"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ap"
+action = "textobject.paragraph"
+args = { around = true }
+desc = "A paragraph"
+
+[[map]]
+mode = ["o", "x"]
+keys = "is"
+action = "textobject.sentence"
+desc = "Inner sentence"
+
+[[map]]
+mode = ["o", "x"]
+keys = "as"
+action = "textobject.sentence"
+args = { around = true }
+desc = "A sentence"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i\""
+action = "textobject.quote"
+args = { quote = "\"" }
+desc = "Inner double quotes"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a\""
+action = "textobject.quote"
+args = { quote = "\"", around = true }
+desc = "A double-quoted string"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i'"
+action = "textobject.quote"
+args = { quote = "'" }
+desc = "Inner single quotes"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a'"
+action = "textobject.quote"
+args = { quote = "'", around = true }
+desc = "A single-quoted string"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i`"
+action = "textobject.quote"
+args = { quote = "`" }
+desc = "Inner backticks"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a`"
+action = "textobject.quote"
+args = { quote = "`", around = true }
+desc = "A backtick string"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i("
+action = "textobject.pair"
+args = { open = "(" }
+desc = "Inner parentheses"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a("
+action = "textobject.pair"
+args = { open = "(", around = true }
+desc = "A parenthesised block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ib"
+action = "textobject.pair"
+args = { open = "(" }
+desc = "Inner parentheses"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ab"
+action = "textobject.pair"
+args = { open = "(", around = true }
+desc = "A parenthesised block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i["
+action = "textobject.pair"
+args = { open = "[" }
+desc = "Inner brackets"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a["
+action = "textobject.pair"
+args = { open = "[", around = true }
+desc = "A bracketed block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i{"
+action = "textobject.pair"
+args = { open = "{" }
+desc = "Inner braces"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a{"
+action = "textobject.pair"
+args = { open = "{", around = true }
+desc = "A braced block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "iB"
+action = "textobject.pair"
+args = { open = "{" }
+desc = "Inner braces"
+
+[[map]]
+mode = ["o", "x"]
+keys = "aB"
+action = "textobject.pair"
+args = { open = "{", around = true }
+desc = "A braced block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "i<lt>"
+action = "textobject.pair"
+args = { open = "<" }
+desc = "Inner angle brackets"
+
+[[map]]
+mode = ["o", "x"]
+keys = "a<lt>"
+action = "textobject.pair"
+args = { open = "<", around = true }
+desc = "An angle-bracketed block"
+
+[[map]]
+mode = ["o", "x"]
+keys = "if"
+action = "textobject.function"
+desc = "Inner function"
+
+[[map]]
+mode = ["o", "x"]
+keys = "af"
+action = "textobject.function"
+args = { around = true }
+desc = "A function"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ic"
+action = "textobject.class"
+desc = "Inner class"
+
+[[map]]
+mode = ["o", "x"]
+keys = "ac"
+action = "textobject.class"
+args = { around = true }
+desc = "A class"
+
+# ---- Operators -------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n", "x"]
+keys = "d"
+action = "operator.delete"
+desc = "Delete"
+
+[[map]]
+mode = ["n", "x"]
+keys = "c"
+action = "operator.change"
+desc = "Change"
+
+[[map]]
+mode = ["n", "x"]
+keys = "y"
+action = "operator.yank"
+desc = "Yank"
+
+[[map]]
+mode = ["n", "x"]
+keys = ">"
+action = "operator.indent"
+desc = "Indent"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<lt>"
+action = "operator.dedent"
+desc = "Dedent"
+
+[[map]]
+mode = ["n", "x"]
+keys = "gu"
+action = "operator.lowercase"
+desc = "Lowercase"
+
+[[map]]
+mode = ["n", "x"]
+keys = "gU"
+action = "operator.uppercase"
+desc = "Uppercase"
+
+[[map]]
+mode = ["n", "x"]
+keys = "g~"
+action = "operator.swap_case"
+desc = "Swap case"
+
+[[map]]
+mode = ["n", "x"]
+keys = "gc"
+action = "operator.comment"
+desc = "Comment"
+
+[[map]]
+mode = ["n"]
+keys = "D"
+action = "edit.delete_to_line_end"
+desc = "Delete to end of line"
+
+[[map]]
+mode = ["n"]
+keys = "C"
+action = "edit.change_to_line_end"
+desc = "Change to end of line"
+
+[[map]]
+mode = ["n"]
+keys = "Y"
+action = "edit.yank_line"
+desc = "Yank line"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "edit.delete_char"
+desc = "Delete character"
+
+[[map]]
+mode = ["n"]
+keys = "X"
+action = "edit.delete_char"
+args = { backward = true }
+desc = "Delete character before"
+
+[[map]]
+mode = ["n", "x"]
+keys = "r"
+action = "edit.replace_char"
+desc = "Replace character"
+
+[[map]]
+mode = ["n", "x"]
+keys = "J"
+action = "edit.join_lines"
+desc = "Join lines"
+
+[[map]]
+mode = ["n", "x"]
+keys = "gJ"
+action = "edit.join_lines"
+args = { keep_spaces = true }
+desc = "Join lines without space"
+
+[[map]]
+mode = ["n"]
+keys = "~"
+action = "edit.toggle_case_char"
+desc = "Toggle case"
+
+[[map]]
+mode = ["n"]
+keys = "."
+action = "edit.repeat"
+desc = "Repeat last change"
+
+[[map]]
+mode = ["n"]
+keys = "u"
+action = "edit.undo"
+desc = "Undo"
+
+[[map]]
+mode = ["n"]
+keys = "<C-r>"
+action = "edit.redo"
+desc = "Redo"
+
+[[map]]
+mode = ["n", "x"]
+keys = "p"
+action = "edit.paste"
+desc = "Paste after"
+
+[[map]]
+mode = ["n", "x"]
+keys = "P"
+action = "edit.paste"
+args = { before = true }
+desc = "Paste before"
+
+# ---- Entering and leaving modes ---------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "i"
+action = "mode.insert"
+desc = "Insert"
+
+[[map]]
+mode = ["n"]
+keys = "I"
+action = "mode.insert"
+args = { at = "first_non_blank" }
+desc = "Insert at start of line"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "mode.insert"
+args = { at = "after" }
+desc = "Append"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "mode.insert"
+args = { at = "line_end" }
+desc = "Append at end of line"
+
+[[map]]
+mode = ["n"]
+keys = "o"
+action = "mode.open_line"
+desc = "Open line below"
+
+[[map]]
+mode = ["n"]
+keys = "O"
+action = "mode.open_line"
+args = { above = true }
+desc = "Open line above"
+
+[[map]]
+mode = ["n"]
+keys = "R"
+action = "mode.replace"
+desc = "Replace mode"
+
+[[map]]
+mode = ["n"]
+keys = "v"
+action = "mode.visual"
+desc = "Visual"
+
+[[map]]
+mode = ["n"]
+keys = "V"
+action = "mode.visual"
+args = { kind = "line" }
+desc = "Visual line"
+
+[[map]]
+mode = ["n"]
+keys = "<C-v>"
+action = "mode.visual"
+args = { kind = "block" }
+desc = "Visual block"
+
+[[map]]
+mode = ["x"]
+keys = "o"
+action = "visual.swap_ends"
+desc = "Swap selection ends"
+
+[[map]]
+mode = ["b"]
+keys = "I"
+action = "visual.block_insert"
+desc = "Insert before block"
+
+[[map]]
+mode = ["b"]
+keys = "A"
+action = "visual.block_append"
+desc = "Append after block"
+
+[[map]]
+mode = ["a"]
+keys = "<Esc>"
+action = "mode.normal"
+desc = "Normal mode"
+
+[[map]]
+mode = ["i", "v", "s", "o", "c"]
+keys = "<C-c>"
+action = "mode.normal"
+desc = "Normal mode"
+
+[[map]]
+mode = ["t"]
+keys = "<C-\\><C-n>"
+action = "mode.normal"
+desc = "Leave the terminal"
+
+# ---- Search ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n", "x"]
+keys = "/"
+action = "search.start"
+desc = "Search"
+
+[[map]]
+mode = ["n", "x"]
+keys = "?"
+action = "search.start"
+args = { backward = true }
+desc = "Search backwards"
+
+[[map]]
+mode = ["n", "x"]
+keys = "n"
+action = "search.next"
+desc = "Next match"
+
+[[map]]
+mode = ["n", "x"]
+keys = "N"
+action = "search.next"
+args = { reverse = true }
+desc = "Previous match"
+
+[[map]]
+mode = ["n"]
+keys = "*"
+action = "search.word_under_cursor"
+desc = "Search word forwards"
+
+[[map]]
+mode = ["n"]
+keys = "#"
+action = "search.word_under_cursor"
+args = { backward = true }
+desc = "Search word backwards"
+
+[[map]]
+mode = ["n"]
+keys = ":"
+action = "command.start"
+desc = "Command line"
+
+# ---- Marks, jumps and macros --------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "m"
+action = "mark.set"
+desc = "Set mark"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "`"
+action = "mark.jump"
+desc = "Jump to mark"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "'"
+action = "mark.jump"
+args = { line = true }
+desc = "Jump to mark's line"
+
+[[map]]
+mode = ["n"]
+keys = "<C-o>"
+action = "jump.back"
+desc = "Jump back"
+
+[[map]]
+mode = ["n"]
+keys = "<C-i>"
+action = "jump.forward"
+desc = "Jump forward"
+
+[[map]]
+mode = ["n"]
+keys = "g;"
+action = "jump.older_change"
+desc = "Older change"
+
+[[map]]
+mode = ["n"]
+keys = "g,"
+action = "jump.newer_change"
+desc = "Newer change"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "macro.record"
+desc = "Record macro"
+
+[[map]]
+mode = ["n"]
+keys = "@"
+action = "macro.play"
+desc = "Play macro"
+
+# ---- The view ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n", "x"]
+keys = "zz"
+action = "scroll.center"
+desc = "Centre the line"
+
+[[map]]
+mode = ["n", "x"]
+keys = "zt"
+action = "scroll.top"
+desc = "Line to the top"
+
+[[map]]
+mode = ["n", "x"]
+keys = "zb"
+action = "scroll.bottom"
+desc = "Line to the bottom"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<C-e>"
+action = "scroll.lines"
+args = { lines = 1 }
+desc = "Scroll down a line"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<C-y>"
+action = "scroll.lines"
+args = { lines = -1 }
+desc = "Scroll up a line"
+
+# ---- Leap ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "s"
+action = "leap.forward"
+desc = "Leap forwards"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "S"
+action = "leap.backward"
+desc = "Leap backwards"
+
+[[map]]
+mode = ["n", "x", "o"]
+keys = "gs"
+action = "leap.window"
+desc = "Leap from another window"
+
+# ---- Buffers ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "]b"
+action = "buffer.next"
+desc = "Next buffer"
+
+[[map]]
+mode = ["n"]
+keys = "[b"
+action = "buffer.previous"
+desc = "Previous buffer"
+
+# AstroNvim puts these on `>b` and `<b`, which cannot work here: `>` and `<` are the indent
+# operators, so `>b` is *indent back a word* and a binding that shadowed it would take a core vim
+# command away. They live in the buffer group instead.
+[[map]]
+mode = ["n"]
+keys = "<Leader>b<gt>"
+action = "buffer.move"
+args = { offset = 1 }
+desc = "Move buffer right"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>b<lt>"
+action = "buffer.move"
+args = { offset = -1 }
+desc = "Move buffer left"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>w"
+action = "buffer.save"
+desc = "Save"
+
+[[map]]
+mode = ["n"]
+keys = "<C-s>"
+action = "buffer.save"
+desc = "Save"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>n"
+action = "buffer.new"
+desc = "New file"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>c"
+action = "buffer.close"
+desc = "Close buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>C"
+action = "buffer.close"
+args = { force = true }
+desc = "Force close buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>q"
+action = "window.close"
+desc = "Close window"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Q"
+action = "app.quit"
+desc = "Quit zdt"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bb"
+action = "picker.buffers"
+desc = "Select buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bc"
+action = "buffer.close_others"
+desc = "Close all buffers except current"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bC"
+action = "buffer.close_all"
+desc = "Close all buffers"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bl"
+action = "buffer.close_left"
+desc = "Close buffers to the left"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>br"
+action = "buffer.close_right"
+desc = "Close buffers to the right"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bp"
+action = "buffer.alternate"
+desc = "Previous buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bse"
+action = "buffer.sort"
+args = { by = "extension" }
+desc = "By extension"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bsr"
+action = "buffer.sort"
+args = { by = "relative_path" }
+desc = "By relative path"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bsp"
+action = "buffer.sort"
+args = { by = "full_path" }
+desc = "By full path"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bsm"
+action = "buffer.sort"
+args = { by = "modified" }
+desc = "By modification"
+
+# ---- Windows ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "|"
+action = "window.split"
+args = { axis = "vertical" }
+desc = "Vertical split"
+
+[[map]]
+mode = ["n"]
+keys = "\\"
+action = "window.split"
+args = { axis = "horizontal" }
+desc = "Horizontal split"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>v"
+action = "window.split"
+args = { axis = "vertical" }
+desc = "Vertical split"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>s"
+action = "window.split"
+args = { axis = "horizontal" }
+desc = "Horizontal split"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>q"
+action = "window.close"
+desc = "Close window"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>w"
+action = "window.cycle"
+desc = "Next window"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>h"
+action = "window.focus"
+args = { direction = "left" }
+desc = "Window left"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>j"
+action = "window.focus"
+args = { direction = "down" }
+desc = "Window below"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>k"
+action = "window.focus"
+args = { direction = "up" }
+desc = "Window above"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>l"
+action = "window.focus"
+args = { direction = "right" }
+desc = "Window right"
+
+# The same four without the prefix, which is what smart-splits binds and what a hand that is
+# already moving expects.
+[[map]]
+mode = ["n", "t"]
+keys = "<C-h>"
+action = "window.focus"
+args = { direction = "left" }
+desc = "Window left"
+
+[[map]]
+mode = ["n", "t"]
+keys = "<C-j>"
+action = "window.focus"
+args = { direction = "down" }
+desc = "Window below"
+
+[[map]]
+mode = ["n", "t"]
+keys = "<C-k>"
+action = "window.focus"
+args = { direction = "up" }
+desc = "Window above"
+
+[[map]]
+mode = ["n", "t"]
+keys = "<C-l>"
+action = "window.focus"
+args = { direction = "right" }
+desc = "Window right"
+
+# ---- Find ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ff"
+action = "picker.files"
+desc = "Find files"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fF"
+action = "picker.files"
+args = { hidden = true, ignored = true }
+desc = "Find all files"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fw"
+action = "picker.grep"
+desc = "Find words"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fW"
+action = "picker.grep"
+args = { hidden = true, ignored = true }
+desc = "Find words in all files"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fc"
+action = "picker.grep"
+args = { word_under_cursor = true }
+desc = "Find word under cursor"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fb"
+action = "picker.buffers"
+desc = "Find buffers"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fo"
+action = "picker.oldfiles"
+desc = "Find old files"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fl"
+action = "picker.lines"
+desc = "Find lines"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>f'"
+action = "picker.marks"
+desc = "Find marks"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fk"
+action = "picker.keymaps"
+desc = "Find keymaps"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fC"
+action = "picker.commands"
+desc = "Find commands"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fr"
+action = "picker.registers"
+desc = "Find registers"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ft"
+action = "picker.themes"
+desc = "Find themes"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fg"
+action = "picker.git_files"
+desc = "Find git files"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>fT"
+action = "picker.todo"
+desc = "Find TODO comments"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>f<CR>"
+action = "picker.resume"
+desc = "Resume the last search"
+
+# ---- Language tools -------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "gd"
+action = "lsp.definition"
+desc = "Go to definition"
+
+[[map]]
+mode = ["n"]
+keys = "gD"
+action = "lsp.declaration"
+desc = "Go to declaration"
+
+[[map]]
+mode = ["n"]
+keys = "gy"
+action = "lsp.type_definition"
+desc = "Go to type definition"
+
+[[map]]
+mode = ["n"]
+keys = "gI"
+action = "lsp.implementation"
+desc = "Go to implementation"
+
+[[map]]
+mode = ["n"]
+keys = "gr"
+action = "lsp.references"
+desc = "References"
+
+[[map]]
+mode = ["n"]
+keys = "K"
+action = "lsp.hover"
+desc = "Hover"
+
+[[map]]
+mode = ["n"]
+keys = "gK"
+action = "lsp.signature_help"
+desc = "Signature help"
+
+[[map]]
+mode = ["n"]
+keys = "gl"
+action = "lsp.line_diagnostics"
+desc = "Hover diagnostics"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<Leader>la"
+action = "lsp.code_action"
+desc = "Code action"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<Leader>lf"
+action = "lsp.format"
+desc = "Format buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lr"
+action = "lsp.rename"
+desc = "Rename symbol"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lR"
+action = "picker.references"
+desc = "Search references"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lh"
+action = "lsp.signature_help"
+desc = "Signature help"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ls"
+action = "picker.symbols"
+desc = "Search symbols"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lG"
+action = "picker.workspace_symbols"
+desc = "Search workspace symbols"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lS"
+action = "lsp.outline"
+desc = "Symbols outline"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>lD"
+action = "picker.diagnostics"
+desc = "Search diagnostics"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ld"
+action = "lsp.line_diagnostics"
+desc = "Hover diagnostics"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>li"
+action = "lsp.info"
+desc = "Language server information"
+
+[[map]]
+mode = ["n"]
+keys = "]e"
+action = "diagnostic.next"
+args = { severity = "error" }
+desc = "Next error"
+
+[[map]]
+mode = ["n"]
+keys = "[e"
+action = "diagnostic.previous"
+args = { severity = "error" }
+desc = "Previous error"
+
+[[map]]
+mode = ["n"]
+keys = "]w"
+action = "diagnostic.next"
+args = { severity = "warning" }
+desc = "Next warning"
+
+[[map]]
+mode = ["n"]
+keys = "[w"
+action = "diagnostic.previous"
+args = { severity = "warning" }
+desc = "Previous warning"
+
+[[map]]
+mode = ["n"]
+keys = "]d"
+action = "diagnostic.next"
+desc = "Next diagnostic"
+
+[[map]]
+mode = ["n"]
+keys = "[d"
+action = "diagnostic.previous"
+desc = "Previous diagnostic"
+
+# ---- Comments and editing conveniences -------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>/"
+action = "operator.comment"
+args = { linewise = true }
+desc = "Toggle comment line"
+
+[[map]]
+mode = ["x"]
+keys = "<Leader>/"
+action = "operator.comment"
+desc = "Toggle comment"
+
+[[map]]
+mode = ["x"]
+keys = "<Tab>"
+action = "operator.indent"
+args = { keep_selection = true }
+desc = "Indent"
+
+[[map]]
+mode = ["x"]
+keys = "<S-Tab>"
+action = "operator.dedent"
+args = { keep_selection = true }
+desc = "Dedent"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>R"
+action = "file.rename"
+desc = "Rename file"
+
+# ---- The tree ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>e"
+action = "tree.toggle"
+desc = "Toggle explorer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>o"
+action = "tree.focus"
+desc = "Focus explorer"
+
+# ---- Terminals -------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tf"
+action = "terminal.toggle"
+args = { placement = "float" }
+desc = "Floating terminal"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>th"
+action = "terminal.toggle"
+args = { placement = "horizontal" }
+desc = "Horizontal terminal"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tv"
+action = "terminal.toggle"
+args = { placement = "vertical" }
+desc = "Vertical terminal"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tl"
+action = "terminal.toggle"
+args = { placement = "float", command = "lazygit", id = "lazygit" }
+desc = "lazygit"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tn"
+action = "terminal.toggle"
+args = { placement = "float", command = "node", id = "node" }
+desc = "node"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tp"
+action = "terminal.toggle"
+args = { placement = "float", command = "python3", id = "python" }
+desc = "python"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tt"
+action = "terminal.toggle"
+args = { placement = "float", command = "btm", id = "btm" }
+desc = "btm"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>tu"
+action = "terminal.toggle"
+args = { placement = "float", command = "gdu", id = "gdu" }
+desc = "gdu"
+
+[[map]]
+mode = ["a"]
+keys = "<F7>"
+action = "terminal.toggle"
+args = { placement = "float" }
+desc = "Toggle terminal"
+
+# ---- Git ---------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gg"
+action = "terminal.toggle"
+args = { placement = "float", command = "lazygit", id = "lazygit" }
+desc = "lazygit"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gb"
+action = "picker.git_branches"
+desc = "Git branches"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gc"
+action = "picker.git_commits"
+desc = "Git commits"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gt"
+action = "picker.git_status"
+desc = "Git status"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<Leader>gs"
+action = "git.stage_hunk"
+desc = "Stage hunk"
+
+[[map]]
+mode = ["n", "x"]
+keys = "<Leader>gr"
+action = "git.reset_hunk"
+desc = "Reset hunk"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gp"
+action = "git.preview_hunk"
+desc = "Preview hunk"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gl"
+action = "git.blame_line"
+desc = "Blame line"
+
+[[map]]
+mode = ["n"]
+keys = "]g"
+action = "git.next_hunk"
+desc = "Next hunk"
+
+[[map]]
+mode = ["n"]
+keys = "[g"
+action = "git.previous_hunk"
+desc = "Previous hunk"
+
+# ---- Lists ---------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>xq"
+action = "list.quickfix"
+desc = "Quickfix list"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>xl"
+action = "list.location"
+desc = "Location list"
+
+# ---- Sessions ------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sl"
+action = "session.load_last"
+desc = "Load last session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Ss"
+action = "session.save"
+desc = "Save this session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sd"
+action = "session.delete"
+desc = "Delete a session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sf"
+action = "session.load"
+desc = "Load a session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>S."
+action = "session.load_here"
+desc = "Load this directory's session"
+
+# ---- The interface ---------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uw"
+action = "ui.toggle"
+args = { setting = "wrap" }
+desc = "Toggle wrap"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>un"
+action = "ui.toggle"
+args = { setting = "line_numbers" }
+desc = "Toggle line numbering"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ur"
+action = "ui.toggle"
+args = { setting = "relative_numbers" }
+desc = "Toggle relative numbering"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ud"
+action = "ui.toggle"
+args = { setting = "diagnostics" }
+desc = "Toggle diagnostics"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uv"
+action = "ui.toggle"
+args = { setting = "virtual_text" }
+desc = "Toggle inline diagnostics"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uh"
+action = "ui.toggle"
+args = { setting = "inlay_hints" }
+desc = "Toggle inlay hints"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uf"
+action = "ui.toggle"
+args = { setting = "format_on_save" }
+desc = "Toggle format on save"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ul"
+action = "ui.toggle"
+args = { setting = "statusline" }
+desc = "Toggle status line"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ut"
+action = "ui.toggle"
+args = { setting = "tabline" }
+desc = "Toggle buffer line"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ub"
+action = "ui.toggle"
+args = { setting = "scheme" }
+desc = "Toggle light and dark"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>u|"
+action = "ui.toggle"
+args = { setting = "indent_guides" }
+desc = "Toggle indent guides"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uZ"
+action = "ui.toggle"
+args = { setting = "zen" }
+desc = "Toggle zen mode"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uT"
+action = "ui.toggle"
+args = { setting = "transparency" }
+desc = "Toggle transparency"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uD"
+action = "ui.dismiss"
+desc = "Dismiss notifications"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>h"
+action = "ui.dashboard"
+desc = "Home screen"
+
+# ---- Packages ---------------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>pl"
+action = "lsp.restart"
+desc = "Restart language servers"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>pi"
+action = "lsp.info"
+desc = "Language server information"
