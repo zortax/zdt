@@ -6,6 +6,7 @@ pub mod pane;
 pub mod panes;
 pub mod statusline;
 pub mod theme;
+pub mod whichkey;
 
 use zgui::prelude::*;
 

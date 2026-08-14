@@ -17,7 +17,7 @@ use std::rc::Rc;
 use zdt_vim::config::merge;
 use zdt_vim::effect::{Context, Effect, Scroll, Selection, Step};
 use zdt_vim::engine::Engine;
-use zdt_vim::keymap::{Keymap, Layered};
+use zdt_vim::keymap::{Keymap, Layered, Resolution};
 use zdt_vim::motion::View;
 use zdt_vim::notation::{Leaders, parse};
 use zdt_vim::{Chord, Mode};
@@ -35,6 +35,17 @@ const DEFAULTS: &str = include_str!("../../../assets/keymap.toml");
 /// A macro that plays itself is the one way a key can never come back, so it is bounded here as
 /// well as in the engine.
 const REPLAY_DEPTH: u32 = 64;
+
+/// One way a part-typed sequence could carry on, as which-key shows it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Continuation {
+    /// The key, written the way a keymap writes it.
+    pub keys: String,
+    /// What it leads to.
+    pub label: String,
+    /// Whether it is a whole binding rather than another prefix.
+    pub runs: bool,
+}
 
 /// The modal layer.
 ///
@@ -91,6 +102,11 @@ impl Vim {
         self.inner.mode.get()
     }
 
+    /// Which mode the editor is in, without subscribing.
+    pub fn mode_untracked(&self) -> Mode {
+        self.inner.mode.get_untracked()
+    }
+
     /// What has been typed toward a binding that has not resolved. Tracked.
     pub fn pending(&self) -> String {
         self.inner.pending.get()
@@ -99,6 +115,41 @@ impl Vim {
     /// Which register a macro is being recorded into. Tracked.
     pub fn recording(&self) -> Option<char> {
         self.inner.recording.get()
+    }
+
+    /// What could come next, when a sequence is part-way through. Tracked.
+    ///
+    /// Answered as owned rows rather than borrowed ones because the keymap is behind a `RefCell`
+    /// and which-key draws from a reactive hole, which is not somewhere a borrow can be held.
+    ///
+    /// Untracked: what wakes which-key is the pending signal, which the panel watches for itself.
+    pub fn continuations(&self) -> Vec<Continuation> {
+        let engine = self.inner.engine.borrow();
+        let keys = engine.pending_keys();
+        // An operator waiting for something to apply to has typed nothing yet, and the motions are
+        // exactly what somebody who paused after `d` is looking for.
+        if keys.is_empty() && engine.pending_operator().is_none() {
+            return Vec::new();
+        }
+
+        let keymap = self.inner.keymap.borrow();
+        let overlay = self.inner.overlay.borrow();
+        let layered = match overlay.as_ref() {
+            Some((_, map)) => Layered::new(map, &keymap),
+            None => Layered::plain(&keymap),
+        };
+
+        match layered.resolve(engine.mode(), keys) {
+            Resolution::Pending(next) => next
+                .into_iter()
+                .map(|one| Continuation {
+                    keys: zdt_vim::notation::format(&[one.chord]),
+                    label: one.label.to_owned(),
+                    runs: one.runs,
+                })
+                .collect(),
+            Resolution::Run(_) | Resolution::None => Vec::new(),
+        }
     }
 
     /// Reads more keymap text on top of what is there, which is what a user's file is.
@@ -179,10 +230,14 @@ impl Vim {
         if self.inner.mode.get_untracked() != mode {
             self.inner.mode.set(mode);
         }
-        let pending = zdt_vim::notation::format(engine.pending_keys());
+        let typed = zdt_vim::notation::format(engine.pending_keys());
+        let waiting = engine
+            .pending_operator()
+            .map(|chord| zdt_vim::notation::format(&[chord]))
+            .unwrap_or_default();
         let pending = match engine.pending_count() {
-            Some(count) => format!("{count}{pending}"),
-            None => pending,
+            Some(count) => format!("{count}{waiting}{typed}"),
+            None => format!("{waiting}{typed}"),
         };
         if self.inner.pending.get_untracked() != pending {
             self.inner.pending.set(pending);

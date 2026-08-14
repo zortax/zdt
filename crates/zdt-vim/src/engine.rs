@@ -237,6 +237,15 @@ impl Engine {
         self.count
     }
 
+    /// The key of the operator that is waiting for something to apply to.
+    ///
+    /// What the status line echoes while `d` waits for a motion, and what tells which-key to
+    /// offer the motions rather than nothing.
+    #[must_use]
+    pub fn pending_operator(&self) -> Option<Chord> {
+        self.operator.as_ref().map(|pending| pending.key)
+    }
+
     /// Puts the engine back in normal mode with nothing pending, which is what `<Esc>` does and
     /// what a buffer switch has to do.
     pub fn reset(&mut self) {

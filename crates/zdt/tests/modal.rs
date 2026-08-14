@@ -248,3 +248,64 @@ fn the_mode_the_layer_reports_is_the_mode_the_editor_is_drawn_in() {
     modal.keys("i");
     assert_eq!(modal.vim.mode(), zdt_vim::Mode::Insert);
 }
+
+#[test]
+fn which_key_offers_what_could_come_next() {
+    let modal = mount("hello");
+    assert!(
+        modal.vim.continuations().is_empty(),
+        "nothing is pending, so there is nothing to offer"
+    );
+
+    modal.press(Key::Named(NamedKey::Space));
+    let next = modal.vim.continuations();
+    assert!(next.len() > 10, "the leader map is not that small");
+
+    let find = next
+        .iter()
+        .find(|one| one.keys == "f")
+        .expect("`f` is in the leader map");
+    assert_eq!(find.label, "Find");
+    assert!(!find.runs, "it is a group rather than a binding");
+
+    let save = next
+        .iter()
+        .find(|one| one.keys == "w")
+        .expect("`w` is in the leader map");
+    assert_eq!(save.label, "Save");
+    assert!(save.runs);
+}
+
+#[test]
+fn which_key_follows_the_sequence_into_a_group() {
+    // The rows are keyed by what they say as well as by their key, because a row reused from the
+    // group above would keep the label it was built with — and the two groups share plenty of
+    // keys.
+    let modal = mount("hello");
+    modal.press(Key::Named(NamedKey::Space));
+    modal.keys("f");
+
+    let next = modal.vim.continuations();
+    assert!(
+        next.iter()
+            .all(|one| one.label.starts_with("Find") || one.label.starts_with("Resume")),
+        "every row belongs to the Find group: {next:?}"
+    );
+    assert!(
+        next.iter()
+            .any(|one| one.keys == "f" && one.label == "Find files")
+    );
+}
+
+#[test]
+fn which_key_has_nothing_to_offer_once_a_sequence_resolves() {
+    let modal = mount("hello world");
+    modal.keys("d");
+    assert!(
+        !modal.vim.continuations().is_empty(),
+        "`d` waits for a motion"
+    );
+    modal.keys("w");
+    assert!(modal.vim.continuations().is_empty());
+    assert_eq!(modal.text(), "world");
+}

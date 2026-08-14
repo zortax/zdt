@@ -1,0 +1,72 @@
+/* What could come next.
+ *
+ * A panel across the bottom of the window, above the status line. It floats, so it is one of the
+ * two things in this interface that carry a border and a shadow. */
+
+.whichkey {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: var(--status);
+    max-height: 45%;
+    z-index: 30;
+    padding: var(--zui-space-sm) var(--zui-space-md) var(--zui-space-md);
+    gap: var(--zui-space-sm);
+    background-color: var(--zui-color-popover);
+    border-top: 1px solid var(--zui-color-border);
+    box-shadow: var(--zui-shadow-md);
+    overflow: hidden;
+}
+
+.whichkey__head {
+    align-items: baseline;
+    gap: var(--zui-space-md);
+    flex: none;
+}
+
+/* What has been typed so far, in the mode block's colour so the eye goes to it first. */
+.whichkey__typed {
+    color: var(--zdt-mode-normal);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+/* Columns rather than rows: a group of thirty keys reads as a page, not as a list to scroll. */
+.whichkey__keys {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0 var(--zui-space-lg);
+    min-height: 0;
+    overflow: hidden;
+}
+
+.whichkey__entry {
+    align-items: baseline;
+    gap: var(--zui-space-sm);
+    height: 18px;
+    min-width: 0;
+}
+
+.whichkey__key {
+    flex: none;
+    min-width: 44px;
+    text-align: right;
+    color: var(--zui-color-foreground);
+    font-weight: 600;
+}
+
+.whichkey__arrow {
+    flex: none;
+    width: 14px;
+    color: var(--zui-color-muted-foreground);
+}
+
+.whichkey__label {
+    min-width: 0;
+    color: var(--zui-color-muted-foreground);
+}
+
+/* A prefix is a heading for more keys, and reads as one. */
+.whichkey__entry[data-group="true"] .whichkey__label {
+    color: var(--zui-color-primary);
+}

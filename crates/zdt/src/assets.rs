@@ -13,6 +13,7 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/frame.css"),
     include_str!("../../../assets/css/chrome.css"),
     include_str!("../../../assets/css/panes.css"),
+    include_str!("../../../assets/css/whichkey.css"),
 ];
 
 /// Every compiled-in style sheet, joined.

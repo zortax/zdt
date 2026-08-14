@@ -15,6 +15,7 @@ use crate::ui::chrome::ChromeProps;
 use crate::ui::frame::FrameProps;
 use crate::ui::panes::PanesProps;
 use crate::ui::statusline::StatusLineProps;
+use crate::ui::whichkey::WhichKeyProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
 use crate::workspace::{self, Workspace};
 
@@ -46,6 +47,7 @@ pub fn Root(
             Frame {
                 Chrome()
                 Panes()
+                WhichKey()
                 StatusLine()
             }
         }
