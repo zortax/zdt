@@ -107,20 +107,21 @@ impl ModeSet {
 
     /// The modes a keymap's mode letter stands for.
     ///
-    /// Vim's letters: `n` normal, `i` insert, `r` replace, `v` every visual mode, `x` the
-    /// character and line ones a `<C-v>` block is not, `b` the block one, `s` select, `o`
-    /// operator-pending, `c` the command line, `t` a terminal. `a` is all of them, for a binding
-    /// like `<F7>` that has to work wherever the person is.
+    /// Vim's letters, and vim's meanings for them: `n` normal, `i` insert, `r` replace, `x` every
+    /// visual mode — the block one included — `v` those and select, `s` select alone, `b` the
+    /// block one alone, `o` operator-pending, `c` the command line, `t` a terminal. `a` is all of
+    /// them, for a binding like `<F7>` that has to work wherever the person is.
     #[must_use]
     pub fn from_letter(letter: &str) -> Option<Self> {
+        let visual = Self::of(Mode::Visual)
+            .with(Self::of(Mode::VisualLine))
+            .with(Self::of(Mode::VisualBlock));
         Some(match letter {
             "n" => Self::of(Mode::Normal),
             "i" => Self::of(Mode::Insert),
             "r" => Self::of(Mode::Replace),
-            "v" => Self::of(Mode::Visual)
-                .with(Self::of(Mode::VisualLine))
-                .with(Self::of(Mode::VisualBlock)),
-            "x" => Self::of(Mode::Visual).with(Self::of(Mode::VisualLine)),
+            "x" => visual,
+            "v" => visual.with(Self::of(Mode::Select)),
             "b" => Self::of(Mode::VisualBlock),
             "s" => Self::of(Mode::Select),
             "o" => Self::of(Mode::OperatorPending),
@@ -164,12 +165,12 @@ mod tests {
         assert!(visual.has(Mode::VisualBlock));
         assert!(!visual.has(Mode::Normal));
 
-        let charwise = ModeSet::from_letter("x").expect("x is a mode letter");
-        assert!(charwise.has(Mode::Visual));
-        assert!(
-            !charwise.has(Mode::VisualBlock),
-            "a block is what `x` is not"
-        );
+        // `x` is every visual mode, the block one included; `v` is those and select. Getting
+        // these the wrong way round makes every operator silently miss block mode.
+        let exact = ModeSet::from_letter("x").expect("x is a mode letter");
+        assert!(exact.has(Mode::VisualBlock));
+        assert!(!exact.has(Mode::Select));
+        assert!(visual.has(Mode::Select));
     }
 
     #[test]

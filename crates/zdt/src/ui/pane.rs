@@ -9,11 +9,18 @@
 //! editor is built around, and swapping it would mean unmounting anyway, losing the view state and
 //! re-parsing the file on every buffer switch.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
+
 use zgui::prelude::*;
+use zgui::reactive::RenderEffect;
+use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::ui::Erase;
+use crate::vim::use_vim;
 use crate::workspace::{BufferId, BufferKind, WindowId, use_workspace};
 
 /// One window.
@@ -118,6 +125,59 @@ fn BufferView(
                 on_cleanup_local(move || workspace.forget_handle(window, buffer));
             }
 
+            // The editor with the keyboard is the current buffer of the focused window. Followed
+            // rather than set once, because both of those change under it — a `]b` or a `<C-w>w`
+            // has to move the keyboard as well as the view.
+            //
+            // The claim is made from a timer rather than here, because the first run of this
+            // effect happens while the editor is still being built and a node that is not mounted
+            // cannot take focus. The handle is held for the component's life: dropping a timer
+            // cancels it.
+            {
+                let workspace = workspace.clone();
+                let timers = Timers::current();
+                let claim: Rc<RefCell<Option<TimeoutHandle>>> = Rc::new(RefCell::new(None));
+                let held = Rc::clone(&claim);
+                let focus = RenderEffect::new(move |_| {
+                    let current = workspace
+                        .window(window)
+                        .is_some_and(|state| state.current == buffer);
+                    if !current || workspace.focused() != window {
+                        return;
+                    }
+                    let Some(timers) = timers.as_ref() else {
+                        return;
+                    };
+                    let workspace = workspace.clone();
+                    *held.borrow_mut() = Some(timers.set_timeout(Duration::ZERO, move || {
+                        if let Some(handle) = workspace.handle_for(window, buffer) {
+                            handle.focus();
+                        }
+                    }));
+                });
+                on_cleanup_local(move || {
+                    drop(focus);
+                    drop(claim);
+                });
+            }
+
+            // Every key reaches the modal layer before the editor does, which is the whole seam a
+            // vim mode needs. A key it declines falls through to the editor's own handling —
+            // which is what makes typing in insert mode the editor's business, with its
+            // auto-indent and its undo grouping.
+            let vim = use_vim();
+            let on_key: zgui_editor::KeyFilter = Box::new(
+                move |event: &zgui::vocab::KeyEvent,
+                      modifiers: zgui::vocab::Modifiers,
+                      handle: &EditorHandle| {
+                    match crate::keys::chord_of(event, modifiers) {
+                        Some(chord) => vim.key(chord, handle),
+                        // A modifier on its own, or a key the keymap has no word for.
+                        None => false,
+                    }
+                },
+            );
+
             view! {
                 box(
                     class = "pane__buffer",
@@ -130,6 +190,7 @@ fn BufferView(
                         autofocus = false,
                         on_ready = on_ready,
                         on_event = on_event,
+                        on_key = on_key,
                     )
                 }
             }

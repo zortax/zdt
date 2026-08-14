@@ -138,8 +138,16 @@
 
 .statusline__spelling,
 .statusline__type,
-.statusline__pos {
+.statusline__pos,
+.statusline__pending {
     flex: none;
+}
+
+/* What has been typed toward a binding that has not resolved, echoed the way vim echoes it. */
+.statusline__pending {
+    font-weight: 600;
+    color: var(--zui-color-foreground);
+    letter-spacing: 0.04em;
 }
 
 .statusline__pos {

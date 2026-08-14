@@ -117,15 +117,13 @@ fn bracketed(name: &str, leaders: Leaders) -> Result<Chord, NotationError> {
     // Modifiers, in any order and any case: `<C-S-Tab>`, `<c-s-tab>`.
     let mut mods = Mods::NONE;
     let mut rest = name;
-    loop {
-        let Some((prefix, after)) = rest.split_once('-') else {
-            break;
-        };
+    while let Some((prefix, after)) = rest.split_once('-') {
         let modifier = match prefix.to_ascii_lowercase().as_str() {
             "c" | "ctrl" | "control" => Mods::CONTROL,
             "m" | "a" | "alt" | "meta" => Mods::ALT,
             "d" | "cmd" | "super" => Mods::SUPER,
             "s" | "shift" => Mods::SHIFT,
+            // Not a modifier, so the rest is the key — which is how `g-` binds a hyphen.
             _ => break,
         };
         mods = mods.with(modifier);

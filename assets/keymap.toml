@@ -671,20 +671,20 @@ action = "mode.replace"
 desc = "Replace mode"
 
 [[map]]
-mode = ["n"]
+mode = ["n", "x", "b"]
 keys = "v"
 action = "mode.visual"
 desc = "Visual"
 
 [[map]]
-mode = ["n"]
+mode = ["n", "x", "b"]
 keys = "V"
 action = "mode.visual"
 args = { kind = "line" }
 desc = "Visual line"
 
 [[map]]
-mode = ["n"]
+mode = ["n", "x", "b"]
 keys = "<C-v>"
 action = "mode.visual"
 args = { kind = "block" }

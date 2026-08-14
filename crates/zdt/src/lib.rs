@@ -4,6 +4,7 @@
 //! pickers — can be driven by a test with no window open. The binary is the entry point and
 //! nothing else.
 
+pub mod actions;
 pub mod app;
 pub mod assets;
 pub mod files;
@@ -13,4 +14,5 @@ pub mod files;
 pub mod icons;
 pub mod keys;
 pub mod ui;
+pub mod vim;
 pub mod workspace;

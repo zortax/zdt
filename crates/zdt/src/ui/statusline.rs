@@ -7,12 +7,14 @@ use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_editor::CursorPos;
 
+use crate::vim::use_vim;
 use crate::workspace::use_workspace;
 
 /// The whole strip.
 #[component]
 pub fn StatusLine() -> impl IntoView {
     let workspace = use_workspace();
+    let vim = use_vim();
 
     let buffer = {
         let workspace = workspace.clone();
@@ -68,9 +70,34 @@ pub fn StatusLine() -> impl IntoView {
         move || workspace.message()
     };
 
+    let mode = {
+        let vim = vim.clone();
+        move || vim.mode()
+    };
+    let pending = {
+        let vim = vim.clone();
+        move || {
+            let recording = vim.recording();
+            let pending = vim.pending();
+            match (recording, pending.is_empty()) {
+                (Some(name), true) => format!("recording @{name}"),
+                (Some(name), false) => format!("{pending}   recording @{name}"),
+                (None, _) => pending,
+            }
+        }
+    };
+
     view! {
         row(class = "statusline") {
-            box(class = "statusline__mode", attr:data-mode = "normal") {"NORMAL"}
+            box(
+                class = "statusline__mode",
+                attr:data-mode = {
+                    let mode = mode.clone();
+                    move || Some(mode().tone().to_owned())
+                }
+            ) {
+                {move || mode().label().to_string()}
+            }
 
             label(class = "statusline__name nowrap") {{name}}
             label(class = "statusline__mark") {{move || if dirty() { "[+]" } else { "" }}}
@@ -89,6 +116,7 @@ pub fn StatusLine() -> impl IntoView {
 
             box(class = "fill") {}
 
+            label(class = "statusline__pending") {{pending}}
             label(class = "statusline__spelling") {{spelling}}
             label(class = "statusline__type") {{file_type}}
             label(class = "statusline__pos") {{move || {

@@ -175,7 +175,7 @@ impl Keymap {
                 runs: child.binding.is_some(),
             })
             .collect();
-        continuations.sort_by(|one, two| sort_key(one.chord).cmp(&sort_key(two.chord)));
+        continuations.sort_by_key(|one| sort_key(one.chord));
         Resolution::Pending(continuations)
     }
 

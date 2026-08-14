@@ -1,0 +1,225 @@
+//! What the engine asks for, and what it needs to know to decide.
+//!
+//! The engine never touches an editor. It is handed what the buffer looks like right now and
+//! answers a list of things to do — which is what lets the whole grammar be driven by a test that
+//! writes down keys and asserts on text.
+
+use std::ops::Range;
+
+use crate::action::Action;
+use crate::mode::Mode;
+use crate::motion::View;
+
+/// One caret, and what it has selected.
+///
+/// `anchor` is where the selection was started and `head` is where the caret is; head may be
+/// before anchor, which is what selecting backwards is.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Selection {
+    /// Where the selection started.
+    pub anchor: usize,
+    /// Where the caret is.
+    pub head: usize,
+}
+
+impl Selection {
+    /// A caret with nothing selected.
+    #[must_use]
+    pub const fn caret(at: usize) -> Self {
+        Self {
+            anchor: at,
+            head: at,
+        }
+    }
+
+    /// A selection from `anchor` to `head`.
+    #[must_use]
+    pub const fn new(anchor: usize, head: usize) -> Self {
+        Self { anchor, head }
+    }
+
+    /// The bytes it covers, whichever way round it is.
+    #[must_use]
+    pub fn range(self) -> Range<usize> {
+        if self.anchor <= self.head {
+            self.anchor..self.head
+        } else {
+            self.head..self.anchor
+        }
+    }
+
+    /// The earlier of its two ends.
+    #[must_use]
+    pub fn start(self) -> usize {
+        self.anchor.min(self.head)
+    }
+
+    /// The later of its two ends.
+    #[must_use]
+    pub fn end(self) -> usize {
+        self.anchor.max(self.head)
+    }
+
+    /// Whether nothing is selected.
+    #[must_use]
+    pub fn is_caret(self) -> bool {
+        self.anchor == self.head
+    }
+}
+
+/// Where to move the view.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Scroll {
+    /// Put the caret's line in the middle.
+    Center,
+    /// Put it at the top.
+    Top,
+    /// Put it at the bottom.
+    Bottom,
+    /// Move the view by lines, without moving the caret.
+    Lines(i32),
+    /// Bring the caret into view, which almost everything wants afterwards.
+    EnsureVisible,
+}
+
+/// One thing for the application to do.
+#[derive(Clone, PartialEq, Debug)]
+pub enum Effect {
+    /// Put the carets here. The first is the primary one.
+    Select(Vec<Selection>),
+    /// Replace these ranges with this text, as one change.
+    ///
+    /// Ranges are in the text as it is now and must not overlap. Deleting is replacing with
+    /// nothing, which is why there is no separate delete.
+    Replace(Vec<(Range<usize>, String)>),
+    /// Take the last change back.
+    Undo,
+    /// Put it back.
+    Redo,
+    /// Move the view.
+    Scroll(Scroll),
+    /// The mode is now this.
+    Mode(Mode),
+    /// Put this on a system clipboard.
+    SetClipboard {
+        /// The text.
+        text: String,
+        /// Whether it is the selection clipboard rather than the ordinary one.
+        primary: bool,
+    },
+    /// Read a system clipboard, and paste what comes back.
+    ReadClipboard {
+        /// Whether it is the selection clipboard.
+        primary: bool,
+        /// Whether to put it before the caret rather than after.
+        before: bool,
+    },
+    /// Something the application owns: a picker, a language server, a window.
+    App(Action),
+    /// Something to say in the status line.
+    Say(String),
+    /// Something that went wrong.
+    Complain(String),
+}
+
+/// What the buffer looks like to the engine right now.
+pub struct Context<'a> {
+    /// The text.
+    pub rope: &'a ropey::Rope,
+    /// The carets, the first being the primary one. Never empty.
+    pub selections: &'a [Selection],
+    /// What the view is showing.
+    pub view: View,
+}
+
+impl Context<'_> {
+    /// The primary caret's head.
+    #[must_use]
+    pub fn cursor(&self) -> usize {
+        self.selections
+            .first()
+            .map_or(0, |selection| selection.head)
+    }
+
+    /// The primary selection.
+    #[must_use]
+    pub fn primary(&self) -> Selection {
+        self.selections
+            .first()
+            .copied()
+            .unwrap_or(Selection::caret(0))
+    }
+}
+
+/// What one key came to.
+#[derive(Clone, PartialEq, Debug)]
+pub enum Step {
+    /// The key was used up. Here is what to do.
+    Consumed(Vec<Effect>),
+    /// The key is part of a sequence that has not finished.
+    Pending,
+    /// The key is not the engine's. The editor should have it, which is what makes typing in
+    /// insert mode the editor's own business — including its auto-indent and its undo grouping.
+    PassThrough,
+}
+
+impl Step {
+    /// A step that did nothing, but used the key up.
+    #[must_use]
+    pub fn nothing() -> Self {
+        Self::Consumed(Vec::new())
+    }
+
+    /// A step that does one thing.
+    #[must_use]
+    pub fn one(effect: Effect) -> Self {
+        Self::Consumed(vec![effect])
+    }
+
+    /// The effects, when it was consumed.
+    #[must_use]
+    pub fn effects(&self) -> &[Effect] {
+        match self {
+            Self::Consumed(effects) => effects,
+            Self::Pending | Self::PassThrough => &[],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Effect, Selection, Step};
+
+    #[test]
+    fn a_selection_covers_the_same_bytes_either_way_round() {
+        let forward = Selection::new(3, 7);
+        let backward = Selection::new(7, 3);
+        assert_eq!(forward.range(), backward.range());
+        assert_eq!(forward.start(), 3);
+        assert_eq!(forward.end(), 7);
+        assert_eq!(backward.start(), 3);
+    }
+
+    #[test]
+    fn a_caret_selects_nothing() {
+        let caret = Selection::caret(4);
+        assert!(caret.is_caret());
+        assert!(caret.range().is_empty());
+    }
+
+    #[test]
+    fn a_step_that_did_nothing_still_used_the_key() {
+        // Which is the difference between a command that had no effect and a key the editor
+        // should have been given.
+        assert_eq!(Step::nothing(), Step::Consumed(Vec::new()));
+        assert!(Step::nothing().effects().is_empty());
+        assert!(Step::Pending.effects().is_empty());
+        assert!(Step::PassThrough.effects().is_empty());
+    }
+
+    #[test]
+    fn one_effect_is_a_step() {
+        let step = Step::one(Effect::Undo);
+        assert_eq!(step.effects(), &[Effect::Undo]);
+    }
+}

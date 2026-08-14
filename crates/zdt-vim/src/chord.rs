@@ -71,7 +71,11 @@ impl Named {
     }
 
     /// The key written as `name`, when there is one. Case-insensitive, as vim's notation is.
+    ///
+    /// Not `FromStr`: that trait's error type would have to say something, and there is nothing
+    /// to say beyond "no key is written that way".
     #[must_use]
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(name: &str) -> Option<Self> {
         let lowered = name.to_ascii_lowercase();
         Some(match lowered.as_str() {

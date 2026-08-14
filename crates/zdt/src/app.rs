@@ -35,6 +35,7 @@ pub fn Root(
 
     let space = Workspace::new(project);
     workspace::provide(space.clone());
+    zgui::reactive::provide_local_context(crate::vim::Vim::new(space.clone()));
 
     for file in files {
         crate::files::open_argument(&space, &file);
