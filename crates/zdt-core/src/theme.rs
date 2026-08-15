@@ -72,6 +72,40 @@ pub fn builtin_theme_names() -> &'static [(&'static str, &'static str)] {
     BUILTIN
 }
 
+/// Every theme that can be switched to: the built-in ones, and whatever is in `dir`.
+///
+/// A name in the directory replaces a built-in one, the same way a keymap row does — that is how
+/// somebody who dislikes one shipped colour changes it rather than forking the whole theme.
+#[must_use]
+pub fn theme_names(dir: Option<&Path>) -> Vec<String> {
+    let mut names: Vec<String> = builtin_theme_names()
+        .iter()
+        .map(|(name, _)| (*name).to_owned())
+        .collect();
+
+    if let Some(dir) = dir
+        && let Ok(entries) = std::fs::read_dir(dir)
+    {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else { continue };
+            // `<name>-light.css` and `<name>-dark.css` are one theme, so both reduce to the stem.
+            let Some(stem) = name
+                .strip_suffix("-light.css")
+                .or_else(|| name.strip_suffix("-dark.css"))
+            else {
+                continue;
+            };
+            if !names.iter().any(|held| held == stem) {
+                names.push(stem.to_owned());
+            }
+        }
+    }
+
+    names.sort();
+    names
+}
+
 /// Reads a theme out of a directory, as `<name>-light.css` and `<name>-dark.css`.
 ///
 /// A surface whose file is missing or unreadable falls back to the other one, so a person who

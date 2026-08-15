@@ -5852,6 +5852,7 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "nucleo",
+ "regex-syntax",
  "ropey",
  "rustc-hash 2.1.3",
  "serde",

@@ -14,11 +14,13 @@ use zgui::{component, view};
 use zgui_ui_tokens::ColorScheme;
 
 use crate::explorer::Explorer;
+use crate::picker::Picker;
 use crate::prompt::Prompt;
 use crate::settings::Settings;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::frame::FrameProps;
 use crate::ui::panes::PanesProps;
+use crate::ui::picker::PickerProps;
 use crate::ui::prompt::PromptProps;
 use crate::ui::statusline::StatusLineProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
@@ -65,6 +67,7 @@ pub fn Root(
     }
 
     crate::prompt::provide(Prompt::new());
+    crate::picker::provide(Picker::new(space.clone(), settings.clone()));
 
     // The tree keeps up with the editor, and with the settings.
     let following_buffer = follow_buffer(&explorer, &space, &settings);
@@ -140,6 +143,7 @@ pub fn Root(
                     Explorer()
                     Panes()
                 }
+                Picker()
                 Prompt()
                 WhichKey()
                 StatusLine()

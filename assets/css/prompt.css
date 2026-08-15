@@ -28,11 +28,18 @@
 
 .prompt__input {
     height: 24px;
-    /* No ring: the panel already floats above everything, and nothing else here is focusable, so
-     * a focus ring would be saying what the caret has already said. */
-    box-shadow: none;
-    outline: none;
     font-size: 12px;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+}
+
+/* Two classes, to out-specify the component's own scoped sheet. No ring: the panel already floats
+ * above everything and nothing else in it can be focused, so a ring would be saying what the
+ * caret has already said. */
+.prompt .prompt__input,
+.prompt .prompt__input:focus,
+.prompt .prompt__input:focus-visible {
+    box-shadow: none;
+    outline: none;
+    border-color: var(--zui-color-border);
     border-radius: calc(var(--zui-radius-base) - 2px);
 }

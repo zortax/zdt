@@ -29,6 +29,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "app" => app(workspace, leaf),
         "editor" => editor(handle, leaf),
         "tree" => tree(workspace, leaf, args),
+        "picker" => picker(workspace, leaf, args, handle),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.
@@ -215,6 +216,39 @@ fn ui(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
         }),
         other => workspace.say(format!("there is no `{other}` to toggle yet")),
     }
+}
+
+/// The pickers.
+///
+/// One action per source, all of them the same call: the difference between `<Leader>ff` and
+/// `<Leader>fb` is which list is gathered, not what the modal does with it.
+fn picker(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args, handle: Option<&EditorHandle>) {
+    use crate::picker::{Picker, Source};
+
+    let Some(picker) = zgui::reactive::use_local_context::<Picker>() else {
+        return;
+    };
+    let Some(mut source) = Source::named(leaf, args) else {
+        workspace.say(format!("picker.{leaf} is not built yet"));
+        return;
+    };
+
+    // `<Leader>fc` searches for what the caret is on, which is the one thing a picker cannot ask
+    // for itself: by the time it is open, the caret is in its own prompt.
+    if args.flag("word_under_cursor")
+        && let Some(handle) = handle
+    {
+        let word = handle.query(|snapshot| {
+            let caret = snapshot.selections().primary().head;
+            let range = snapshot.word_at(caret);
+            snapshot.text_in(range)
+        });
+        if let Source::Grep { start, .. } = &mut source {
+            *start = word;
+        }
+    }
+
+    picker.open(source);
 }
 
 /// The file tree.

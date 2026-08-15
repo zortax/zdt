@@ -217,6 +217,20 @@ impl Engine {
         &self.registers
     }
 
+    /// Where each mark is, for the picker that lists them.
+    ///
+    /// In name order, so that `a` reads before `b` however they were set.
+    #[must_use]
+    pub fn marks(&self) -> Vec<(char, usize)> {
+        let mut marks: Vec<(char, usize)> = self
+            .marks
+            .iter()
+            .map(|(name, byte)| (*name, *byte))
+            .collect();
+        marks.sort_unstable();
+        marks
+    }
+
     /// Whether a macro is being recorded, and into which register.
     #[must_use]
     pub fn recording(&self) -> Option<char> {

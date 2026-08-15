@@ -153,6 +153,50 @@ impl Vim {
         }
     }
 
+    /// Everything bound in normal mode, as the keys that reach it and what it is called.
+    ///
+    /// Owned rather than borrowed, because the keymap is behind a `RefCell` and a picker holds
+    /// what it lists for as long as it is open.
+    #[must_use]
+    pub fn bindings(&self) -> Vec<Bound> {
+        let keymap = self.inner.keymap.borrow();
+        keymap
+            .bindings(Mode::Normal)
+            .into_iter()
+            .map(|(keys, binding)| Bound {
+                keys: zdt_vim::notation::format(&keys),
+                actions: binding.actions.clone(),
+                description: binding.description.clone(),
+            })
+            .collect()
+    }
+
+    /// What is in each register that has anything in it.
+    #[must_use]
+    pub fn registers(&self) -> Vec<(char, String)> {
+        let engine = self.inner.engine.borrow();
+        engine
+            .registers()
+            .occupied()
+            .into_iter()
+            .map(|(name, contents)| (name, contents.text.clone()))
+            .collect()
+    }
+
+    /// Where each mark is, as a byte offset into the buffer it was set in.
+    #[must_use]
+    pub fn marks(&self) -> Vec<(char, usize)> {
+        self.inner.engine.borrow().marks()
+    }
+
+    /// Carries out one action, as though a key had asked for it.
+    ///
+    /// What a picker of commands does with the row somebody chose.
+    pub fn run(&self, action: &zdt_vim::Action) {
+        let handle = self.inner.workspace.current_handle();
+        crate::actions::run(&self.inner.workspace, self, action, handle.as_ref());
+    }
+
     /// Puts the keymap back to the one the editor ships with.
     ///
     /// What a reload does before reading a person's file again: layering the new file onto what is
@@ -489,4 +533,15 @@ impl Vim {
 /// anything can carry on from.
 pub fn use_vim() -> Vim {
     zgui::reactive::use_local_context::<Vim>().expect("a vim layer is provided at the root")
+}
+
+/// One row of the keymap, as a picker lists it.
+#[derive(Clone, PartialEq, Debug)]
+pub struct Bound {
+    /// The keys that reach it, in the notation a keymap is written in.
+    pub keys: String,
+    /// What it does.
+    pub actions: Vec<zdt_vim::Action>,
+    /// What the keymap calls it.
+    pub description: String,
 }

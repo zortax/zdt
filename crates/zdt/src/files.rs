@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use zgui::reactive::prelude::*;
-use zgui::task::{background, blocking, spawn_local};
+use zgui::task::{background, blocking};
 
 use crate::workspace::{BufferId, Workspace};
 
@@ -17,14 +17,24 @@ use crate::workspace::{BufferId, Workspace};
 /// file already open is shown at once and never re-read, which is what stops `<Leader>ff` onto
 /// something on the buffer line from throwing away its undo history.
 pub fn open(workspace: &Workspace, path: impl Into<PathBuf>) {
+    open_at(workspace, path, None);
+}
+
+/// The same, and puts the caret on `line` — counting from one — when there is one.
+///
+/// What a grep hit and a jump to a definition both come to.
+pub fn open_at(workspace: &Workspace, path: impl Into<PathBuf>, line: Option<u64>) {
     let path = path.into();
     if let Some(existing) = workspace.find_path(&path) {
         workspace.show(existing);
+        go_to_line(workspace, existing, line);
         return;
     }
 
     let workspace = workspace.clone();
-    let task = spawn_local(async move {
+    // Detached: opening a file is often what closes the picker that asked for it, and a read
+    // belonging to the picker would be cancelled before the buffer ever appeared.
+    crate::task::detached(async move {
         let reading = path.clone();
         let loaded = blocking(move || zdt_core::fs::load(&reading)).await;
 
@@ -32,6 +42,7 @@ pub fn open(workspace: &Workspace, path: impl Into<PathBuf>) {
             Ok(file) => {
                 let document = zgui_editor::Document::new(&file.text);
                 let id = workspace.open_document(Some(path.clone()), document);
+                go_to_line(&workspace, id, line);
                 if let Some(buffer) = workspace.buffer_untracked(id) {
                     // The encoding and the line ending are the file's, and have to be put back
                     // exactly when it is written. They are read once, here.
@@ -55,8 +66,50 @@ pub fn open(workspace: &Workspace, path: impl Into<PathBuf>) {
             Err(error) => workspace.complain(error.to_string()),
         }
     });
-    // The task belongs to whatever owner called this, and is cancelled with it.
-    drop(task);
+}
+
+/// Puts the caret at the start of `line` in `buffer`, once there is an editor showing it.
+///
+/// `line` counts from one, the way a grep hit and an error message both do.
+pub fn go_to(workspace: &Workspace, buffer: BufferId, line: u64) {
+    go_to_line(workspace, buffer, Some(line));
+}
+
+/// The same, for a line that may not be there.
+///
+/// From a timer, because a buffer that has just been opened has no mounted editor yet: the view is
+/// built on the next frame, and there is nothing to scroll until it is.
+fn go_to_line(workspace: &Workspace, buffer: BufferId, line: Option<u64>) {
+    let Some(line) = line.filter(|line| *line > 0) else {
+        return;
+    };
+    let Some(timers) = zgui::view::time::Timers::current() else {
+        return;
+    };
+    let workspace = workspace.clone();
+    let handle = timers.set_timeout(std::time::Duration::ZERO, move || {
+        let window = workspace.focused_untracked();
+        let Some(editor) = workspace.handle_for(window, buffer) else {
+            return;
+        };
+        let wanted = (line - 1) as usize;
+        let at = editor.query(|snapshot| {
+            let rope = snapshot.rope();
+            let line = wanted.min(rope.len_lines().saturating_sub(1));
+            rope.char_to_byte(rope.line_to_char(line))
+        });
+        editor.command(zgui_editor::Command::SetSelections {
+            selections: vec![zgui_editor::Selection::caret(at)],
+            primary: 0,
+        });
+        // Centred rather than merely visible: a hit at the bottom of the screen with nothing
+        // under it reads as the end of the file even when it is not.
+        editor.command(zgui_editor::Command::Scroll(
+            zgui_editor::ScrollCmd::CursorCenter,
+        ));
+    });
+    // Held nowhere: dropping a timer handle cancels it, and this one has to fire.
+    std::mem::forget(handle);
 }
 
 /// Opens `path` when it is a file, or says why it cannot.
@@ -112,7 +165,8 @@ pub fn save_as(
     let (encoding, line_ending) = (entry.encoding, entry.line_ending);
 
     let workspace = workspace.clone();
-    let task = spawn_local(async move {
+    // Detached: `:wq` closes the window that asked, and a write cancelled half way is a file lost.
+    crate::task::detached(async move {
         let writing = path.clone();
         let written =
             background(async move { zdt_core::fs::save(&writing, &text, encoding, line_ending) })
@@ -128,5 +182,4 @@ pub fn save_as(
             Err(error) => workspace.complain(error.to_string()),
         }
     });
-    drop(task);
 }

@@ -15,6 +15,7 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/panes.css"),
     include_str!("../../../assets/css/tree.css"),
     include_str!("../../../assets/css/prompt.css"),
+    include_str!("../../../assets/css/picker.css"),
     include_str!("../../../assets/css/whichkey.css"),
 ];
 

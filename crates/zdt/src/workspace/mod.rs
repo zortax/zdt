@@ -69,6 +69,9 @@ struct Inner {
     /// Not a signal: nothing on screen is decided by which handles exist, and an action that
     /// needs one needs it right now rather than on the next flush.
     handles: RefCell<FxHashMap<(WindowId, BufferId), zgui_editor::EditorHandle>>,
+    /// Every file opened this session, most recent first. Not a signal, for the same reason as
+    /// the handles: it is read when a picker asks and never drawn.
+    recent: RefCell<Vec<PathBuf>>,
 }
 
 /// Something the interface is saying.
@@ -107,6 +110,7 @@ impl Workspace {
                 alternate: RwSignal::new_local(None),
                 message: RwSignal::new_local(None),
                 handles: RefCell::new(FxHashMap::default()),
+                recent: RefCell::new(Vec::new()),
             }),
         }
     }
@@ -252,6 +256,11 @@ impl Workspace {
         }
         if let Some(previous) = previous {
             self.inner.alternate.set(Some(previous));
+        }
+        // Every file shown is a file recently opened, whichever way it was reached — the picker,
+        // the tree, the buffer line or the command line.
+        if let Some(path) = self.buffer_untracked(id).and_then(|buffer| buffer.path) {
+            self.remember(&path);
         }
         self.inner.windows.update(|windows| {
             let Some(state) = windows.get_mut(window) else {
@@ -483,6 +492,24 @@ impl Workspace {
         let window = self.focused_untracked();
         let buffer = self.buffer_in_untracked(window)?;
         self.handle_for(window, buffer)
+    }
+
+    /// Every file that has been open in this session, the most recent first.
+    ///
+    /// Kept rather than derived from the open buffers, because the point of a recent-files list is
+    /// the ones that are *not* open any more.
+    #[must_use]
+    pub fn recent(&self) -> Vec<PathBuf> {
+        self.inner.recent.borrow().clone()
+    }
+
+    /// Remembers `path` as the most recently opened.
+    pub fn remember(&self, path: &Path) {
+        let mut recent = self.inner.recent.borrow_mut();
+        recent.retain(|held| held != path);
+        recent.insert(0, path.to_path_buf());
+        // A session's worth, which is as much as anybody scrolls: this is not a history file.
+        recent.truncate(200);
     }
 
     /// Gives the keyboard back to the editor, wherever it went.

@@ -1,0 +1,189 @@
+/* The pickers.
+ *
+ * One of the few things in the application that floats, so one of the few that carries a border
+ * and a shadow. Everything else about it is the same 22px row and the same tones as the rest. */
+
+.picker__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    /* Barely there: enough that the modal reads as being in front, not so much that the file
+     * behind it stops being readable — which is half of why anybody keeps a picker open. */
+    background-color: oklch(0 0 0 / 24%);
+}
+
+.picker {
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1400px, 90%);
+    height: 72%;
+    z-index: 31;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    box-shadow: var(--zui-shadow-md);
+}
+
+/* Without a preview it does not need half the screen to say so. */
+.picker:not([data-preview="true"]) {
+    width: min(760px, 80%);
+    height: 56%;
+}
+
+/* ---- The prompt ------------------------------------------------------------------------- */
+
+.picker__prompt {
+    flex: 0 0 auto;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+}
+
+.picker__title {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--zui-color-muted-foreground);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+}
+
+.picker__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 13px;
+}
+
+/* Two classes, to out-specify the component's own scoped sheet: a field is a box everywhere else
+ * in the world, and here it is the whole modal — the border and the ring would be drawing a
+ * second frame inside the one the picker already is. The caret says where the typing goes. */
+.picker .picker__input,
+.picker .picker__input:focus,
+.picker .picker__input:focus-visible {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    outline: none;
+    background-color: transparent;
+}
+
+.picker__counts {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--zui-color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Still working: the count dims rather than a spinner appearing, because a spinner beside a
+ * number that is already moving says nothing the number did not. */
+.picker__counts[data-working="true"] {
+    opacity: 0.5;
+}
+
+/* ---- The two halves ---------------------------------------------------------------------- */
+
+.picker__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    border-top: 1px solid var(--zui-color-border);
+}
+
+.picker__list {
+    flex: 0 0 45%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.picker:not([data-preview="true"]) .picker__list {
+    flex: 1 1 auto;
+}
+
+.picker__preview {
+    flex: 1 1 55%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+    border-left: 1px solid var(--zui-color-border);
+    background-color: var(--editor-bg);
+}
+
+.picker__preview[data-empty="true"] {
+    background-color: transparent;
+}
+
+.picker__editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    background-color: var(--editor-bg);
+    color: var(--editor-fg);
+    /* No caret and no current-line band: nothing is being edited here, and both would say the
+     * opposite. */
+    --editor-current-line: transparent;
+    --editor-caret: transparent;
+}
+
+/* ---- The matches -------------------------------------------------------------------------- */
+
+.picker__row {
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    color: var(--zui-color-muted-foreground);
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.picker__row:hover {
+    background-color: var(--zui-color-accent);
+}
+
+.picker__row[data-selected="true"] {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+    box-shadow: inset 2px 0 0 0 var(--zui-color-primary);
+}
+
+ /* The path wins the room over the line beside it: a grep hit whose file has been truncated
+  * away is a hit nobody can act on, while a line trimmed at the right is still readable. */
+.picker__label {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    overflow: hidden;
+    color: var(--zui-color-foreground);
+}
+
+/* The characters the query landed on. The one place the accent colour appears in a list, which
+ * is what makes it read as an answer to what was typed rather than as decoration. */
+.picker__hit {
+    color: var(--zui-color-primary);
+    font-weight: 600;
+}
+
+.picker__detail {
+    flex: 0 1 55%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--zui-color-muted-foreground);
+    opacity: 0.75;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+}
