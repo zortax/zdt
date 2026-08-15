@@ -28,7 +28,7 @@ use zgui_editor::{Clipboard, Command, EditorHandle, InsertPoint, ScrollCmd};
 use crate::workspace::Workspace;
 
 /// The keymap the editor ships with.
-const DEFAULTS: &str = include_str!("../../../assets/keymap.toml");
+use crate::assets::KEYMAP as DEFAULTS;
 
 /// How deep a replay may go before it is refused.
 ///
@@ -59,8 +59,10 @@ pub struct Vim {
 struct Inner {
     engine: RefCell<Engine>,
     keymap: RefCell<Keymap>,
-    /// A region's own keys, in front of the base map: the tree, a picker, a terminal.
-    overlay: RefCell<Option<(String, Keymap)>>,
+    /// Each region's own keys, in front of the base map: the tree, a picker, a terminal.
+    overlays: RefCell<rustc_hash::FxHashMap<String, Keymap>>,
+    /// What a region has typed toward one of its own sequences.
+    region_keys: RefCell<Vec<Chord>>,
     workspace: Workspace,
     settings: crate::settings::Settings,
     /// How deep a replay is, so a macro that plays itself stops.
@@ -88,7 +90,8 @@ impl Vim {
             inner: Rc::new(Inner {
                 engine: RefCell::new(Engine::new()),
                 keymap: RefCell::new(keymap),
-                overlay: RefCell::new(None),
+                overlays: RefCell::new(rustc_hash::FxHashMap::default()),
+                region_keys: RefCell::new(Vec::new()),
                 workspace,
                 settings,
                 depth: std::cell::Cell::new(0),
@@ -135,11 +138,7 @@ impl Vim {
         }
 
         let keymap = self.inner.keymap.borrow();
-        let overlay = self.inner.overlay.borrow();
-        let layered = match overlay.as_ref() {
-            Some((_, map)) => Layered::new(map, &keymap),
-            None => Layered::plain(&keymap),
-        };
+        let layered = Layered::plain(&keymap);
 
         match layered.resolve(engine.mode(), keys) {
             Resolution::Pending(next) => next
@@ -175,16 +174,43 @@ impl Vim {
             .map_err(|problems| problems.iter().map(ToString::to_string).collect())
     }
 
-    /// Puts a region's own keys in front of the base map.
+    /// Puts a region's own keys in front of the base map, under `name`.
     pub fn set_overlay(&self, name: &str, keymap: Keymap) {
-        *self.inner.overlay.borrow_mut() = Some((name.to_owned(), keymap));
+        self.inner
+            .overlays
+            .borrow_mut()
+            .insert(name.to_owned(), keymap);
     }
 
-    /// Takes them off again, if `name` is what is there.
+    /// Takes them off again.
     pub fn clear_overlay(&self, name: &str) {
-        let mut overlay = self.inner.overlay.borrow_mut();
-        if overlay.as_ref().is_some_and(|(held, _)| held == name) {
-            *overlay = None;
+        self.inner.overlays.borrow_mut().remove(name);
+    }
+
+    /// Reads a region's keymap out of text, and puts it in front under `name`.
+    ///
+    /// A region's keys are a file like every other keymap, so a person can change them: `extra` is
+    /// read after `text`, which is where their own file goes.
+    pub fn load_overlay(
+        &self,
+        name: &str,
+        text: &str,
+        extra: Option<&str>,
+    ) -> Result<(), Vec<String>> {
+        let mut keymap = Keymap::new();
+        let mut problems: Vec<String> = Vec::new();
+        for source in std::iter::once(text).chain(extra) {
+            if let Err(found) = merge(&mut keymap, source, Leaders::default()) {
+                problems.extend(found.iter().map(ToString::to_string));
+            }
+        }
+        // Whatever did read is still installed: a region with most of its keys is more use than
+        // one with none, and the problems are reported either way.
+        self.set_overlay(name, keymap);
+        if problems.is_empty() {
+            Ok(())
+        } else {
+            Err(problems)
         }
     }
 
@@ -210,15 +236,64 @@ impl Vim {
         }
     }
 
+    /// Takes one key for a region that is not an editor: the tree, a picker, a terminal.
+    ///
+    /// The same keymap with that region's rows in front, resolved in normal mode — a region has no
+    /// modes of its own — and no editor to apply anything to. Answers whether the key was used.
+    pub fn key_in_region(&self, chord: Chord, region: &str) -> bool {
+        let overlay = self.inner.overlays.borrow();
+        let Some(map) = overlay.get(region) else {
+            return false;
+        };
+        let keymap = self.inner.keymap.borrow();
+        let layered = Layered::new(map, &keymap);
+
+        // A region's keys have no grammar: no counts, no operators, nothing to hold between
+        // presses but the sequence itself.
+        let mut keys = self.inner.region_keys.borrow_mut();
+        keys.push(chord);
+
+        match layered.resolve(Mode::Normal, &keys) {
+            Resolution::Pending(_) => {
+                drop(keys);
+                self.publish_region();
+                true
+            }
+            Resolution::None => {
+                keys.clear();
+                drop(keys);
+                self.publish_region();
+                false
+            }
+            Resolution::Run(binding) => {
+                let actions = binding.actions.clone();
+                keys.clear();
+                drop(keys);
+                drop(overlay);
+                drop(keymap);
+                self.publish_region();
+                for action in &actions {
+                    crate::actions::run(&self.inner.workspace, self, action, None);
+                }
+                true
+            }
+        }
+    }
+
+    /// Echoes what a region has typed so far, so which-key and the status line follow it too.
+    fn publish_region(&self) {
+        let keys = self.inner.region_keys.borrow();
+        let pending = zdt_vim::notation::format(&keys);
+        if self.inner.pending.get_untracked() != pending {
+            self.inner.pending.set(pending);
+        }
+    }
+
     /// One key, without publishing what changed.
     fn step(&self, chord: Chord, handle: &EditorHandle) -> Step {
         let engine = &self.inner.engine;
         let keymap = self.inner.keymap.borrow();
-        let overlay = self.inner.overlay.borrow();
-        let layered = match overlay.as_ref() {
-            Some((_, map)) => Layered::new(map, &keymap),
-            None => Layered::plain(&keymap),
-        };
+        let layered = Layered::plain(&keymap);
 
         handle.query(|snapshot| {
             let selections: Vec<Selection> = snapshot
@@ -364,7 +439,7 @@ impl Vim {
             self.replay(&keys, handle);
             return;
         }
-        crate::actions::run(&self.inner.workspace, self, action, handle);
+        crate::actions::run(&self.inner.workspace, self, action, Some(handle));
     }
 
     /// Plays `keys` as though they had been typed.

@@ -7,15 +7,19 @@
 //! An action nobody has written yet says so in the status line rather than doing nothing, which is
 //! what makes a half-built editor say which half.
 
+use std::path::PathBuf;
+
 use zdt_vim::Action;
 use zgui_editor::EditorHandle;
 
+use crate::explorer::Explorer;
+use crate::prompt::Prompt;
 use crate::settings::Settings;
 use crate::vim::Vim;
 use crate::workspace::{Axis, Workspace};
 
 /// Carries out `action`.
-pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: &EditorHandle) {
+pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&EditorHandle>) {
     let leaf = action.leaf();
     let args = &action.args;
 
@@ -24,6 +28,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: &EditorHan
         "window" => window(workspace, vim, leaf, args),
         "app" => app(workspace, leaf),
         "editor" => editor(handle, leaf),
+        "tree" => tree(workspace, leaf, args),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.
@@ -212,9 +217,311 @@ fn ui(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
     }
 }
 
+/// The file tree.
+///
+/// Everything that touches the filesystem goes through a worker and reports back, because a
+/// directory copy on the interface thread is a frozen window.
+fn tree(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
+    let Some(explorer) = zgui::reactive::use_local_context::<Explorer>() else {
+        return;
+    };
+
+    match leaf {
+        "toggle" => explorer.toggle(),
+        "focus" => explorer.focus(),
+        "close" => {
+            explorer.close();
+            workspace.focus_editor();
+        }
+        "leave" => {
+            explorer.unfocus();
+            workspace.focus_editor();
+        }
+        "down" => explorer.move_by(1),
+        "up" => explorer.move_by(-1),
+        "first" => explorer.go_to(0),
+        "last" => explorer.go_to(usize::MAX),
+        "parent_or_close" => explorer.parent_or_close(),
+        "child_or_open" => {
+            if let Some(path) = explorer.open_selected() {
+                crate::files::open(workspace, path);
+                // Opening a file gives the keyboard back, the way `<CR>` in neo-tree does.
+                explorer.unfocus();
+                workspace.focus_editor();
+            }
+        }
+        "refresh" => explorer.refresh(),
+        "reveal" => {
+            if let Some(path) = workspace.current_buffer().and_then(|buffer| buffer.path) {
+                explorer.focus();
+                explorer.reveal(&path);
+            }
+        }
+        // Both go through the settings rather than the tree, because the tree follows the
+        // settings — writing to the tree directly would be undone the next time anything else
+        // changed.
+        "toggle_hidden" => {
+            let now = with_settings(|config| {
+                config.tree.hidden = !config.tree.hidden;
+                config.tree.hidden
+            });
+            if let Some(now) = now {
+                workspace.say(if now {
+                    "hidden files on"
+                } else {
+                    "hidden files off"
+                });
+            }
+        }
+        "toggle_ignored" => {
+            let now = with_settings(|config| {
+                config.tree.ignored = !config.tree.ignored;
+                config.tree.ignored
+            });
+            if let Some(now) = now {
+                workspace.say(if now {
+                    "ignored files on"
+                } else {
+                    "ignored files off"
+                });
+            }
+        }
+        "copy_path" => {
+            if let Some(row) = explorer.selected() {
+                let path = row.entry.path.display().to_string();
+                zgui::runtime::clipboard::use_clipboard()
+                    .set_text(zgui::platform::ClipboardKind::Standard, path.clone());
+                workspace.say(path);
+            }
+        }
+        "copy" | "cut" => {
+            let cut = leaf == "cut";
+            if let Some(path) = explorer.hold(cut) {
+                workspace.say(format!(
+                    "{} {}",
+                    if cut { "cut" } else { "copied" },
+                    path.file_name().unwrap_or_default().to_string_lossy()
+                ));
+            }
+        }
+        "paste" => paste(workspace, &explorer),
+        "create" => create(workspace, &explorer, args.flag("directory")),
+        "rename" => rename(workspace, &explorer),
+        "delete" => delete(workspace, &explorer),
+        "system_open" => {
+            if let Some(row) = explorer.selected() {
+                let path = row.entry.path.clone();
+                crate::task::detached(async move {
+                    zgui::task::blocking(move || {
+                        let _ = std::process::Command::new("xdg-open").arg(&path).spawn();
+                    })
+                    .await;
+                });
+            }
+        }
+        other => workspace.say(format!("tree.{other} is not built yet")),
+    }
+}
+
+/// Changes a setting and answers what it became, when there are settings to change.
+fn with_settings<T>(change: impl FnOnce(&mut zdt_core::Config) -> T) -> Option<T> {
+    let settings = zgui::reactive::use_local_context::<Settings>()?;
+    let mut answer = None;
+    settings.update(|config| answer = Some(change(config)));
+    answer
+}
+
+/// Asks for a name, then makes one.
+fn create(workspace: &Workspace, explorer: &Explorer, directory: bool) {
+    let target = explorer.target_directory();
+    let title = if directory {
+        format!("New directory in {}", short(workspace, &target))
+    } else {
+        format!("New file in {}", short(workspace, &target))
+    };
+    ask(workspace, explorer, title, String::new(), move |name| {
+        let path = target.join(name.trim_end_matches('/'));
+        // A name ending in a separator is a directory, which is how neo-tree's `a` makes one.
+        let directory = directory || name.ends_with('/');
+        let made = path.clone();
+        (
+            Box::new(move || zdt_core::paths::create(&path, directory).map(|_| ()))
+                as Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+            Some(made),
+        )
+    });
+}
+
+/// Asks for a new name, then moves it.
+fn rename(workspace: &Workspace, explorer: &Explorer) {
+    let Some(row) = explorer.selected() else {
+        return;
+    };
+    let from = row.entry.path.clone();
+    let parent = from
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .unwrap_or_default();
+    ask(
+        workspace,
+        explorer,
+        format!("Rename {}", row.entry.name),
+        row.entry.name.clone(),
+        move |name| {
+            // Cloned per call: the prompt's answer is typed as callable more than once, even
+            // though it only ever is once.
+            let from = from.clone();
+            let to = parent.join(name);
+            let landed = to.clone();
+            (
+                Box::new(move || zdt_core::paths::rename(&from, &to))
+                    as Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+                Some(landed),
+            )
+        },
+    );
+}
+
+/// Asks whether, then removes it.
+fn delete(workspace: &Workspace, explorer: &Explorer) {
+    let Some(row) = explorer.selected() else {
+        return;
+    };
+    let path = row.entry.path.clone();
+    // Typed confirmation rather than a dialog: the keyboard is already in the tree, and a dialog
+    // that takes it away is a dialog people dismiss without reading.
+    ask(
+        workspace,
+        explorer,
+        format!("Delete {}? (y/n)", row.entry.name),
+        String::new(),
+        move |answer| {
+            let path = path.clone();
+            if !answer.eq_ignore_ascii_case("y") && !answer.eq_ignore_ascii_case("yes") {
+                return (
+                    Box::new(|| Ok(())) as Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+                    None,
+                );
+            }
+            (
+                Box::new(move || zdt_core::paths::remove(&path))
+                    as Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+                None,
+            )
+        },
+    );
+}
+
+/// Puts what was held into the selected directory.
+fn paste(workspace: &Workspace, explorer: &Explorer) {
+    let Some(held) = explorer.clipboard() else {
+        workspace.complain("nothing to paste");
+        return;
+    };
+    let target = explorer.target_directory().join(
+        held.path
+            .file_name()
+            .map(std::ffi::OsStr::to_os_string)
+            .unwrap_or_default(),
+    );
+    if target == held.path {
+        // Pasting into the directory it already sits in means a copy beside it, not an error.
+        if held.cut {
+            explorer.release();
+            return;
+        }
+    }
+
+    let from = held.path.clone();
+    let cut = held.cut;
+    let explorer = explorer.clone();
+    let workspace = workspace.clone();
+    crate::task::detached(async move {
+        let done = zgui::task::blocking(move || {
+            let to = zdt_core::paths::free_name(&target);
+            if cut {
+                zdt_core::paths::rename(&from, &to).map(|()| to)
+            } else {
+                zdt_core::paths::copy(&from, &to).map(|()| to)
+            }
+        })
+        .await;
+        match done {
+            Ok(landed) => {
+                if cut {
+                    explorer.release();
+                }
+                explorer.refresh();
+                workspace.say(format!(
+                    "{} {}",
+                    if cut { "moved to" } else { "copied to" },
+                    landed.display()
+                ));
+            }
+            Err(error) => workspace.complain(error.to_string()),
+        }
+    });
+}
+
+/// The shape every tree prompt has: ask, do the work on a worker, refresh, report.
+///
+/// `plan` turns the answer into the work and, when there is one, the path the caret should land
+/// on afterwards. It runs on the interface thread; only what it returns crosses to the worker.
+fn ask<F>(workspace: &Workspace, explorer: &Explorer, title: String, start: String, plan: F)
+where
+    F: Fn(
+            &str,
+        ) -> (
+            Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+            Option<PathBuf>,
+        ) + 'static,
+{
+    let Some(prompt) = zgui::reactive::use_local_context::<Prompt>() else {
+        return;
+    };
+    let explorer = explorer.clone();
+    let workspace = workspace.clone();
+    prompt.ask(title, start, move |answer| {
+        let (work, landing) = plan(answer);
+        let explorer = explorer.clone();
+        let workspace = workspace.clone();
+        // Detached, because submitting the prompt is what closed it: a task belonging to the
+        // prompt would be cancelled before the file was ever made.
+        crate::task::detached(async move {
+            match zgui::task::blocking(work).await {
+                Ok(()) => {
+                    explorer.refresh();
+                    if let Some(landing) = landing {
+                        explorer.reveal(&landing);
+                    }
+                }
+                Err(error) => workspace.complain(error.to_string()),
+            }
+            explorer.focus();
+        });
+    });
+}
+
+/// A path as it reads in a message: relative to the project when it is under it.
+///
+/// The project root itself is relative to nothing, so it reads as its own name rather than as the
+/// empty string that "relative to here" literally comes to.
+fn short(workspace: &Workspace, path: &std::path::Path) -> String {
+    let relative = workspace.project().relative(path).into_owned();
+    if relative.is_empty() {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string())
+    } else {
+        relative
+    }
+}
+
 /// The few things that are the editor's own.
-fn editor(handle: &EditorHandle, leaf: &str) {
-    if leaf == "focus" {
+fn editor(handle: Option<&EditorHandle>, leaf: &str) {
+    if leaf == "focus"
+        && let Some(handle) = handle
+    {
         handle.focus();
     }
 }

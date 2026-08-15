@@ -69,7 +69,8 @@ pub const SETTINGS_SHEET: &str = "zdt-settings";
 #[must_use]
 pub fn settings_sheet(config: &zdt_core::Config) -> String {
     format!(
-        ":root {{\n  --zdt-ui-font: \"{ui}\";\n  font-size: {ui_size}px;\n}}\n\
+        ":root {{\n  --zdt-ui-font: \"{ui}\";\n  font-size: {ui_size}px;\n  \
+         --tree-width: {tree_width}px;\n}}\n\
          .pane__editor {{\n  --zdt-editor-font: \"{editor}\";\n  font-size: {editor_size}px;\n  \
          tab-size: {tab};\n}}\n",
         ui = config.ui.font,
@@ -77,6 +78,7 @@ pub fn settings_sheet(config: &zdt_core::Config) -> String {
         editor = config.editor.font,
         editor_size = config.editor.font_size,
         tab = config.editor.tab_size,
+        tree_width = config.tree.width,
     )
 }
 

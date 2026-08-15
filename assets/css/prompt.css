@@ -1,0 +1,38 @@
+/* The one-line question.
+ *
+ * One of the few things in the application that floats, so one of the few that carries a border
+ * and a shadow. */
+
+.prompt {
+    position: absolute;
+    top: 22%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, 70%);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+    padding: calc(var(--zui-space-base) * 3);
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    box-shadow: var(--zui-shadow-md);
+}
+
+.prompt__title {
+    font-size: 11px;
+    color: var(--zui-color-muted-foreground);
+    padding: 0 var(--zui-space-base);
+}
+
+.prompt__input {
+    height: 24px;
+    /* No ring: the panel already floats above everything, and nothing else here is focusable, so
+     * a focus ring would be saying what the caret has already said. */
+    box-shadow: none;
+    outline: none;
+    font-size: 12px;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    border-radius: calc(var(--zui-radius-base) - 2px);
+}

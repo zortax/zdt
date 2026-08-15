@@ -1428,6 +1428,12 @@ keys = "<Leader>o"
 action = "tree.focus"
 desc = "Focus explorer"
 
+[[map]]
+mode = ["n"]
+keys = "<Leader>E"
+action = "tree.reveal"
+desc = "Reveal this file"
+
 # ---- Terminals -------------------------------------------------------------------------------------
 
 [[map]]

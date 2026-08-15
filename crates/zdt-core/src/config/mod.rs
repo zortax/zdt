@@ -23,7 +23,7 @@ mod schema;
 use std::path::{Path, PathBuf};
 
 pub use crate::config::schema::{
-    Config, Editor, Keys, LineNumbers, Lsp, Picker, Scheme, Server, Terminal, Ui,
+    Config, Editor, Keys, LineNumbers, Lsp, Picker, Scheme, Server, Terminal, Tree, Ui,
 };
 
 /// Where the configuration directory is.
@@ -70,6 +70,12 @@ impl Paths {
         self.root.join("keymap.toml")
     }
 
+    /// The file tree's own keys, read after the shipped ones.
+    #[must_use]
+    pub fn tree_keymap(&self) -> PathBuf {
+        self.root.join("keymap-tree.toml")
+    }
+
     /// The style sheet installed after everything else.
     #[must_use]
     pub fn user_css(&self) -> PathBuf {
@@ -100,6 +106,7 @@ impl Paths {
         vec![
             self.config(),
             self.keymap(),
+            self.tree_keymap(),
             self.user_css(),
             self.themes(),
         ]
@@ -234,9 +241,10 @@ mod tests {
         let paths = Paths::at("/home/someone/.config/zdt");
         assert!(paths.config().ends_with("config.toml"));
         assert!(paths.keymap().ends_with("keymap.toml"));
+        assert!(paths.tree_keymap().ends_with("keymap-tree.toml"));
         assert!(paths.user_css().ends_with("user.css"));
         assert!(paths.themes().ends_with("themes"));
-        assert_eq!(paths.watched().len(), 4);
+        assert_eq!(paths.watched().len(), 5);
     }
 
     #[test]

@@ -13,8 +13,16 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/frame.css"),
     include_str!("../../../assets/css/chrome.css"),
     include_str!("../../../assets/css/panes.css"),
+    include_str!("../../../assets/css/tree.css"),
+    include_str!("../../../assets/css/prompt.css"),
     include_str!("../../../assets/css/whichkey.css"),
 ];
+
+/// The keymap the editor ships with.
+pub const KEYMAP: &str = include_str!("../../../assets/keymap.toml");
+
+/// The file tree's own keys, read in front of the base map while the keyboard is in the panel.
+pub const TREE_KEYMAP: &str = include_str!("../../../assets/keymap-tree.toml");
 
 /// Every compiled-in style sheet, joined.
 #[must_use]

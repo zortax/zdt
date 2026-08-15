@@ -13,12 +13,16 @@ use zgui::reactive::{LocalStorage, RenderEffect, RwSignal};
 use zgui::{component, view};
 use zgui_ui_tokens::ColorScheme;
 
+use crate::explorer::Explorer;
+use crate::prompt::Prompt;
 use crate::settings::Settings;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::frame::FrameProps;
 use crate::ui::panes::PanesProps;
+use crate::ui::prompt::PromptProps;
 use crate::ui::statusline::StatusLineProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
+use crate::ui::tree::ExplorerProps;
 use crate::ui::whichkey::WhichKeyProps;
 use crate::vim::Vim;
 use crate::workspace::{self, Workspace};
@@ -35,7 +39,7 @@ pub fn Root(
     let (settings, problem) = Settings::load(paths.clone());
     crate::settings::provide(settings.clone());
 
-    let space = Workspace::new(project);
+    let space = Workspace::new(project.clone());
     workspace::provide(space.clone());
     if let Some(problem) = problem {
         space.complain(problem);
@@ -43,6 +47,30 @@ pub fn Root(
 
     let vim = Vim::new(space.clone(), settings.clone());
     zgui::reactive::provide_local_context(vim.clone());
+
+    // The tree's own keys, in front of the base map while the keyboard is in the panel. Shipped
+    // rather than optional: without them `j` in the tree would be the editor's `j`.
+    apply_tree_keymap(&vim, &space, paths.as_ref());
+
+    let explorer = Explorer::new(
+        project.root().to_path_buf(),
+        settings.with(|config| zdt_core::tree::Filter {
+            hidden: config.tree.hidden,
+            ignored: config.tree.ignored,
+        }),
+    );
+    crate::explorer::provide(explorer.clone());
+    if settings.with(|config| config.tree.open) {
+        explorer.toggle();
+    }
+
+    crate::prompt::provide(Prompt::new());
+
+    // The tree keeps up with the editor, and with the settings.
+    let following_buffer = follow_buffer(&explorer, &space, &settings);
+    on_cleanup_local(move || drop(following_buffer));
+    let following_filter = follow_filter(&explorer, &settings);
+    on_cleanup_local(move || drop(following_filter));
 
     // A person's own keymap, read after the shipped one so a row in it replaces the shipped row
     // for the same keys.
@@ -108,7 +136,11 @@ pub fn Root(
         ZdtTheme(theme = theme, scheme = scheme) {
             Frame {
                 Chrome()
-                Panes()
+                row(class = "frame__body") {
+                    Explorer()
+                    Panes()
+                }
+                Prompt()
                 WhichKey()
                 StatusLine()
             }
@@ -126,6 +158,50 @@ fn read_theme(settings: &Settings) -> ThemeSource {
     })
 }
 
+/// Moves the tree's caret onto whatever the editor is showing.
+///
+/// Only while the panel is open, because opening the way to a file reads every directory along it
+/// and there is no reason to pay that for a panel nobody is looking at.
+fn follow_buffer(explorer: &Explorer, space: &Workspace, settings: &Settings) -> RenderEffect<()> {
+    let (explorer, space, settings) = (explorer.clone(), space.clone(), settings.clone());
+    RenderEffect::new(move |_| {
+        let path = space.current_buffer().and_then(|buffer| buffer.path);
+        if !explorer.is_open() || !settings.with(|config| config.tree.follow) {
+            return;
+        }
+        // Not while the keyboard is in the panel: a caret that jumps out from under somebody
+        // walking the tree is worse than one that is a file behind.
+        if explorer.is_focused_untracked() {
+            return;
+        }
+        if let Some(path) = path {
+            explorer.reveal(&path);
+        }
+    })
+}
+
+/// Keeps what the tree shows in step with the settings.
+fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
+    let (explorer, settings) = (explorer.clone(), settings.clone());
+    RenderEffect::new(move |_| {
+        let wanted = settings.with(|config| zdt_core::tree::Filter {
+            hidden: config.tree.hidden,
+            ignored: config.tree.ignored,
+        });
+        if explorer.filter() != wanted {
+            explorer.set_filter(wanted);
+        }
+    })
+}
+
+/// The file tree's keys: the shipped ones, then a person's own on top.
+fn apply_tree_keymap(vim: &Vim, space: &Workspace, paths: Option<&Paths>) {
+    let theirs = paths.and_then(|paths| zdt_core::config::read_optional(&paths.tree_keymap()));
+    if let Err(problems) = vim.load_overlay("tree", crate::assets::TREE_KEYMAP, theirs.as_deref()) {
+        space.complain(format!("keymap-tree.toml: {}", problems.join("; ")));
+    }
+}
+
 /// Reads a person's keymap on top of the shipped one, saying what did not read.
 fn apply_keymap(vim: &Vim, space: &Workspace, paths: &Paths, settings: &Settings) {
     let Some(text) = zdt_core::config::read_optional(&paths.keymap()) else {
@@ -139,12 +215,8 @@ fn apply_keymap(vim: &Vim, space: &Workspace, paths: &Paths, settings: &Settings
 
 /// What `<Leader>` and `<LocalLeader>` stand for, as the settings say.
 fn leaders_from(settings: &Settings) -> zdt_vim::Leaders {
-    let (leader, local) = settings.with(|config| {
-        (
-            config.keys.leader.clone(),
-            config.keys.local_leader.clone(),
-        )
-    });
+    let (leader, local) =
+        settings.with(|config| (config.keys.leader.clone(), config.keys.local_leader.clone()));
     let default = zdt_vim::Leaders::default();
     let one = |text: &str, fallback| {
         zdt_vim::notation::parse(text, default)
@@ -193,6 +265,7 @@ fn reload(
             space.complain(format!("keymap.toml: {}", problems.join("; ")));
         }
 
+        apply_tree_keymap(&vim, &space, Some(&paths));
         theme.set(read_theme(&settings));
         crate::ui::theme::install_user_css(reloaded.user_css.as_deref());
 

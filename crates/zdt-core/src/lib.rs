@@ -6,11 +6,14 @@
 pub mod config;
 pub mod fs;
 pub mod language;
+pub mod paths;
 pub mod project;
 pub mod theme;
+pub mod tree;
 
 pub use crate::config::{Config, Paths};
 pub use crate::fs::{Encoding, FileError, LineEnding, LoadedFile};
 pub use crate::language::FileType;
 pub use crate::project::Project;
 pub use crate::theme::{ThemeSource, builtin_theme, builtin_theme_names};
+pub use crate::tree::Tree;

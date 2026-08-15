@@ -485,6 +485,13 @@ impl Workspace {
         self.handle_for(window, buffer)
     }
 
+    /// Gives the keyboard back to the editor, wherever it went.
+    pub fn focus_editor(&self) {
+        if let Some(handle) = self.current_handle() {
+            handle.focus();
+        }
+    }
+
     // ---- Saying things ----------------------------------------------------------------------
 
     /// Says something in the status line.

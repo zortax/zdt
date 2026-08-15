@@ -1,0 +1,143 @@
+# The file tree's own keys.
+#
+# Read as an overlay in front of the ordinary keymap: the tree answers first, and everything it
+# says nothing about — `<Leader>ff`, `<C-w>l` — still works while the tree has the keyboard.
+#
+# The bindings mirror neo-tree's, because those are the ones the hands already know.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "tree.down"
+desc = "Down"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "tree.up"
+desc = "Up"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "tree.down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "tree.up"
+
+[[map]]
+mode = ["n"]
+keys = "h"
+action = "tree.parent_or_close"
+desc = "Close, or go to the parent"
+
+[[map]]
+mode = ["n"]
+keys = "l"
+action = "tree.child_or_open"
+desc = "Open"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "tree.child_or_open"
+desc = "Open"
+
+[[map]]
+mode = ["n"]
+keys = "gg"
+action = "tree.first"
+desc = "First"
+
+[[map]]
+mode = ["n"]
+keys = "G"
+action = "tree.last"
+desc = "Last"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "tree.create"
+desc = "New file"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "tree.create"
+args = { directory = true }
+desc = "New directory"
+
+[[map]]
+mode = ["n"]
+keys = "d"
+action = "tree.delete"
+desc = "Delete"
+
+[[map]]
+mode = ["n"]
+keys = "r"
+action = "tree.rename"
+desc = "Rename"
+
+[[map]]
+mode = ["n"]
+keys = "y"
+action = "tree.copy"
+desc = "Copy"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "tree.cut"
+desc = "Cut"
+
+[[map]]
+mode = ["n"]
+keys = "p"
+action = "tree.paste"
+desc = "Paste"
+
+[[map]]
+mode = ["n"]
+keys = "Y"
+action = "tree.copy_path"
+desc = "Copy the path"
+
+[[map]]
+mode = ["n"]
+keys = "R"
+action = "tree.refresh"
+desc = "Refresh"
+
+[[map]]
+mode = ["n"]
+keys = "H"
+action = "tree.toggle_hidden"
+desc = "Toggle hidden files"
+
+[[map]]
+mode = ["n"]
+keys = "I"
+action = "tree.toggle_ignored"
+desc = "Toggle ignored files"
+
+[[map]]
+mode = ["n"]
+keys = "O"
+action = "tree.system_open"
+desc = "Open with the desktop"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "tree.close"
+desc = "Close the explorer"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "tree.leave"
+desc = "Back to the editor"

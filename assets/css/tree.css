@@ -1,0 +1,100 @@
+/* The file tree.
+ *
+ * A plane, not a panel: it is told apart from the editor by tone, and there is no line between
+ * them. Rows are 22px, which is the same as every other row in the application. */
+
+.tree {
+    width: var(--tree-width, 260px);
+    min-width: 160px;
+    max-width: 480px;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--zui-color-surface);
+    color: var(--zui-color-muted-foreground);
+    font-size: 12px;
+    user-select: none;
+}
+
+.tree:not([data-open="true"]) {
+    display: none;
+}
+
+.tree:focus,
+.tree:focus-visible {
+    outline: none;
+}
+
+.tree__head {
+    height: var(--chrome, 30px);
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    color: var(--zui-color-muted-foreground);
+}
+
+.tree__root {
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+}
+
+.tree__rows {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.tree__row {
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding-right: calc(var(--zui-space-base) * 2);
+    border-radius: 0;
+    color: var(--zui-color-muted-foreground);
+    white-space: nowrap;
+}
+
+.tree__row[data-directory="true"] .tree__name {
+    color: var(--zui-color-foreground);
+}
+
+.tree__row:hover {
+    background-color: var(--zui-color-accent);
+}
+
+/* The caret row.
+ *
+ * Tone, and a bar down the left edge — not a filled block. A filled selection would have to win
+ * against each row's own filetype colour, and a glyph the same hue as the fill behind it is a
+ * glyph nobody can see. The bar says which row is live without touching anything's colour. */
+.tree__row[data-selected="true"] {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.tree[data-focused="true"] .tree__row[data-selected="true"] {
+    box-shadow: inset 2px 0 0 0 var(--zui-color-primary);
+}
+
+.tree[data-focused="true"] .tree__row[data-selected="true"] .tree__name {
+    color: var(--zui-color-foreground);
+    font-weight: 500;
+}
+
+.tree__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.glyph {
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    width: 14px;
+    text-align: center;
+    flex: 0 0 auto;
+}

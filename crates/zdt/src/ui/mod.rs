@@ -4,8 +4,10 @@ pub mod chrome;
 pub mod frame;
 pub mod pane;
 pub mod panes;
+pub mod prompt;
 pub mod statusline;
 pub mod theme;
+pub mod tree;
 pub mod whichkey;
 
 use zgui::prelude::*;

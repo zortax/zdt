@@ -22,6 +22,8 @@ pub struct Config {
     pub terminal: Terminal,
     /// How the pickers search.
     pub picker: Picker,
+    /// What the file tree shows.
+    pub tree: Tree,
     /// Which keys are the leaders.
     pub keys: Keys,
     /// The language servers, by the name they are known as.
@@ -179,6 +181,34 @@ impl Default for Picker {
             smart_case: true,
             ignored: false,
             hidden: false,
+        }
+    }
+}
+
+/// What the file tree shows.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Tree {
+    /// Whether it opens with the window.
+    pub open: bool,
+    /// How wide it is, in pixels.
+    pub width: u32,
+    /// Whether to show what begins with a dot.
+    pub hidden: bool,
+    /// Whether to show what git ignores.
+    pub ignored: bool,
+    /// Whether to move the tree's caret onto the file the editor shows.
+    pub follow: bool,
+}
+
+impl Default for Tree {
+    fn default() -> Self {
+        Self {
+            open: false,
+            width: 260,
+            hidden: false,
+            ignored: false,
+            follow: true,
         }
     }
 }

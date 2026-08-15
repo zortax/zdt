@@ -49,7 +49,10 @@ pub fn watch(paths: &Paths, changed: impl Fn() + 'static) -> Option<Watcher> {
     // and a watch on the file itself would follow the one that was renamed away. A directory that
     // is not there is not an error — somebody who has never configured anything has none, and may
     // make one later; the editor notices at the next start.
-    if watcher.watch(&paths.root, RecursiveMode::Recursive).is_err() {
+    if watcher
+        .watch(&paths.root, RecursiveMode::Recursive)
+        .is_err()
+    {
         return None;
     }
 
