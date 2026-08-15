@@ -203,6 +203,13 @@ fn BufferView(
                 on_cleanup_local(move || drop(following));
             }
 
+            // And what git says, in a layer of its own beside them.
+            if let Some(git) = zgui::reactive::use_local_context::<crate::git::Git>() {
+                let following =
+                    crate::ui::diagnostics::follow_git(&workspace, &git, window, buffer);
+                on_cleanup_local(move || drop(following));
+            }
+
             // The settings that the editor can be told about after it is mounted. The rest — the
             // fonts, the tab width — are CSS and reach it through the cascade.
             {

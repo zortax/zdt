@@ -177,6 +177,16 @@ pub fn save_as(
                 if let Some(entry) = workspace.buffer_untracked(buffer) {
                     entry.saved_revision.set(revision);
                 }
+                // The servers hear about the save, and the signs are worked out again from what
+                // is now on disk.
+                if let Some(language) =
+                    zgui::reactive::use_local_context::<crate::language::Language>()
+                {
+                    language.saved(buffer);
+                }
+                if let Some(git) = zgui::reactive::use_local_context::<crate::git::Git>() {
+                    git.refresh_soon(buffer);
+                }
                 workspace.say(format!("{} written", path.display()));
             }
             Err(error) => workspace.complain(error.to_string()),

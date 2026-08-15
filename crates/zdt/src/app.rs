@@ -14,6 +14,7 @@ use zgui::{component, view};
 use zgui_ui_tokens::ColorScheme;
 
 use crate::explorer::Explorer;
+use crate::git::Git;
 use crate::language::Language;
 use crate::picker::Picker;
 use crate::prompt::Prompt;
@@ -79,6 +80,10 @@ pub fn Root(
     crate::language::provide(language.clone());
     let servers = follow_buffers(&language, &space);
     on_cleanup_local(move || drop(servers));
+
+    // What git says about the open files.
+    let git = Git::new(space.clone());
+    crate::git::provide(git.clone());
 
     // The keys leap labels are drawn from, and again whenever the settings change.
     let alphabet = {
@@ -198,6 +203,9 @@ fn follow_buffers(language: &Language, workspace: &Workspace) -> RenderEffect<Ve
         for id in &order {
             if !previous.contains(id) {
                 language.opened(*id);
+                if let Some(git) = zgui::reactive::use_local_context::<crate::git::Git>() {
+                    git.refresh(*id);
+                }
             }
         }
         for id in &previous {

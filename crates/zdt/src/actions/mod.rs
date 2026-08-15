@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 
+mod git;
 mod lsp;
 
 use zdt_vim::Action;
@@ -18,7 +19,7 @@ use crate::explorer::Explorer;
 use crate::prompt::Prompt;
 use crate::settings::Settings;
 use crate::vim::Vim;
-use crate::workspace::{Axis, Workspace};
+use crate::workspace::{Axis, Direction, Workspace};
 
 /// Carries out `action`.
 pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&EditorHandle>) {
@@ -35,6 +36,8 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "picker" => picker(workspace, leaf, args, handle),
         "terminal" => terminal(workspace, vim, leaf, args),
         "lsp" => lsp::run(workspace, leaf, handle),
+        "git" => git::run(workspace, leaf, handle),
+        "session" => session(workspace, leaf, handle),
         "diagnostic" => lsp::diagnostic(workspace, leaf, handle),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
@@ -140,14 +143,112 @@ fn window(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::Args) {
             workspace.cycle_window(true);
             vim.reset();
         }
-        // Which window is left, below, above or right of this one needs the geometry of the frame
-        // that was drawn, which the panes know and this does not yet.
         "focus" => {
-            workspace.cycle_window(!matches!(args.str("direction"), Some("left" | "up")));
-            vim.reset();
+            let moved = match args.str("direction").and_then(Direction::named) {
+                Some(direction) => workspace.focus_direction(direction),
+                // No direction named: `<C-w>w`, which walks the windows in order.
+                None => {
+                    workspace.cycle_window(true);
+                    true
+                }
+            };
+            if moved {
+                vim.reset();
+            }
         }
         other => workspace.say(format!("window.{other} is not built yet")),
     }
+}
+
+/// The sessions.
+///
+/// A session is the files that were open and where the caret was in each, kept under the project's
+/// own name so that "the session for this project" needs nothing remembered.
+fn session(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
+    use crate::session::{self, Entry, Session};
+
+    let paths = zgui::reactive::use_local_context::<Settings>()
+        .and_then(|settings| settings.paths().cloned());
+    let Some(paths) = paths else {
+        workspace.complain("there is nowhere to keep sessions");
+        return;
+    };
+    let root = workspace.project().root().to_path_buf();
+
+    match leaf {
+        "save" => {
+            let order = workspace.order();
+            let current = workspace.current_buffer().map(|buffer| buffer.id);
+            let mut files = Vec::new();
+            let mut showing = 0;
+
+            for id in order {
+                let Some(buffer) = workspace.buffer_untracked(id) else {
+                    continue;
+                };
+                let Some(path) = buffer.path.clone() else {
+                    continue;
+                };
+                if Some(id) == current {
+                    showing = files.len();
+                }
+                // The caret of the window showing it, when one is; otherwise the top.
+                let line = workspace
+                    .handle_for(workspace.focused_untracked(), id)
+                    .map_or(1, |handle| {
+                        handle.query(|snapshot| {
+                            let caret = snapshot.selections().primary().head;
+                            snapshot.rope().byte_to_line(caret) as u64 + 1
+                        })
+                    });
+                files.push(Entry {
+                    path: workspace.project().relative(&path).into_owned().into(),
+                    line,
+                });
+            }
+
+            let saved = Session {
+                root,
+                files,
+                showing,
+            };
+            match session::save(&paths, &saved) {
+                Ok(path) => workspace.say(format!("session saved to {}", path.display())),
+                Err(error) => workspace.complain(error.to_string()),
+            }
+        }
+        "load" | "load_here" => match session::load(&paths, &root) {
+            Ok(session) => restore(workspace, &session),
+            Err(error) => workspace.complain(error.to_string()),
+        },
+        "load_last" => match session::most_recent(&paths) {
+            Some(session) => restore(workspace, &session),
+            None => workspace.say("no sessions"),
+        },
+        "delete" => match session::delete(&paths, &root) {
+            Ok(()) => workspace.say("session deleted"),
+            Err(error) => workspace.complain(error.to_string()),
+        },
+        other => workspace.say(format!("session.{other} is not built yet")),
+    }
+    let _ = handle;
+}
+
+/// Opens everything a session names, and shows what it was showing.
+fn restore(workspace: &Workspace, session: &crate::session::Session) {
+    if session.files.is_empty() {
+        workspace.say("that session has nothing in it");
+        return;
+    }
+    for entry in &session.files {
+        crate::files::open_at(workspace, session.absolute(entry), Some(entry.line));
+    }
+    // The one that was showing goes last, so it is the one left on screen — every open before it
+    // showed itself on the way past.
+    if let Some(entry) = session.files.get(session.showing) {
+        crate::files::open_at(workspace, session.absolute(entry), Some(entry.line));
+    }
+    workspace.say(format!("{} files", session.files.len()));
 }
 
 /// The application itself.

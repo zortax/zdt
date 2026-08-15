@@ -9,6 +9,7 @@ pub mod app;
 pub mod assets;
 pub mod explorer;
 pub mod files;
+pub mod git;
 // The icon set is chosen as a set: an outline drawn only by a region built later is still part of
 // it, and the props of `Icon` are its contract whether or not a caller has needed one yet.
 #[allow(dead_code)]
@@ -19,6 +20,7 @@ pub mod leap;
 pub mod picker;
 pub mod prompt;
 pub mod reload;
+pub mod session;
 pub mod settings;
 pub mod task;
 pub mod terminals;

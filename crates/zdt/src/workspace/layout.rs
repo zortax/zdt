@@ -32,6 +32,48 @@ impl Axis {
     }
 }
 
+/// Which way `<C-w>h` and its neighbours look.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Direction {
+    /// `<C-w>h`.
+    Left,
+    /// `<C-w>l`.
+    Right,
+    /// `<C-w>k`.
+    Up,
+    /// `<C-w>j`.
+    Down,
+}
+
+impl Direction {
+    /// Which the direction a split has to divide along for this to cross it.
+    #[must_use]
+    pub const fn axis(self) -> Axis {
+        match self {
+            Self::Left | Self::Right => Axis::Horizontal,
+            Self::Up | Self::Down => Axis::Vertical,
+        }
+    }
+
+    /// Whether it looks toward the later children of a split rather than the earlier ones.
+    #[must_use]
+    pub const fn forward(self) -> bool {
+        matches!(self, Self::Right | Self::Down)
+    }
+
+    /// The direction a keymap's argument names, when it names one.
+    #[must_use]
+    pub fn named(name: &str) -> Option<Self> {
+        Some(match name {
+            "left" => Self::Left,
+            "right" => Self::Right,
+            "up" => Self::Up,
+            "down" => Self::Down,
+            _ => return None,
+        })
+    }
+}
+
 /// The arrangement of windows.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Layout {
@@ -54,6 +96,83 @@ impl Layout {
         let mut found = Vec::new();
         self.collect(&mut found);
         found
+    }
+
+    /// The window `direction` of `from`, when there is one.
+    ///
+    /// Worked out from the tree rather than from where things ended up on screen: the nearest
+    /// ancestor split that divides the right way is crossed, and the sibling on the other side is
+    /// entered at its nearest edge. That is what vim does with a tree of splits, and it needs no
+    /// geometry — which matters, because the geometry is not known until after a frame is drawn.
+    #[must_use]
+    pub fn neighbour(&self, from: WindowId, direction: Direction) -> Option<WindowId> {
+        let mut path = Vec::new();
+        if !self.path_to(from, &mut path) {
+            return None;
+        }
+
+        // Climbing from the window: the first split that divides the way this direction crosses,
+        // and has a sibling that way, is the one to step through.
+        for depth in (0..path.len()).rev() {
+            let (node, index) = &path[depth];
+            let Self::Split { axis, children } = node else {
+                continue;
+            };
+            if *axis != direction.axis() {
+                continue;
+            }
+            let next = if direction.forward() {
+                index + 1
+            } else {
+                index.checked_sub(1)?
+            };
+            if let Some((child, _)) = children.get(next) {
+                return Some(child.edge(direction));
+            }
+        }
+        None
+    }
+
+    /// The window at the near edge of this subtree, coming from `direction`.
+    fn edge(&self, direction: Direction) -> WindowId {
+        match self {
+            Self::Leaf(id) => *id,
+            Self::Split { axis, children } => {
+                // Along the direction being travelled, enter at the near side; across it, the
+                // first child is as good as any without knowing where the caret was.
+                let at = if *axis == direction.axis() && direction.forward() {
+                    children.first()
+                } else if *axis == direction.axis() {
+                    children.last()
+                } else {
+                    children.first()
+                };
+                at.map_or_else(
+                    || match children.first() {
+                        Some((child, _)) => child.edge(direction),
+                        None => WindowId::default(),
+                    },
+                    |(child, _)| child.edge(direction),
+                )
+            }
+        }
+    }
+
+    /// The nodes from the root down to the one holding `from`, each with the child index taken.
+    fn path_to<'a>(&'a self, from: WindowId, into: &mut Vec<(&'a Self, usize)>) -> bool {
+        match self {
+            Self::Leaf(id) => *id == from,
+            Self::Split { children, .. } => {
+                for (index, (child, _)) in children.iter().enumerate() {
+                    into.push((self, index));
+                    if child.path_to(from, into) {
+                        return true;
+                    }
+                    into.pop();
+                }
+                false
+            }
+        }
     }
 
     fn collect(&self, into: &mut Vec<WindowId>) {
@@ -195,7 +314,7 @@ impl Layout {
 mod tests {
     use slotmap::SlotMap;
 
-    use super::{Axis, Layout, WindowId};
+    use super::{Axis, Direction, Layout, WindowId};
 
     fn ids(count: usize) -> Vec<WindowId> {
         let mut map: SlotMap<WindowId, ()> = SlotMap::with_key();
@@ -320,5 +439,81 @@ mod tests {
             }
             Layout::Leaf(_) => panic!("it did not split"),
         }
+    }
+
+    #[test]
+    fn a_side_by_side_split_is_crossed_left_and_right() {
+        let id = ids(2);
+        let mut layout = Layout::Leaf(id[0]);
+        layout.split(id[0], Axis::Horizontal, id[1]);
+
+        assert_eq!(layout.neighbour(id[0], Direction::Right), Some(id[1]));
+        assert_eq!(layout.neighbour(id[1], Direction::Left), Some(id[0]));
+    }
+
+    #[test]
+    fn a_split_the_other_way_is_not_crossed() {
+        let id = ids(2);
+        let mut layout = Layout::Leaf(id[0]);
+        layout.split(id[0], Axis::Horizontal, id[1]);
+
+        // Side by side: there is nothing above or below either of them.
+        assert_eq!(layout.neighbour(id[0], Direction::Down), None);
+        assert_eq!(layout.neighbour(id[1], Direction::Up), None);
+    }
+
+    #[test]
+    fn the_edge_of_the_layout_has_no_neighbour() {
+        let id = ids(2);
+        let mut layout = Layout::Leaf(id[0]);
+        layout.split(id[0], Axis::Horizontal, id[1]);
+
+        assert_eq!(layout.neighbour(id[0], Direction::Left), None);
+        assert_eq!(layout.neighbour(id[1], Direction::Right), None);
+    }
+
+    #[test]
+    fn crossing_out_of_a_nested_split_climbs_to_find_one() {
+        // Left | (top over bottom). From either of the two on the right, `h` is the one on the
+        // left — the split that divides that way is two levels up.
+        let id = ids(3);
+        let mut layout = Layout::Leaf(id[0]);
+        layout.split(id[0], Axis::Horizontal, id[1]);
+        layout.split(id[1], Axis::Vertical, id[2]);
+
+        assert_eq!(layout.neighbour(id[1], Direction::Left), Some(id[0]));
+        assert_eq!(layout.neighbour(id[2], Direction::Left), Some(id[0]));
+        assert_eq!(layout.neighbour(id[1], Direction::Down), Some(id[2]));
+        assert_eq!(layout.neighbour(id[2], Direction::Up), Some(id[1]));
+    }
+
+    #[test]
+    fn crossing_into_a_split_enters_at_its_near_edge() {
+        // (top over bottom) | right. Going left from the right-hand one enters the left column at
+        // its first window rather than at whichever happens to be last.
+        let id = ids(3);
+        let mut layout = Layout::Leaf(id[0]);
+        layout.split(id[0], Axis::Horizontal, id[1]);
+        layout.split(id[0], Axis::Vertical, id[2]);
+
+        assert_eq!(layout.neighbour(id[1], Direction::Left), Some(id[0]));
+    }
+
+    #[test]
+    fn a_window_that_is_not_in_the_layout_has_no_neighbour() {
+        let id = ids(2);
+        let layout = Layout::Leaf(id[0]);
+        assert_eq!(layout.neighbour(id[1], Direction::Right), None);
+    }
+
+    #[test]
+    fn a_direction_is_named_the_way_the_keymap_writes_it() {
+        assert_eq!(Direction::named("left"), Some(Direction::Left));
+        assert_eq!(Direction::named("down"), Some(Direction::Down));
+        assert_eq!(Direction::named("sideways"), None);
+        assert_eq!(Direction::Left.axis(), Axis::Horizontal);
+        assert_eq!(Direction::Up.axis(), Axis::Vertical);
+        assert!(Direction::Right.forward());
+        assert!(!Direction::Up.forward());
     }
 }

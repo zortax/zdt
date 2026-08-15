@@ -26,7 +26,7 @@ use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
 pub use crate::workspace::buffer::{Buffer, BufferId, BufferKind};
-pub use crate::workspace::layout::{Axis, Layout, WindowId};
+pub use crate::workspace::layout::{Axis, Direction, Layout, WindowId};
 
 /// How many editors one window keeps mounted for buffers it is not showing.
 ///
@@ -546,6 +546,23 @@ impl Workspace {
         recent.insert(0, path.to_path_buf());
         // A session's worth, which is as much as anybody scrolls: this is not a history file.
         recent.truncate(200);
+    }
+
+    /// Moves the keyboard to the window `direction` of the focused one.
+    ///
+    /// Answers whether there was one. Nothing that way is not an error: `<C-w>h` in the leftmost
+    /// window is a key that does nothing, the same as in vim.
+    pub fn focus_direction(&self, direction: crate::workspace::Direction) -> bool {
+        let from = self.focused_untracked();
+        let Some(next) = self
+            .inner
+            .layout
+            .with_untracked(|layout| layout.neighbour(from, direction))
+        else {
+            return false;
+        };
+        self.focus_window(next);
+        true
     }
 
     /// Gives the keyboard back to the editor, wherever it went.

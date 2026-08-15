@@ -197,6 +197,57 @@ pub fn summary(language: &Language, path: Option<&PathBuf>) -> Vec<Part> {
     .collect()
 }
 
+/// The layer git signs are painted in, beside the diagnostics' own.
+const GIT_LAYER: &str = "git";
+
+/// Keeps the editor showing what git says about `buffer` in `window`.
+///
+/// Held for as long as the view is.
+pub fn follow_git(
+    workspace: &Workspace,
+    git: &crate::git::Git,
+    window: WindowId,
+    buffer: BufferId,
+) -> zgui::reactive::RenderEffect<()> {
+    let (workspace, git) = (workspace.clone(), git.clone());
+    zgui::reactive::RenderEffect::new(move |_| {
+        // Read first, so this runs again whenever the diff has.
+        let _ = git.revision();
+
+        let Some(handle) = workspace.handle_for(window, buffer) else {
+            return;
+        };
+        let Some(path) = workspace
+            .buffer_untracked(buffer)
+            .and_then(|entry| entry.path)
+        else {
+            return;
+        };
+
+        let hunks = git.hunks(&path);
+        if hunks.is_empty() {
+            handle.clear_gutter_marks(GIT_LAYER);
+            return;
+        }
+
+        let marks: Vec<GutterMark> = hunks
+            .iter()
+            .flat_map(|hunk| {
+                let (glyph, tint) = (
+                    crate::git::glyph(hunk.change),
+                    crate::git::tint(hunk.change),
+                );
+                hunk.lines().map(move |line| GutterMark {
+                    line,
+                    text: glyph.into(),
+                    paint: Paint::Property(tint.into()),
+                })
+            })
+            .collect();
+        handle.set_gutter_marks(GIT_LAYER, marks);
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

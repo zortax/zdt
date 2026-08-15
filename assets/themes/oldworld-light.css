@@ -137,6 +137,12 @@
 --syntax-variable-builtin: #a8542f;
 --syntax-variable-parameter: #a8542f;
 
+/* --- what git says ------------------------------------------------------------------------ */
+
+--zdt-git-added: #3f7346;
+--zdt-git-changed: #4a5f9e;
+--zdt-git-removed: #b3496a;
+
 /* --- what the language servers say ------------------------------------------------------- */
 
 --zdt-diagnostic-error: #b3496a;
