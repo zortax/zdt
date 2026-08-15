@@ -23,7 +23,7 @@ mod schema;
 use std::path::{Path, PathBuf};
 
 pub use crate::config::schema::{
-    Config, Editor, Keys, LineNumbers, Lsp, Picker, Scheme, Server, Terminal, Tree, Ui,
+    Config, Editor, Keys, Leap, LineNumbers, Lsp, Picker, Scheme, Server, Terminal, Tree, Ui,
 };
 
 /// Where the configuration directory is.

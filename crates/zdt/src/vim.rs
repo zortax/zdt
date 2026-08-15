@@ -63,6 +63,8 @@ struct Inner {
     overlays: RefCell<rustc_hash::FxHashMap<String, Keymap>>,
     /// What a region has typed toward one of its own sequences.
     region_keys: RefCell<Vec<Chord>>,
+    /// A leap in progress, which takes every key while it is running.
+    leaping: crate::leap::Leaping,
     workspace: Workspace,
     settings: crate::settings::Settings,
     /// How deep a replay is, so a macro that plays itself stops.
@@ -92,6 +94,7 @@ impl Vim {
                 keymap: RefCell::new(keymap),
                 overlays: RefCell::new(rustc_hash::FxHashMap::default()),
                 region_keys: RefCell::new(Vec::new()),
+                leaping: crate::leap::Leaping::new(),
                 workspace,
                 settings,
                 depth: std::cell::Cell::new(0),
@@ -268,6 +271,13 @@ impl Vim {
     ///
     /// This is what an editor's key filter is: `true` means the key is used up.
     pub fn key(&self, chord: Chord, handle: &EditorHandle) -> bool {
+        // A leap in progress takes every key: once it has started, each one is either a character
+        // it is aiming at or a label, and a keymap that answered any of them would put some
+        // letters out of reach.
+        if self.inner.leaping.is_running() {
+            return self.leap_key(chord, handle);
+        }
+
         let step = self.step(chord, handle);
         self.publish();
         match step {
@@ -278,6 +288,68 @@ impl Vim {
             Step::Pending => true,
             Step::PassThrough => false,
         }
+    }
+
+    /// Starts a leap looking `direction`.
+    pub fn start_leap(&self, direction: zdt_vim::leap::Direction) {
+        self.inner.leaping.start(direction);
+    }
+
+    /// The leap layer, for the overlay that draws its labels.
+    #[must_use]
+    pub fn leaping(&self) -> crate::leap::Leaping {
+        self.inner.leaping.clone()
+    }
+
+    /// One key while a leap is in progress.
+    ///
+    /// Always answers `true`: every key belongs to the leap while one is running, including the
+    /// one that ends it.
+    fn leap_key(&self, chord: Chord, handle: &EditorHandle) -> bool {
+        use zdt_vim::chord::Key;
+
+        // Only a plain character narrows or chooses. A chord with a modifier on it — and `<Esc>`,
+        // which is how anybody expects to get out — ends the leap.
+        let character = match chord.key {
+            Key::Char(character) if chord.mods.is_empty() => Some(character),
+            _ => None,
+        };
+
+        let took = handle.query(|snapshot| {
+            let rope = snapshot.rope();
+            let window = snapshot.visible_byte_range();
+            let caret = snapshot.selections().primary().head;
+            self.inner
+                .leaping
+                .key(character, |pair, direction, alphabet| {
+                    zdt_vim::leap::landings(rope, window, caret, pair, direction, alphabet)
+                })
+        });
+
+        if let crate::leap::Took::Landed(byte) = took {
+            let step = handle.query(|snapshot| {
+                let selections: Vec<Selection> = snapshot
+                    .selections()
+                    .iter()
+                    .map(|selection| Selection::new(selection.anchor, selection.head))
+                    .collect();
+                let visible = snapshot.visible_lines();
+                let context = Context {
+                    rope: snapshot.rope(),
+                    selections: &selections,
+                    view: View {
+                        top_line: visible.start,
+                        height: visible.len().max(1),
+                    },
+                };
+                self.inner.engine.borrow_mut().leap_to(byte, &context)
+            });
+            if let Step::Consumed(effects) = step {
+                self.carry_out(effects, handle);
+            }
+        }
+        self.publish();
+        true
     }
 
     /// Takes one key for a region that is not an editor: the tree, a picker, a terminal.

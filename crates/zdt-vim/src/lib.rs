@@ -10,6 +10,7 @@ pub mod config;
 pub mod effect;
 pub mod engine;
 pub mod keymap;
+pub mod leap;
 pub mod mode;
 pub mod motion;
 pub mod notation;

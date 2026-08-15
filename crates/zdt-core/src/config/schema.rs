@@ -24,6 +24,8 @@ pub struct Config {
     pub picker: Picker,
     /// What the file tree shows.
     pub tree: Tree,
+    /// How leaping behaves.
+    pub leap: Leap,
     /// Which keys are the leaders.
     pub keys: Keys,
     /// The language servers, by the name they are known as.
@@ -209,6 +211,25 @@ impl Default for Tree {
             hidden: false,
             ignored: false,
             follow: true,
+        }
+    }
+}
+
+/// How leaping behaves.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Leap {
+    /// The keys labels are drawn from, in the order they are handed out.
+    ///
+    /// The earliest are the ones the fingers are already on, so the order matters as much as the
+    /// letters do.
+    pub alphabet: String,
+}
+
+impl Default for Leap {
+    fn default() -> Self {
+        Self {
+            alphabet: "sfnjklhodweimbuyvrgtaqpcxz".to_owned(),
         }
     }
 }

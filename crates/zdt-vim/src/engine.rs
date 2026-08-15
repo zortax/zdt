@@ -520,6 +520,20 @@ impl Engine {
         self.go(target, cx)
     }
 
+    /// Puts the caret at `byte`, or hands the range there to a waiting operator.
+    ///
+    /// What a leap comes back as. The three keystrokes that chose it are not the engine's — they
+    /// belong to the layer that drew the labels — but where they landed is a motion like any
+    /// other, which is what makes `ds{ab}` delete up to it.
+    ///
+    /// Exclusive, as leap.nvim's is: `ds` up to a pair takes what is before it and leaves the pair
+    /// itself. A jump, so `<C-o>` comes back.
+    pub fn leap_to(&mut self, byte: usize, cx: &Context<'_>) -> Step {
+        let mut target = Target::exclusive(byte);
+        target.jump = true;
+        self.go(target, cx)
+    }
+
     /// Moves the caret to `target`, or hands the range to a waiting operator.
     fn go(&mut self, target: Target, cx: &Context<'_>) -> Step {
         if let Some(pending) = self.operator.take() {

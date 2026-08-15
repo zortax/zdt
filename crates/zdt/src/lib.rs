@@ -14,6 +14,7 @@ pub mod files;
 #[allow(dead_code)]
 pub mod icons;
 pub mod keys;
+pub mod leap;
 pub mod picker;
 pub mod prompt;
 pub mod reload;

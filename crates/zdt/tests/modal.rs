@@ -310,3 +310,74 @@ fn which_key_has_nothing_to_offer_once_a_sequence_resolves() {
     assert!(modal.vim.continuations().is_empty());
     assert_eq!(modal.text(), "world");
 }
+
+// ---- Leap ----------------------------------------------------------------------------------
+
+#[test]
+fn a_leap_takes_two_characters_and_a_label() {
+    // `s` then the pair then the label. Nothing between them reaches the keymap, which is why a
+    // label can be a letter that is bound to something else.
+    let modal = mount("the cat sat on the mat");
+    assert_eq!(modal.cursor(), 0);
+
+    modal.keys("sat");
+    // Three places have `at`, none under the caret, so labels are offered rather than a jump.
+    assert_eq!(modal.cursor(), 0, "nothing has moved yet");
+
+    modal.keys("s");
+    assert_eq!(
+        modal.cursor(),
+        5,
+        "the first label goes to the nearest place, which is `cat`"
+    );
+}
+
+#[test]
+fn one_place_needs_no_label() {
+    let modal = mount("alpha .. beta");
+    modal.keys("sbe");
+    assert_eq!(modal.cursor(), 9, "there is only one `be`, so it just goes");
+}
+
+#[test]
+fn a_leap_is_a_motion_an_operator_can_use() {
+    // `ds{ab}` deletes up to where the leap lands, exclusive, as leap.nvim's does.
+    let modal = mount("alpha beta");
+    modal.keys("dsbe");
+    assert_eq!(modal.text(), "beta", "everything before `beta` is gone");
+}
+
+#[test]
+fn escape_ends_a_leap_without_moving() {
+    let modal = mount("the cat sat");
+    modal.keys("sat");
+    modal.press(Key::Named(NamedKey::Escape));
+    assert_eq!(modal.cursor(), 0);
+
+    // And the keymap answers again straight after.
+    modal.keys("l");
+    assert_eq!(modal.cursor(), 1);
+}
+
+#[test]
+fn a_leap_with_nowhere_to_go_ends_itself() {
+    let modal = mount("the cat sat");
+    modal.keys("szz");
+    assert_eq!(modal.cursor(), 0);
+    modal.keys("l");
+    assert_eq!(modal.cursor(), 1, "and the keymap has it back");
+}
+
+#[test]
+fn leaping_backwards_looks_the_other_way() {
+    let modal = mount("at .. at .. at");
+    modal.keys("$");
+    let end = modal.cursor();
+    assert!(end > 10);
+
+    // `$` sits on the final `t`, so all three `at`s are behind the caret. The nearest — the one
+    // the caret is inside — gets the first label, and the second label reaches past it.
+    modal.keys("Sat");
+    modal.keys("f");
+    assert_eq!(modal.cursor(), 6);
+}

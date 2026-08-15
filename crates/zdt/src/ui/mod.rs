@@ -2,6 +2,7 @@
 
 pub mod chrome;
 pub mod frame;
+pub mod leap;
 pub mod pane;
 pub mod panes;
 pub mod picker;

@@ -21,6 +21,7 @@ use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::settings::use_settings;
 use crate::ui::Erase;
+use crate::ui::leap::LeapLabelsProps;
 use crate::ui::terminal::EmulatorProps;
 use crate::vim::use_vim;
 use crate::workspace::{BufferId, BufferKind, WindowId, use_workspace};
@@ -228,6 +229,7 @@ fn BufferView(
                     class = "pane__buffer",
                     style:display = move || (!current()).then(|| "none".to_owned())
                 ) {
+                    LeapLabels(window = window, buffer = buffer)
                     Editor(
                         class = "pane__editor",
                         document = document.clone(),

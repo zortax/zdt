@@ -68,3 +68,32 @@
 .zui-resizable-handle:focus-visible {
     background-color: var(--zui-color-primary);
 }
+
+/* The leap labels.
+ *
+ * Over the text, in the accent colour, which is the one place in the editor that colour appears —
+ * so a label reads as a key to press rather than as syntax. */
+.leap {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    /* The labels are read, never clicked: a pointer that could catch one would be a pointer that
+     * could not select the text under it. */
+    pointer-events: none;
+}
+
+.leap__label {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1ch;
+    padding: 0 1px;
+    border-radius: 2px;
+    background-color: var(--zui-color-primary);
+    color: var(--zui-color-primary-foreground);
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}

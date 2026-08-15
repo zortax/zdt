@@ -72,6 +72,16 @@ pub fn Root(
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
 
+    // The keys leap labels are drawn from, and again whenever the settings change.
+    let alphabet = {
+        let (settings, vim) = (settings.clone(), vim.clone());
+        RenderEffect::new(move |_| {
+            let alphabet = settings.with(|config| config.leap.alphabet.clone());
+            vim.leaping().set_alphabet(&alphabet);
+        })
+    };
+    on_cleanup_local(move || drop(alphabet));
+
     // The tree keeps up with the editor, and with the settings.
     let following_buffer = follow_buffer(&explorer, &space, &settings);
     on_cleanup_local(move || drop(following_buffer));

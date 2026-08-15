@@ -28,6 +28,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "window" => window(workspace, vim, leaf, args),
         "app" => app(workspace, leaf),
         "editor" => editor(handle, leaf),
+        "leap" => leap(workspace, vim, leaf),
         "tree" => tree(workspace, leaf, args),
         "picker" => picker(workspace, leaf, args, handle),
         "terminal" => terminal(workspace, vim, leaf, args),
@@ -612,6 +613,24 @@ fn short(workspace: &Workspace, path: &std::path::Path) -> String {
             .unwrap_or_else(|| path.display().to_string())
     } else {
         relative
+    }
+}
+
+/// Leap.
+///
+/// One action; the argument says which way it looks. Everything after the key that started it
+/// belongs to the leap layer rather than to the keymap.
+fn leap(workspace: &Workspace, vim: &Vim, leaf: &str) {
+    use zdt_vim::leap::Direction;
+
+    match leaf {
+        "forward" => vim.start_leap(Direction::Forward),
+        "backward" => vim.start_leap(Direction::Backward),
+        // `gs` leaps into another window in leap.nvim. There is one window's worth of labels here
+        // until the panes can say where each other's text is on screen, so it leaps both ways in
+        // this one — which is the useful half of it, and says so rather than doing nothing.
+        "window" => vim.start_leap(Direction::Both),
+        other => workspace.say(format!("leap.{other} is not built yet")),
     }
 }
 
