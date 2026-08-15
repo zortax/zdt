@@ -279,6 +279,18 @@ impl Vim {
             hover.hide();
         }
 
+        // Labelled tabs take the next key, whatever it is: every letter is a label or the end of
+        // the labelling, so a keymap answering one would put some tabs out of reach.
+        if let Some(tabs) = zgui::reactive::use_local_context::<crate::tabpick::TabPick>()
+            && tabs.is_running()
+        {
+            let character = match chord.key {
+                zdt_vim::chord::Key::Char(character) if chord.mods.is_empty() => Some(character),
+                _ => None,
+            };
+            return tabs.key(character);
+        }
+
         // A leap in progress takes every key: once it has started, each one is either a character
         // it is aiming at or a label, and a keymap that answered any of them would put some
         // letters out of reach.

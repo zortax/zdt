@@ -11,6 +11,7 @@
 use zgui::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 use zgui::{component, view};
+use zgui_ui_primitives::prelude::*;
 
 use crate::explorer::use_explorer;
 use crate::vim::use_vim;
@@ -113,15 +114,28 @@ const ITEMS: &[Item] = &[
 #[component]
 pub fn TreeMenu() -> impl IntoView {
     let at = position();
+    let surface = NodeRef::new();
+
+    // Where it was opened, kept for the length of the exit: the position is cleared the moment the
+    // menu closes, and a menu that read it directly would jump to the corner as it left.
+    let showing: RwSignal<Option<(f32, f32)>, LocalStorage> = RwSignal::new_local(None);
+    let follow = zgui::reactive::RenderEffect::new(move |_| {
+        if let Some(place) = at.get() {
+            showing.set(Some(place));
+        }
+    });
+    on_cleanup_local(move || drop(follow));
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match at.get() {
-                Some((x, y)) => view! { Menu(x = x, y = y) }.any(),
-                None => ().any(),
-            }
-        }}
+        Presence(present = Signal::derive_local(move || at.get().is_some()), surface = surface) {
+            {move || {
+                use crate::ui::Erase;
+                match showing.get() {
+                    Some((x, y)) => view! { Menu(x = x, y = y, surface = surface) }.any(),
+                    None => ().any(),
+                }
+            }}
+        }
     }
 }
 
@@ -132,7 +146,10 @@ fn Menu(
     x: f32,
     /// The same.
     y: f32,
+    /// The menu itself, whose exit animation says when it may be taken away.
+    surface: NodeRef,
 ) -> impl IntoView {
+    let leaving = use_presence();
     let vim = use_vim();
     let explorer = use_explorer();
 
@@ -172,9 +189,15 @@ fn Menu(
 
     view! {
         // A press anywhere else closes it, which is what every menu everywhere does.
-        box(class = "treemenu__scrim", on:pointer_down = move |_| close()) {}
+        box(
+            class = "treemenu__scrim",
+            attr:data-state = move || crate::ui::leaving_state(leaving),
+            on:pointer_down = move |_| close()
+        ) {}
         column(
             class = "treemenu",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving),
             style:left = Some(format!("{x}px")),
             style:top = Some(format!("{y}px")),
             a11y:role = Role::Menu,

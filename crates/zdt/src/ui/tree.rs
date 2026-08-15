@@ -29,6 +29,7 @@ const ROW: f32 = 22.0;
 pub fn Explorer() -> impl IntoView {
     let explorer = use_explorer();
     let vim = use_vim();
+    let window = use_window();
     let node = NodeRef::new();
 
     // The keyboard follows the panel: taking it is what makes `j` walk the tree rather than the
@@ -106,7 +107,10 @@ pub fn Explorer() -> impl IntoView {
             on:key_down = on_key,
             on:focus_in = take_focus
         ) {
-            row(class = "tree__head") {
+            // The strip above the tree lines up with the buffer line beside it, and the two
+            // together are the whole width of the window's top edge. A title bar that stopped
+            // where the tree began would be one a person had to aim at.
+            row(class = "tree__head", on:pointer_down = window.move_drag_handler()) {
                 Icon(icon = icons::LIST_TREE, class = "icon--sm")
                 label(class = "tree__root nowrap") {{root_name}}
             }
@@ -165,17 +169,30 @@ fn TreeRow(
             (explorer.drop_target()? == row.entry.path).then(|| "into".to_owned())
         }
     };
-    let directory = {
+    let is_directory = {
         let row = row.clone();
-        move || {
-            row()
-                .filter(|row| row.entry.directory)
-                .map(|_| "true".to_owned())
-        }
+        move || row().is_some_and(|row| row.entry.directory)
+    };
+    let directory = {
+        let is_directory = is_directory.clone();
+        move || is_directory().then(|| "true".to_owned())
     };
     let depth = {
         let row = row.clone();
         move || row().map_or(0, |row| row.depth)
+    };
+    // Whether the disclosure chevron is turned down. Written as an attribute rather than as two
+    // different icons, because a chevron that *turns* is the whole of what says a directory
+    // opened: the rows below it are recycled by the virtual list rather than created, so nothing
+    // among them can carry an animation, and the folder glyph swaps one character for another
+    // with nothing in between to interpolate.
+    let expanded = {
+        let row = row.clone();
+        move || {
+            row()
+                .filter(|row| row.entry.directory && row.expanded)
+                .map(|_| "true".to_owned())
+        }
     };
     let glyph = {
         let row = row.clone();
@@ -199,17 +216,25 @@ fn TreeRow(
         move || row().map_or_else(String::new, |row| row.entry.name)
     };
 
-    // A press picks the row; what kind of press decides whether it also adds to the set, opens
-    // it, or begins a drag. Selection happens on the *press* rather than the release, because a
-    // drag begins from a press that never becomes a click.
+    // A press picks the row, and a plain one opens it. What kind of press decides which: the
+    // secondary button is the menu and nothing else, the middle button is nothing at all, and a
+    // modifier turns the gesture into one about the *set* rather than about this row.
+    //
+    // On the press rather than the release, because that is the moment the gesture is understood
+    // — the same reason the buffer line selects a tab on the way down. Opening a file is cheap and
+    // undoing it is one keystroke, so waiting for the button to come back up buys nothing and
+    // costs the impression that the tree is answering.
     let press = {
         let explorer = explorer.clone();
+        let workspace = use_workspace();
         move |event: &mut EventCx<'_, events::PointerDown>| {
             explorer.focus();
             match event.button {
                 Some(PointerButton::Secondary) => {
                     // A right click on a row nobody has picked out acts on that row; on one of
-                    // several, it acts on all of them.
+                    // several, it acts on all of them. It opens the menu and *only* the menu: a
+                    // press that both asked what to do and did something would be one that
+                    // answered its own question.
                     if !explorer
                         .row_at(index)
                         .is_some_and(|row| explorer.is_marked(&row.entry.path))
@@ -232,11 +257,17 @@ fn TreeRow(
                 explorer.clear_marks();
                 explorer.go_to(index);
                 explorer.start_drag(index);
+                // Both ways, the way the keyboard's `<CR>` is: it opens a closed directory and
+                // closes an open one.
+                if let Some(path) = explorer.toggle_selected() {
+                    crate::files::open(&workspace, path);
+                }
             }
         }
     };
 
-    // A release without a drag is a click, and a click opens. Dropping is the other half.
+    // What the release is left with is the drop: a press that travelled to another row is a move,
+    // and one that went nowhere has already done everything it was going to do.
     let release = {
         let explorer = explorer.clone();
         let workspace = use_workspace();
@@ -244,18 +275,8 @@ fn TreeRow(
             if event.button == Some(PointerButton::Secondary) {
                 return;
             }
-            match explorer.finish_drag() {
-                Some((from, into)) => {
-                    crate::actions::move_into(&workspace, &explorer, &from, &into)
-                }
-                None => {
-                    if !event.modifiers.control() && !event.modifiers.shift() {
-                        explorer.go_to(index);
-                        if let Some(path) = explorer.open_selected() {
-                            crate::files::open(&workspace, path);
-                        }
-                    }
-                }
+            if let Some((from, into)) = explorer.finish_drag() {
+                crate::actions::move_into(&workspace, &explorer, &from, &into);
             }
         }
     };
@@ -280,7 +301,21 @@ fn TreeRow(
         ) {
             // One rail per level of nesting, each drawing the line that traces back to the
             // directory it belongs to.
-            {move || (0..depth()).map(|_| view! { box(class = "tree__rail") {} }).collect::<Vec<_>>()}
+            {move || {
+                (0..depth())
+                    .map(|_| view! { box(class = "tree__rail") { box(class = "tree__rail__line") {} } })
+                    .collect::<Vec<_>>()
+            }}
+            box(class = "tree__twist", attr:data-open = expanded) {
+                {move || {
+                    use crate::ui::Erase;
+                    if is_directory() {
+                        view! { Icon(icon = icons::CHEVRON_RIGHT, class = "icon--xs") }.any()
+                    } else {
+                        ().any()
+                    }
+                }}
+            }
             label(class = "glyph", style:color = tint) {{glyph}}
             label(class = "tree__name nowrap") {{name}}
         }

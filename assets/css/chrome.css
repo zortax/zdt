@@ -158,13 +158,28 @@
 .statusline__mode[data-mode="command"]  { background-color: var(--zdt-mode-command); }
 .statusline__mode[data-mode="terminal"] { background-color: var(--zdt-mode-terminal); }
 
+/* The file: its type's glyph, its name, and whether it is saved. One group, so the three move
+ * together and the line does not reflow when the middle one grows. */
+.statusline__file {
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-xs);
+    min-width: 0;
+}
+
 .statusline__name {
     min-width: 0;
     color: var(--zui-color-foreground);
 }
 
+/* Always here, holding the pencil only when there is unsaved work — an empty box rather than no
+ * box, so a name does not shift sideways the first time it is typed into. */
 .statusline__mark {
     flex: none;
+    display: flex;
+    align-items: center;
+    width: 10px;
+    height: 10px;
     color: var(--zdt-warning);
 }
 
@@ -194,7 +209,16 @@
 }
 
 .statusline__pos {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) / 2);
     color: var(--zui-color-foreground);
+}
+
+/* The glyph before the line and column reads as "number", so it is dimmer than the digits it
+ * introduces: it is a label, and they are the answer. */
+.statusline__pos .icon {
+    color: var(--zui-color-muted-foreground);
 }
 
 /* What the servers say about the file, in the status line. Each count carries its own colour:
@@ -289,4 +313,33 @@
  * editor is the one thing that is not. */
 .statusline {
     background-color: var(--zui-color-sidebar);
+}
+
+/* The key on a tab while the buffer line is labelled.
+ *
+ * In the same slot as the dirty mark and the close button, so the row does not move when the
+ * labels appear — and in the accent colour, which is the one place in the chrome it is used, so a
+ * labelled tab reads as a key to press rather than as decoration. */
+.tab__key {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    background-color: var(--zui-color-primary);
+    color: var(--zui-color-primary-foreground);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.tab[data-labelled="true"] .tab__key {
+    display: flex;
+}
+
+.tab[data-labelled="true"] .tab__mark,
+.tab[data-labelled="true"] .tab__close {
+    display: none;
 }

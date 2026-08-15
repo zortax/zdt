@@ -383,19 +383,37 @@ impl Explorer {
         self.with_tree_on_a_worker(move |tree| tree.expand(&root));
     }
 
-    /// Opens the selected directory, or opens the selected file.
+    /// Opens the selected file, or steps into the selected directory — what `l` does.
     ///
-    /// Answers the file to open, when the selected row is one — the caller opens it, because the
+    /// Answers the file to open, when the selected row is one; the caller opens it, because the
     /// tree has no business knowing what a buffer is.
     pub fn open_selected(&self) -> Option<PathBuf> {
+        self.activate(false)
+    }
+
+    /// The same, except that a directory already open is *closed* — what `<CR>` and a click do.
+    ///
+    /// `l` and `<CR>` differ deliberately, as they do in neo-tree: `l` is a movement and steps
+    /// into what is already open, while `<CR>` and a click are the one gesture people expect to
+    /// work both ways.
+    pub fn toggle_selected(&self) -> Option<PathBuf> {
+        self.activate(true)
+    }
+
+    /// Opens a file, or opens, steps into, or closes a directory.
+    fn activate(&self, collapse: bool) -> Option<PathBuf> {
         let row = self.selected()?;
         if !row.entry.directory {
             return Some(row.entry.path);
         }
         let path = row.entry.path.clone();
         if self.inner.tree.borrow().is_expanded(&path) {
-            // Already open: `l` steps into it rather than closing it.
-            self.move_by(1);
+            if collapse {
+                self.inner.tree.borrow_mut().collapse(&path);
+                self.publish();
+            } else {
+                self.move_by(1);
+            }
             return None;
         }
         self.with_tree_on_a_worker(move |tree| tree.expand(&path));

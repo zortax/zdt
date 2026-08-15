@@ -6,6 +6,7 @@
 use zgui::prelude::*;
 use zgui::{component, view};
 
+use crate::icons::{self, IconProps};
 use crate::ui::spinner::SpinnerProps;
 use zgui_editor::CursorPos;
 
@@ -37,6 +38,22 @@ pub fn StatusLine() -> impl IntoView {
         move || buffer().is_some_and(|entry| entry.is_dirty())
     };
 
+    // The same glyph the buffer line puts on the tab, and in the same colour. A status line that
+    // named the file type in words *and* drew it would be saying one thing twice; the glyph says
+    // it, and the word beside it at the other end of the line says which grammar is highlighting.
+    let glyph = {
+        let buffer = buffer.clone();
+        move || match buffer() {
+            Some(entry) => entry.file_type.glyph.to_owned(),
+            None => String::new(),
+        }
+    };
+
+    let tint = {
+        let buffer = buffer.clone();
+        move || buffer().map(|entry| format!("var(--{})", entry.file_type.tint))
+    };
+
     let file_type = {
         let buffer = buffer.clone();
         move || match buffer() {
@@ -59,7 +76,7 @@ pub fn StatusLine() -> impl IntoView {
         let workspace = workspace.clone();
         move || {
             let window = workspace.focused();
-            let buffer = workspace.window(window).map(|state| state.current);
+            let buffer = workspace.window(window).and_then(|state| state.current);
             let handle = buffer.and_then(|buffer| workspace.handle_for(window, buffer));
             handle
                 .map(|handle| handle.cursor_position().get())
@@ -131,8 +148,23 @@ pub fn StatusLine() -> impl IntoView {
                 {move || mode().label().to_string()}
             }
 
-            label(class = "statusline__name nowrap") {{name}}
-            label(class = "statusline__mark") {{move || if dirty() { "[+]" } else { "" }}}
+            row(class = "statusline__file") {
+                label(class = "glyph", style:color = tint) {{glyph}}
+                label(class = "statusline__name nowrap") {{name}}
+                // Unsaved work, in the one slot that is always there so the name does not shift
+                // when a file is first edited.
+                box(class = "statusline__mark") {
+                    {move || {
+                        use crate::ui::Erase;
+                        if dirty() {
+                            view! { Icon(icon = icons::PENCIL, class = "icon--xs", label = "Modified") }
+                                .any()
+                        } else {
+                            ().any()
+                        }
+                    }}
+                }
+            }
 
             row(class = "statusline__diagnostics") {
                 {move || {
@@ -180,10 +212,13 @@ pub fn StatusLine() -> impl IntoView {
             label(class = "statusline__pending") {{pending}}
             label(class = "statusline__spelling") {{spelling}}
             label(class = "statusline__type") {{file_type}}
-            label(class = "statusline__pos") {{move || {
-                let CursorPos { line, col } = position();
-                format!("{}:{}", line + 1, col + 1)
-            }}}
+            row(class = "statusline__pos") {
+                Icon(icon = icons::HASH, class = "icon--xs")
+                label() {{move || {
+                    let CursorPos { line, col } = position();
+                    format!("{}:{}", line + 1, col + 1)
+                }}}
+            }
         }
     }
 }

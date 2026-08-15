@@ -12,6 +12,7 @@ use std::time::Duration;
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_ui::prelude::*;
+use zgui_ui_primitives::prelude::*;
 
 use crate::cmdline::use_cmdline;
 
@@ -19,21 +20,26 @@ use crate::cmdline::use_cmdline;
 #[component]
 pub fn CommandLine() -> impl IntoView {
     let cmdline = use_cmdline();
+    let surface = NodeRef::new();
+    let present = {
+        let cmdline = cmdline.clone();
+        Signal::derive_local(move || cmdline.is_open())
+    };
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match cmdline.is_open() {
-                true => view! { Typing() }.any(),
-                false => ().any(),
-            }
-        }}
+        Presence(present = present, surface = surface) {
+            {view! { Typing(surface = surface) }}
+        }
     }
 }
 
 /// One command being typed.
 #[component]
-fn Typing() -> impl IntoView {
+fn Typing(
+    /// The row itself, whose exit animation says when it may be taken away.
+    surface: NodeRef,
+) -> impl IntoView {
+    let leaving = use_presence();
     let cmdline = use_cmdline();
     let field = NodeRef::new();
     let value = RwSignal::new_local(cmdline.text());
@@ -83,7 +89,11 @@ fn Typing() -> impl IntoView {
     };
 
     view! {
-        row(class = "cmdline") {
+        row(
+            class = "cmdline",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving)
+        ) {
             label(class = "cmdline__sigil") {":"}
             Input(
                 class = "cmdline__input",

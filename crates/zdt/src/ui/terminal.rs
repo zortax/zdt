@@ -20,6 +20,7 @@ use std::time::Duration;
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_terminal::{TerminalConfig, TerminalHandle, TerminalProps};
+use zgui_ui_primitives::prelude::*;
 
 use crate::settings::Settings;
 use crate::terminals::use_terminals;
@@ -29,20 +30,56 @@ use crate::workspace::{BufferId, use_workspace};
 #[component]
 pub fn FloatingTerminal() -> impl IntoView {
     let terminals = use_terminals();
+    let surface = NodeRef::new();
+
+    // Which terminal it was, kept for the length of the exit: what is showing is cleared the
+    // moment the float is hidden, and a float that read it directly would go blank as it left.
+    let showing: RwSignal<Option<BufferId>, LocalStorage> = RwSignal::new_local(None);
+    let follow = {
+        let terminals = terminals.clone();
+        zgui::reactive::RenderEffect::new(move |_| {
+            if let Some(buffer) = terminals.showing() {
+                showing.set(Some(buffer));
+            }
+        })
+    };
+    on_cleanup_local(move || drop(follow));
+
+    let present = {
+        let terminals = terminals.clone();
+        Signal::derive_local(move || terminals.showing().is_some())
+    };
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match terminals.showing() {
-                Some(buffer) => view! {
-                    box(class = "termfloat") {
-                        Emulator(buffer = buffer, floating = true)
-                    }
+        Presence(present = present, surface = surface) {
+            {move || {
+                use crate::ui::Erase;
+                match showing.get() {
+                    Some(buffer) => view! { Float(buffer = buffer, surface = surface) }.any(),
+                    None => ().any(),
                 }
-                .any(),
-                None => ().any(),
-            }
-        }}
+            }}
+        }
+    }
+}
+
+/// The float's own box, which is what the exit animation runs on.
+#[component]
+fn Float(
+    /// Which terminal is in it.
+    buffer: BufferId,
+    /// The box itself, whose exit animation says when it may be taken away.
+    surface: NodeRef,
+) -> impl IntoView {
+    let leaving = use_presence();
+    view! {
+        box(
+            class = "termfloat",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving)
+        ) {
+            Emulator(buffer = buffer, floating = true)
+        }
     }
 }
 
@@ -153,7 +190,7 @@ pub fn Emulator(
             floating
                 || workspace
                     .window(workspace.focused())
-                    .is_some_and(|state| state.current == buffer)
+                    .is_some_and(|state| state.current == Some(buffer))
         }
     };
 

@@ -71,7 +71,46 @@
     width: 12px;
     flex: 0 0 auto;
     align-self: stretch;
-    border-left: 1px solid var(--zui-color-sidebar-border);
+    display: flex;
+}
+
+/* The line itself, six across its rail rather than at its left edge.
+ *
+ * Six is the middle of the twelve-wide disclosure slot that follows the rails on every row, so
+ * the line falls out of the parent directory's own chevron and runs down past its children —
+ * which is what a plain `border-left` on the rail would not have done. */
+.tree__rail__line {
+    margin-left: 6px;
+    width: 1px;
+    align-self: stretch;
+    background-color: var(--zui-color-sidebar-border);
+}
+
+/* The disclosure chevron, and the empty slot standing in for it on a file so that names line up
+ * whatever is beside them.
+ *
+ * It is the one thing in the tree that can carry an expand or a collapse. The rows are a virtual
+ * list — the element showing the fifth row goes on being the element showing the fifth row while
+ * what it *says* changes — so nothing among the rows themselves is created or destroyed for an
+ * animation to hang on, and the folder glyph swaps one character for another with nothing in
+ * between. A quarter turn is a state, and a state can be transitioned. */
+.tree__twist {
+    width: 12px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--zui-color-muted-foreground);
+    /* Stated at rest as well as turned, so the property is there to be interpolated from rather
+     * than coming into existence on the first frame of the turn. */
+    transform: rotate(0deg);
+    transition-property: transform;
+    transition-duration: var(--zdt-instant);
+    transition-timing-function: var(--zdt-ease);
+}
+
+.tree__twist[data-open="true"] {
+    transform: rotate(90deg);
 }
 
 .tree__row[data-directory="true"] .tree__name {

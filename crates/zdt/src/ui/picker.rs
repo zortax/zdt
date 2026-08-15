@@ -18,6 +18,7 @@ use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_editor::EditorProps;
 use zgui_ui::prelude::*;
+use zgui_ui_primitives::prelude::*;
 
 use crate::picker::{Row, use_picker};
 
@@ -89,16 +90,44 @@ const PREVIEW_HEAD: u64 = 256 * 1024;
 #[component]
 pub fn Picker() -> impl IntoView {
     let picker = use_picker();
+    let surface = NodeRef::new();
+
+    // What it was opened as, kept for as long as it is on the screen — which is a little longer
+    // than it is *open*. The source is cleared the moment a picker closes, and a modal that read
+    // it directly would spend its whole exit animation blank.
+    let showing: RwSignal<Option<crate::picker::Source>, LocalStorage> = RwSignal::new_local(None);
+    let follow = {
+        let picker = picker.clone();
+        zgui::reactive::RenderEffect::new(move |_| {
+            if let Some(source) = picker.source() {
+                showing.set(Some(source));
+            }
+        })
+    };
+    on_cleanup_local(move || drop(follow));
+
+    let present = {
+        let picker = picker.clone();
+        Signal::derive_local(move || picker.source().is_some())
+    };
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match picker.source() {
-                Some(source) => view! { Open(title = source.title(), previews = source.previews()) }
+        Presence(present = present, surface = surface) {
+            {move || {
+                use crate::ui::Erase;
+                match showing.get() {
+                    Some(source) => view! {
+                        Open(
+                            title = source.title(),
+                            previews = source.previews(),
+                            surface = surface,
+                        )
+                    }
                     .any(),
-                None => ().any(),
-            }
-        }}
+                    None => ().any(),
+                }
+            }}
+        }
     }
 }
 
@@ -112,8 +141,11 @@ fn Open(
     title: &'static str,
     /// Whether to show what the caret is on beside the list.
     previews: bool,
+    /// The modal's own element, whose exit animation says when it may be taken away.
+    surface: NodeRef,
 ) -> impl IntoView {
     let picker = use_picker();
+    let leaving = use_presence();
     let field = NodeRef::new();
     let query = RwSignal::new_local(picker.query());
 
@@ -162,13 +194,19 @@ fn Open(
     };
 
     view! {
-        box(class = "picker__scrim", on:pointer_down = {
-            let picker = picker.clone();
-            move |_| picker.close()
-        }) {}
+        box(
+            class = "picker__scrim",
+            attr:data-state = move || crate::ui::leaving_state(leaving),
+            on:pointer_down = {
+                let picker = picker.clone();
+                move |_| picker.close()
+            }
+        ) {}
 
         column(
             class = "picker",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving),
             attr:data-preview = previews.then(|| "true".to_owned()),
             a11y:role = Role::Dialog,
             a11y:label = title,

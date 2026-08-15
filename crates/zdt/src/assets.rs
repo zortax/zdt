@@ -17,6 +17,8 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/prompt.css"),
     include_str!("../../../assets/css/picker.css"),
     include_str!("../../../assets/css/terminal.css"),
+    // Last, so that what moves is decided in one place rather than beside each thing that moves.
+    include_str!("../../../assets/css/motion.css"),
     include_str!("../../../assets/css/whichkey.css"),
 ];
 

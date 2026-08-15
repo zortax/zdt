@@ -100,12 +100,18 @@ fn BufferTab(
         move || {
             workspace
                 .window(workspace.focused())
-                .is_some_and(|state| state.current == buffer)
+                .is_some_and(|state| state.current == Some(buffer))
         }
     };
     let dirty = {
         let entry = entry.clone();
         move || entry.is_dirty()
+    };
+    // The key that goes here, while the tabs are labelled. It takes the whole slot: the mark and
+    // the close button are not what is being asked about.
+    let key = {
+        let tabs = crate::tabpick::use_tabpick();
+        move || tabs.label_for(buffer).map(|key| key.to_string())
     };
 
     let window = use_window();
@@ -140,6 +146,10 @@ fn BufferTab(
             tabindex = Focus::Programmatic,
             attr:data-current = move || current().then(|| "true".to_owned()),
             attr:data-dirty = move || dirty().then(|| "true".to_owned()),
+            attr:data-labelled = {
+                let key = key.clone();
+                move || key().map(|_| "true".to_owned())
+            },
             a11y:label = name.clone(),
             on:pointer_down = press
         ) {
@@ -149,6 +159,7 @@ fn BufferTab(
             // is over the tab, and nothing otherwise — always present, so the name beside it does
             // not shift when a buffer is edited.
             box(class = "tab__slot") {
+                label(class = "tab__key") {{move || key().unwrap_or_default()}}
                 label(class = "tab__mark") {"\u{25cf}"}
                 control(
                     class = "tab__close",

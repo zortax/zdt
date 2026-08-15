@@ -7,6 +7,7 @@
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_ui::prelude::*;
+use zgui_ui_primitives::prelude::*;
 
 use crate::prompt::use_prompt;
 
@@ -14,17 +15,33 @@ use crate::prompt::use_prompt;
 #[component]
 pub fn Prompt() -> impl IntoView {
     let prompt = use_prompt();
+    let surface = NodeRef::new();
+
+    // The question it was asked, kept for the length of the exit: what is pending is cleared the
+    // moment it is answered, and a field that read it directly would empty out as it left.
+    let showing: RwSignal<Option<crate::prompt::Pending>, LocalStorage> = RwSignal::new_local(None);
+    let follow = zgui::reactive::RenderEffect::new(move |_| {
+        if let Some(pending) = prompt.pending() {
+            showing.set(Some(pending));
+        }
+    });
+    on_cleanup_local(move || drop(follow));
+
+    let present = Signal::derive_local(move || prompt.pending().is_some());
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match prompt.pending() {
-                Some(pending) => {
-                    view! { Asking(title = pending.title, start = pending.start) }.any()
+        Presence(present = present, surface = surface) {
+            {move || {
+                use crate::ui::Erase;
+                match showing.get() {
+                    Some(pending) => view! {
+                        Asking(title = pending.title, start = pending.start, surface = surface)
+                    }
+                    .any(),
+                    None => ().any(),
                 }
-                None => ().any(),
-            }
-        }}
+            }}
+        }
     }
 }
 
@@ -38,8 +55,11 @@ fn Asking(
     title: String,
     /// What the field starts out holding.
     start: String,
+    /// The panel itself, whose exit animation says when it may be taken away.
+    surface: NodeRef,
 ) -> impl IntoView {
     let prompt = use_prompt();
+    let leaving = use_presence();
     let node = NodeRef::new();
     let value = RwSignal::new_local(start.clone());
 
@@ -66,7 +86,13 @@ fn Asking(
     };
 
     view! {
-        column(class = "prompt", a11y:role = Role::Dialog, a11y:label = title.clone()) {
+        column(
+            class = "prompt",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving),
+            a11y:role = Role::Dialog,
+            a11y:label = title.clone()
+        ) {
             label(class = "prompt__title nowrap") {{title}}
             Input(
                 class = "prompt__input",

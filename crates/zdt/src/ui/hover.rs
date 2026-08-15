@@ -12,6 +12,7 @@
 use zgui::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 use zgui::{component, view};
+use zgui_ui_primitives::prelude::*;
 
 /// What is being shown, and where.
 #[derive(Clone, PartialEq, Debug)]
@@ -138,15 +139,31 @@ pub fn use_hover() -> Hover {
 #[component]
 pub fn HoverPanel() -> impl IntoView {
     let hover = use_hover();
+    let surface = NodeRef::new();
+
+    // What it was showing, kept for the length of the exit: the documentation is cleared the
+    // moment the panel closes, and a panel that read it directly would empty out as it left.
+    let showing: RwSignal<Option<Showing>, LocalStorage> = RwSignal::new_local(None);
+    let follow = zgui::reactive::RenderEffect::new(move |_| {
+        if let Some(what) = hover.showing() {
+            showing.set(Some(what));
+        }
+    });
+    on_cleanup_local(move || drop(follow));
 
     view! {
-        {move || {
-            use crate::ui::Erase;
-            match hover.showing() {
-                Some(showing) => view! { Panel(showing = showing) }.any(),
-                None => ().any(),
-            }
-        }}
+        Presence(
+            present = Signal::derive_local(move || hover.showing().is_some()),
+            surface = surface
+        ) {
+            {move || {
+                use crate::ui::Erase;
+                match showing.get() {
+                    Some(what) => view! { Panel(showing = what, surface = surface) }.any(),
+                    None => ().any(),
+                }
+            }}
+        }
     }
 }
 
@@ -155,7 +172,10 @@ pub fn HoverPanel() -> impl IntoView {
 fn Panel(
     /// What to show, and where.
     showing: Showing,
+    /// The panel itself, whose exit animation says when it may be taken away.
+    surface: NodeRef,
 ) -> impl IntoView {
+    let leaving = use_presence();
     // Under the caret's line rather than over it: what a person pressed `K` about is the thing the
     // caret is on, and covering it to describe it is not a help.
     let top = format!("{}px", showing.y + showing.height + 2.0);
@@ -165,6 +185,8 @@ fn Panel(
     view! {
         column(
             class = "hover",
+            node_ref = surface,
+            attr:data-state = move || crate::ui::leaving_state(leaving),
             style:left = Some(left),
             style:top = Some(top),
             a11y:role = Role::Tooltip,

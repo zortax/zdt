@@ -970,8 +970,21 @@ desc = "Quit zdt"
 [[map]]
 mode = ["n"]
 keys = "<Leader>bb"
+action = "buffer.pick"
+desc = "Go to buffer by key"
+
+# The picker is still there for when the name is what is remembered rather than the position.
+[[map]]
+mode = ["n"]
+keys = "<Leader>bf"
 action = "picker.buffers"
-desc = "Select buffer"
+desc = "Find buffer"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>bd"
+action = "buffer.pick_close"
+desc = "Close buffer by key"
 
 [[map]]
 mode = ["n"]

@@ -88,6 +88,12 @@ struct Inner {
     pending: RefCell<Option<zgui::view::time::TimeoutHandle>>,
     /// How to stop the grep that is running.
     cancel: RefCell<Option<Cancel>>,
+    /// What a preview changed, and what to put back when it is given up on.
+    ///
+    /// Choosing a theme by reading its name is not choosing a theme; the way to know is to see
+    /// it. So the caret moving applies it, and `<Esc>` puts back whatever was in force before the
+    /// picker opened.
+    restore: RefCell<Option<String>>,
 }
 
 impl Picker {
@@ -112,6 +118,7 @@ impl Picker {
                 polling: RefCell::new(None),
                 pending: RefCell::new(None),
                 cancel: RefCell::new(None),
+                restore: RefCell::new(None),
             }),
         }
     }
@@ -185,6 +192,13 @@ impl Picker {
     /// Opens `source`, gathering whatever it needs.
     pub fn open(&self, source: Source) {
         self.stop();
+        // What to put back if this is given up on. Taken before anything is shown, because a
+        // preview overwrites it.
+        *self.inner.restore.borrow_mut() = matches!(source, Source::Themes).then(|| {
+            self.inner
+                .settings
+                .with_untracked(|config| config.ui.theme.clone())
+        });
         let start = source.start();
         self.inner.at.set(0);
         self.inner.rows.set(Vec::new());
@@ -194,10 +208,22 @@ impl Picker {
         self.gather(&source, &start);
     }
 
-    /// Closes it, stopping whatever it had started.
+    /// Closes it, putting back anything a preview changed.
+    ///
+    /// What `<Esc>` does. Choosing a row calls [`Picker::activate`], which keeps what it showed.
     pub fn close(&self) {
         if self.inner.source.with_untracked(Option::is_none) {
             return;
+        }
+        if let Some(held) = self.inner.restore.borrow_mut().take()
+            && self
+                .inner
+                .settings
+                .with_untracked(|config| config.ui.theme != held)
+        {
+            self.inner
+                .settings
+                .update(|config| config.ui.theme.clone_from(&held));
         }
         self.stop();
         self.inner.source.set(None);
@@ -229,6 +255,7 @@ impl Picker {
         let at = self.inner.at.get_untracked() as isize + offset;
         let wrapped = at.rem_euclid(count as isize) as usize;
         self.inner.at.set(wrapped);
+        self.preview_row();
     }
 
     /// Puts the caret on `at`.
@@ -236,7 +263,24 @@ impl Picker {
         let count = self.inner.rows.with_untracked(Vec::len);
         if count > 0 {
             self.inner.at.set(at.min(count - 1));
+            self.preview_row();
         }
+    }
+
+    /// Shows what the row under the caret would do, for the sources where showing *is* the answer.
+    ///
+    /// Only the themes so far. A theme read as a name is a name; a theme applied is a theme, and
+    /// nobody picks one any other way.
+    fn preview_row(&self) {
+        if !matches!(self.inner.source.get_untracked(), Some(Source::Themes)) {
+            return;
+        }
+        let Some(Target::Theme(name)) = self.selected().map(|row| row.target) else {
+            return;
+        };
+        self.inner
+            .settings
+            .update(|config| config.ui.theme.clone_from(&name));
     }
 
     /// Takes what has been typed and searches or ranks again.
@@ -261,6 +305,8 @@ impl Picker {
             return;
         };
         let workspace = self.inner.workspace.clone();
+        // Whatever a preview showed is what was chosen, so there is nothing to put back.
+        self.inner.restore.borrow_mut().take();
         self.close();
 
         match row.target {
@@ -392,6 +438,7 @@ impl Picker {
 
         self.inner.counts.set((rows.len(), total));
         self.publish(rows);
+        self.preview_row();
     }
 
     /// Keeps asking the matcher for its answer until it says it has finished.

@@ -39,8 +39,12 @@ const MOUNTED_PER_WINDOW: usize = 8;
 /// One window: which buffer it shows, and which it is keeping ready.
 #[derive(Clone)]
 pub struct WindowState {
-    /// Which buffer is on screen.
-    pub current: BufferId,
+    /// Which buffer is on screen, when one is.
+    ///
+    /// A window with nothing in it is a real state rather than something to be avoided: closing
+    /// the last buffer used to conjure an empty scratch one, which is a file nobody asked for
+    /// sitting on the buffer line. An empty window says it is empty.
+    pub current: Option<BufferId>,
     /// Which buffers have an editor mounted here, most recently seen first.
     pub mounted: Vec<BufferId>,
     /// How much larger or smaller this window's text is than the setting, in steps of one pixel.
@@ -74,9 +78,29 @@ struct Inner {
     /// Not a signal: nothing on screen is decided by which handles exist, and an action that
     /// needs one needs it right now rather than on the next flush.
     handles: RefCell<FxHashMap<(WindowId, BufferId), zgui_editor::EditorHandle>>,
+    /// A number that changes whenever an editor arrives or goes away.
+    ///
+    /// The map itself is not a signal — nothing on screen is decided by which handles exist — but
+    /// *when* one arrives matters to one thing: the effect that gives the keyboard to the focused
+    /// window. A window made by `:split` is focused before its editor has mounted, so that effect
+    /// runs, finds no editor and gives up. Without something to wake it the keyboard stays where
+    /// it was, and `<C-j>` appears to do nothing until a later split happens to re-run it.
+    mounted: RwSignal<u64, LocalStorage>,
     /// Every file opened this session, most recent first. Not a signal, for the same reason as
     /// the handles: it is read when a picker asks and never drawn.
     recent: RefCell<Vec<PathBuf>>,
+    /// The reactive owner every buffer's signals are created under.
+    ///
+    /// A signal belongs to whichever owner was current when it was made, and dies with it. A
+    /// buffer, though, is made from wherever the action that opened it was running — and that is
+    /// a key handler on some element, whose owner is the pane it is mounted in. `<Leader>th`
+    /// splits the window and *then* starts a terminal, so the buffer's signals were being created
+    /// under a pane that the split had just taken apart: dead the moment they were made, and the
+    /// buffer line panicked the first time it asked one of them for the tab's name.
+    ///
+    /// This is the workspace's own owner, taken once where the workspace itself is made. A buffer
+    /// outlives every view of it by construction, so its signals have to as well.
+    owner: zgui::reactive::Owner,
 }
 
 /// Something the interface is saying.
@@ -100,7 +124,7 @@ impl Workspace {
 
         let mut windows = SlotMap::with_key();
         let window = windows.insert(WindowState {
-            current: scratch,
+            current: Some(scratch),
             mounted: vec![scratch],
             font_step: 0,
         });
@@ -116,9 +140,19 @@ impl Workspace {
                 alternate: RwSignal::new_local(None),
                 message: RwSignal::new_local(None),
                 handles: RefCell::new(FxHashMap::default()),
+                mounted: RwSignal::new_local(0),
                 recent: RefCell::new(Vec::new()),
+                owner: zgui::reactive::Owner::current().unwrap_or_default(),
             }),
         }
+    }
+
+    /// Makes something under the owner every buffer's signals belong to.
+    ///
+    /// Every buffer is created through this, and none is created any other way — see
+    /// [`Inner::owner`].
+    fn owned<T>(&self, make: impl FnOnce() -> T) -> T {
+        self.inner.owner.with(make)
     }
 
     /// The directory everything is relative to.
@@ -173,14 +207,14 @@ impl Workspace {
     /// The buffer the focused window is showing. Tracked.
     pub fn current_buffer(&self) -> Option<Buffer> {
         let window = self.window(self.focused())?;
-        self.buffer(window.current)
+        self.buffer(window.current?)
     }
 
     /// The buffer `id` shows, without subscribing.
     pub fn buffer_in_untracked(&self, window: WindowId) -> Option<BufferId> {
         self.inner
             .windows
-            .with_untracked(|windows| windows.get(window).map(|state| state.current))
+            .with_untracked(|windows| windows.get(window).and_then(|state| state.current))
     }
 
     /// The buffer at `path`, when it is already open.
@@ -212,9 +246,11 @@ impl Workspace {
         }
 
         let id = self
-            .inner
-            .buffers
-            .try_update(|buffers| buffers.insert_with_key(|id| Buffer::text(id, path, document)))
+            .owned(|| {
+                self.inner.buffers.try_update(|buffers| {
+                    buffers.insert_with_key(|id| Buffer::text(id, path, document))
+                })
+            })
             .expect("the buffer map is writable");
         self.inner.order.update(|order| order.push(id));
         self.show(id);
@@ -224,9 +260,11 @@ impl Workspace {
     /// Adds a buffer that is not text, such as a terminal, and shows it.
     pub fn open_buffer(&self, make: impl FnOnce(BufferId) -> Buffer) -> BufferId {
         let id = self
-            .inner
-            .buffers
-            .try_update(|buffers| buffers.insert_with_key(make))
+            .owned(|| {
+                self.inner
+                    .buffers
+                    .try_update(|buffers| buffers.insert_with_key(make))
+            })
             .expect("the buffer map is writable");
         self.inner.order.update(|order| order.push(id));
         self.show(id);
@@ -272,7 +310,7 @@ impl Workspace {
             let Some(state) = windows.get_mut(window) else {
                 return;
             };
-            state.current = id;
+            state.current = Some(id);
             state.mounted.retain(|held| *held != id);
             state.mounted.insert(0, id);
             state.mounted.truncate(MOUNTED_PER_WINDOW);
@@ -287,9 +325,11 @@ impl Workspace {
     /// nothing else, which is what makes it a scratch terminal rather than another tab to close.
     pub fn open_terminal(&self, name: &str, listed: bool) -> BufferId {
         let id = self
-            .inner
-            .buffers
-            .try_update(|buffers| buffers.insert_with_key(|id| Buffer::terminal(id, name)))
+            .owned(|| {
+                self.inner
+                    .buffers
+                    .try_update(|buffers| buffers.insert_with_key(|id| Buffer::terminal(id, name)))
+            })
             .expect("the buffer map is writable");
         if listed {
             self.inner.order.update(|order| order.push(id));
@@ -320,32 +360,16 @@ impl Workspace {
     /// The buffer's text goes with it: a closed buffer is closed, and its undo history is not
     /// something an editor keeps for a file nobody has open. Answers whether there was one.
     pub fn close_buffer(&self, id: BufferId) -> bool {
-        let remaining: Vec<BufferId> = self
-            .inner
-            .order
-            .get_untracked()
-            .into_iter()
-            .filter(|held| *held != id)
-            .collect();
-
-        // Something has to be open. Closing the last buffer leaves an empty one in its place,
-        // which is what `:bd` on a lone buffer does.
-        let replacement = match remaining.first().copied() {
-            Some(next) => next,
-            None => {
-                let scratch = self
-                    .inner
-                    .buffers
-                    .try_update(|buffers| {
-                        buffers.insert_with_key(|id| {
-                            Buffer::text(id, None, zgui_editor::Document::new(""))
-                        })
-                    })
-                    .expect("the buffer map is writable");
-                self.inner.order.update(|order| order.push(scratch));
-                scratch
-            }
-        };
+        // What a window showing this should show instead: the next buffer along, or nothing when
+        // that was the last one. Nothing is a real answer — an empty window says so.
+        let order = self.inner.order.get_untracked();
+        let at = order.iter().position(|held| *held == id);
+        let replacement = at.and_then(|at| {
+            order
+                .get(at + 1)
+                .or_else(|| at.checked_sub(1).and_then(|before| order.get(before)))
+                .copied()
+        });
 
         let existed = self
             .inner
@@ -367,9 +391,11 @@ impl Workspace {
         self.inner.windows.update(|windows| {
             for state in windows.values_mut() {
                 state.mounted.retain(|held| *held != id);
-                if state.current == id {
+                if state.current == Some(id) {
                     state.current = replacement;
-                    if !state.mounted.contains(&replacement) {
+                    if let Some(replacement) = replacement
+                        && !state.mounted.contains(&replacement)
+                    {
                         state.mounted.insert(0, replacement);
                     }
                 }
@@ -429,7 +455,7 @@ impl Workspace {
             .windows
             .try_update(|windows| {
                 windows.insert(WindowState {
-                    current,
+                    current: Some(current),
                     mounted: vec![current],
                     font_step: 0,
                 })
@@ -511,11 +537,44 @@ impl Workspace {
             .handles
             .borrow_mut()
             .insert((window, buffer), handle);
+        self.inner
+            .mounted
+            .update(|revision| *revision = revision.wrapping_add(1));
+    }
+
+    /// A number that changes whenever an editor arrives or goes away. Tracked.
+    ///
+    /// What the focus effect reads so that an editor mounting after its window was focused still
+    /// ends up with the keyboard.
+    #[must_use]
+    pub fn mounted_revision(&self) -> u64 {
+        self.inner.mounted.get()
     }
 
     /// Forgets it, which a view does as it unmounts.
-    pub fn forget_handle(&self, window: WindowId, buffer: BufferId) {
-        self.inner.handles.borrow_mut().remove(&(window, buffer));
+    ///
+    /// `handle` is the editor that is going away, and the entry is dropped only if it is still the
+    /// one filed here. A pane rebuilt in place — which is what splitting does to every pane the
+    /// new layout re-creates — mounts its new editor *before* the old one is cleaned up, so the
+    /// two orders overlap: register the new, then forget the old. Forgetting by key alone deletes
+    /// the registration the new editor had just made, and the window is then a window with an
+    /// editor on the screen and no handle to it. Nothing draws differently; what breaks is
+    /// everything that asks the workspace for the editor of a window, `<C-k>` first among them.
+    pub fn forget_handle(
+        &self,
+        window: WindowId,
+        buffer: BufferId,
+        handle: &zgui_editor::EditorHandle,
+    ) {
+        let mut handles = self.inner.handles.borrow_mut();
+        if handles.get(&(window, buffer)) != Some(handle) {
+            return;
+        }
+        handles.remove(&(window, buffer));
+        drop(handles);
+        self.inner
+            .mounted
+            .update(|revision| *revision = revision.wrapping_add(1));
     }
 
     /// The editor showing `buffer` in `window`, when one is mounted.

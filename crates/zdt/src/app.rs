@@ -20,6 +20,7 @@ use crate::language::Language;
 use crate::picker::Picker;
 use crate::prompt::Prompt;
 use crate::settings::Settings;
+use crate::tabpick::TabPick;
 use crate::terminals::Terminals;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::cmdline::CommandLineProps;
@@ -78,6 +79,7 @@ pub fn Root(
     crate::ui::treemenu::provide();
     crate::cmdline::provide(CommandLine::new(space.clone()));
     crate::ui::hover::provide(Hover::new());
+    crate::tabpick::provide(TabPick::new(space.clone()));
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
 

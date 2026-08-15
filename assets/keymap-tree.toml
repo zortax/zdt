@@ -42,8 +42,8 @@ desc = "Open"
 [[map]]
 mode = ["n"]
 keys = "<CR>"
-action = "tree.child_or_open"
-desc = "Open"
+action = "tree.activate"
+desc = "Open, or close an open directory"
 
 [[map]]
 mode = ["n"]

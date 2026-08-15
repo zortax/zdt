@@ -1,0 +1,250 @@
+/* What moves, and how fast.
+ *
+ * Everything here is under a tenth of a second. A transition long enough to notice is a
+ * transition long enough to wait for, and this is an editor — the animation exists to say *what
+ * happened*, not to be looked at. If a change ever feels like it is being waited for, the
+ * durations below are the first thing to cut, not the last.
+ *
+ * Two durations only:
+ *
+ *   --zdt-quick   a thing appearing or going: a modal, a menu, a panel
+ *   --zdt-instant a thing changing while it stays: a row lighting up, a chevron turning
+ */
+
+:root {
+    --zdt-quick: 90ms;
+    --zdt-instant: 60ms;
+    --zdt-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---- Things that appear ------------------------------------------------------------------- */
+
+/* A surface arrives by fading in and growing the last four percent of its size. Four pixels of
+ * rise is what a panel the size of a which-key row reads as movement; on a modal seven hundred
+ * pixels across the same four pixels are invisible, and the amount that reads the same way is a
+ * *proportion* of the thing rather than a distance. Ninety milliseconds either way.
+ *
+ * There is one keyframe set per resting transform, and that is not incidental. A keyframe naming
+ * `transform` replaces the property *whole* — an element centred by `translateX(-50%)` and grown
+ * by a keyframe naming only `scale` is an element that is not centred for the length of the
+ * animation, which for a picker is a jump of half its width and back again. So each surface's
+ * arrival carries its own resting transform along with the movement.
+ *
+ * The scale is written after the centring translation in every one of them, which is what makes
+ * it a scale about the box's own middle rather than about the point the translation moved it
+ * from. Reversed, a picker would grow out of its left edge and slide as it went. */
+
+@keyframes zdt-rise {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* For the surfaces centred on the horizontal. */
+@keyframes zdt-zoom-centred-x {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+}
+
+/* And for the one centred on both. */
+@keyframes zdt-zoom-centred {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* For the ones anchored where they were opened rather than centred: a hover under a caret, a menu
+ * at a pointer. They grow from their own top left, because that is the point that was aimed at
+ * and a surface that grew from its middle would slide away from it. */
+@keyframes zdt-zoom-anchored {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Which-key is the one that already read right: it is a strip at the foot of the window, it moves
+ * four pixels, and it is left alone. */
+.whichkey {
+    animation-name: zdt-rise;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+}
+
+.picker,
+.prompt {
+    animation-name: zdt-zoom-centred-x;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+}
+
+.termfloat {
+    animation-name: zdt-zoom-centred;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+}
+
+.hover,
+.treemenu,
+.cmdline {
+    animation-name: zdt-zoom-anchored;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+    transform-origin: top left;
+}
+
+/* ---- Things that go ------------------------------------------------------------------------ */
+
+/* The same movement, run the other way.
+ *
+ * Written as its own keyframes rather than as `animation-direction: reverse` on the entry, because
+ * the entry has *finished* by the time anything closes: changing the direction of an animation
+ * that is already past its end changes nothing anybody can see, and only a new
+ * `animation-name` starts something. `forwards` holds the last frame, so the surface stays
+ * invisible for however many frames pass between the animation ending and the presence taking it
+ * away.
+ *
+ * Faster than the arrival. A surface appearing is worth a moment; a surface leaving is in the way,
+ * and the thing behind it is what is being looked at. */
+
+@keyframes zdt-shrink-centred-x {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) scale(0.96);
+    }
+}
+
+@keyframes zdt-shrink-centred {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.96);
+    }
+}
+
+@keyframes zdt-shrink-anchored {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+
+.picker[data-state="closed"],
+.prompt[data-state="closed"] {
+    animation-name: zdt-shrink-centred-x;
+    animation-duration: var(--zdt-instant);
+    animation-fill-mode: forwards;
+}
+
+.termfloat[data-state="closed"] {
+    animation-name: zdt-shrink-centred;
+    animation-duration: var(--zdt-instant);
+    animation-fill-mode: forwards;
+}
+
+.hover[data-state="closed"],
+.treemenu[data-state="closed"],
+.cmdline[data-state="closed"] {
+    animation-name: zdt-shrink-anchored;
+    animation-duration: var(--zdt-instant);
+    animation-fill-mode: forwards;
+}
+
+.picker__scrim[data-state="closed"],
+.treemenu__scrim[data-state="closed"] {
+    animation-name: zdt-vanish;
+    animation-duration: var(--zdt-instant);
+    animation-fill-mode: forwards;
+}
+
+@keyframes zdt-vanish {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+/* ---- Things that only fade ----------------------------------------------------------------- */
+
+@keyframes zdt-fade {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* What is behind a modal only fades — a scrim that slid would be a scrim that was noticed. */
+.picker__scrim,
+.treemenu__scrim {
+    animation-name: zdt-fade;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+}
+
+/* ---- Things that change while they stay ---------------------------------------------------- */
+
+/* A tree row appearing when its directory opens. The rows below it move because the list is
+ * taller, which is the animation people actually read; the new rows fading in is what says which
+ * ones are new. */
+.tree__row {
+    animation-name: zdt-fade;
+    animation-duration: var(--zdt-instant);
+    animation-timing-function: var(--zdt-ease);
+    transition-property: background-color, color;
+    transition-duration: var(--zdt-instant);
+    transition-timing-function: var(--zdt-ease);
+}
+
+/* The folder glyph turning as it opens. */
+.tree__row .glyph {
+    transition-property: color;
+    transition-duration: var(--zdt-instant);
+    transition-timing-function: var(--zdt-ease);
+}
+
+/* A picker row lighting up under the caret, and a tab under the pointer. */
+.picker__row,
+.tab,
+.tab__close,
+.treemenu__item,
+.chrome__button,
+.wincontrol {
+    transition-property: background-color, color, opacity;
+    transition-duration: var(--zdt-instant);
+    transition-timing-function: var(--zdt-ease);
+}

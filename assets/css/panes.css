@@ -25,6 +25,11 @@
 }
 
 .pane__buffer {
+    /* Positioned, so that the overlays inside it — the leap labels — are placed against *this*
+     * box rather than against whatever positioned ancestor happens to be above it. Without this
+     * they resolve against the frame, and every label is out by however far the pane sits from
+     * the window's corner: the tree's width across, the buffer line's height down. */
+    position: relative;
     display: flex;
     flex: 1 1 auto;
     min-width: 0;
@@ -135,4 +140,36 @@
 .spinner {
     font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
     color: var(--zui-color-primary);
+}
+
+/* A window with nothing in it.
+ *
+ * Two lines and a glyph. Not a dashboard: what a person wants from an empty pane is to stop
+ * looking at it, and the fastest way to say how is to say it once. */
+.pane__empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--zui-space-base) * 2);
+    color: var(--zui-color-muted-foreground);
+    user-select: none;
+}
+
+.pane__empty-icon {
+    width: 28px;
+    height: 28px;
+    opacity: 0.4;
+}
+
+.pane__empty-title {
+    font-size: 13px;
+    color: var(--zui-color-muted-foreground);
+}
+
+.pane__empty-hint {
+    font-size: 11px;
+    opacity: 0.6;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
 }

@@ -31,7 +31,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "window" => window(workspace, vim, leaf, args),
         "app" => app(workspace, leaf),
         "editor" => editor(handle, leaf),
-        "leap" => leap(workspace, vim, leaf),
+        "leap" => leap(workspace, vim, leaf, handle),
         "tree" => tree(workspace, leaf, args),
         "picker" => picker(workspace, leaf, args, handle),
         "terminal" => terminal(workspace, vim, leaf, args),
@@ -65,6 +65,17 @@ fn buffer(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
                 } else {
                     workspace.close_buffer(buffer.id);
                 }
+            }
+        }
+        // Not a picker: the tabs are on screen with their names on them already, so a modal that
+        // covers them to list them again is a worse way to do the same thing.
+        "pick" | "pick_close" => {
+            if let Some(tabs) = zgui::reactive::use_local_context::<crate::tabpick::TabPick>() {
+                tabs.start(if leaf == "pick_close" {
+                    crate::tabpick::Then::Close
+                } else {
+                    crate::tabpick::Then::Show
+                });
             }
         }
         "next" => workspace.cycle_buffer(1),
@@ -490,6 +501,18 @@ fn tree(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
         "first" => explorer.go_to(0),
         "last" => explorer.go_to(usize::MAX),
         "parent_or_close" => explorer.parent_or_close(),
+        // `<CR>` and a click work both ways; `l` steps into what is already open. The two are
+        // deliberately different, as they are in neo-tree.
+        //
+        // Not `tree.toggle` — that is the panel itself, and a row and a panel are not the same
+        // thing to toggle.
+        "activate" => {
+            if let Some(path) = explorer.toggle_selected() {
+                crate::files::open(workspace, path);
+                explorer.unfocus();
+                workspace.focus_editor();
+            }
+        }
         "child_or_open" => {
             if let Some(path) = explorer.open_selected() {
                 crate::files::open(workspace, path);
@@ -802,8 +825,16 @@ fn short(workspace: &Workspace, path: &std::path::Path) -> String {
 ///
 /// One action; the argument says which way it looks. Everything after the key that started it
 /// belongs to the leap layer rather than to the keymap.
-fn leap(workspace: &Workspace, vim: &Vim, leaf: &str) {
+fn leap(workspace: &Workspace, vim: &Vim, leaf: &str, handle: Option<&EditorHandle>) {
     use zdt_vim::leap::Direction;
+
+    // A leap needs text to label and an editor to take its next two keys. Started from the tree or
+    // a terminal there is neither, and what it would leave behind is a leap nothing can finish
+    // that then swallows the first key typed back in the editor.
+    if handle.is_none() {
+        workspace.say("nothing to leap over here");
+        return;
+    }
 
     match leaf {
         "forward" => vim.start_leap(Direction::Forward),

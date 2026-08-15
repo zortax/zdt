@@ -19,6 +19,7 @@ use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
+use crate::icons::IconProps;
 use crate::settings::use_settings;
 use crate::ui::Erase;
 use crate::ui::leap::LeapLabelsProps;
@@ -53,6 +54,17 @@ pub fn Pane(
         move || workspace.focused() == window
     };
 
+    // A window showing nothing is a real state, not a mistake to be papered over with an empty
+    // scratch buffer that nobody asked for and that then sits on the buffer line.
+    let empty = {
+        let workspace = workspace.clone();
+        move || {
+            workspace
+                .window(window)
+                .is_none_or(|state| state.current.is_none())
+        }
+    };
+
     view! {
         box(
             class = "pane",
@@ -71,6 +83,24 @@ pub fn Pane(
             for buffer in move || mounted(), key = |buffer: &BufferId| *buffer {
                 BufferView(window = window, buffer = buffer)
             }
+            {move || {
+                use crate::ui::Erase;
+                if empty() { view! { Nothing() }.any() } else { ().any() }
+            }}
+        }
+    }
+}
+
+/// What a window with no buffer in it shows.
+///
+/// Not a hint sheet and not a dashboard — two lines saying what is true and how to change it.
+#[component]
+fn Nothing() -> impl IntoView {
+    view! {
+        column(class = "pane__empty") {
+            Icon(icon = crate::icons::FILE, class = "pane__empty-icon")
+            label(class = "pane__empty-title") {"No buffer open"}
+            label(class = "pane__empty-hint") {"<Space>ff to find a file   <Space>n for a new one"}
         }
     }
 }
@@ -103,7 +133,7 @@ fn BufferView(
         move || {
             workspace
                 .window(window)
-                .is_some_and(|state| state.current == buffer)
+                .is_some_and(|state| state.current == Some(buffer))
         }
     };
 
@@ -129,11 +159,17 @@ fn BufferView(
 
             // The language is set through the handle rather than through the prop, because the
             // prop takes a name and this has an answer that may be "none".
+            // Kept so that the cleanup below can say *which* editor is going away. A pane rebuilt
+            // in place registers its new editor before the old one is cleaned up, and a cleanup
+            // that only named the window and the buffer would take the new registration with it.
+            let mine: Rc<RefCell<Option<EditorHandle>>> = Rc::new(RefCell::new(None));
             let on_ready = {
                 let workspace = workspace.clone();
                 let language = entry.language();
+                let mine = Rc::clone(&mine);
                 Box::new(move |handle: EditorHandle| {
                     handle.set_language(language);
+                    *mine.borrow_mut() = Some(handle.clone());
                     workspace.register_handle(window, buffer, handle);
                 }) as Box<dyn Fn(EditorHandle)>
             };
@@ -159,7 +195,12 @@ fn BufferView(
 
             {
                 let workspace = workspace.clone();
-                on_cleanup_local(move || workspace.forget_handle(window, buffer));
+                let mine = Rc::clone(&mine);
+                on_cleanup_local(move || {
+                    if let Some(handle) = mine.borrow().as_ref() {
+                        workspace.forget_handle(window, buffer, handle);
+                    }
+                });
             }
 
             // The editor with the keyboard is the current buffer of the focused window. Followed
@@ -176,9 +217,12 @@ fn BufferView(
                 let claim: Rc<RefCell<Option<TimeoutHandle>>> = Rc::new(RefCell::new(None));
                 let held = Rc::clone(&claim);
                 let focus = RenderEffect::new(move |_| {
+                    // Read first: an editor mounting is what has to wake this, and it is the one
+                    // thing that changes without the window or the focus changing.
+                    let _ = workspace.mounted_revision();
                     let current = workspace
                         .window(window)
-                        .is_some_and(|state| state.current == buffer);
+                        .is_some_and(|state| state.current == Some(buffer));
                     if !current || workspace.focused() != window {
                         return;
                     }

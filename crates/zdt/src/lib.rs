@@ -23,6 +23,7 @@ pub mod prompt;
 pub mod reload;
 pub mod session;
 pub mod settings;
+pub mod tabpick;
 pub mod task;
 pub mod terminals;
 pub mod ui;

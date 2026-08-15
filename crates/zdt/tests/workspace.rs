@@ -101,22 +101,38 @@ fn closing_the_shown_buffer_shows_another() {
         );
         assert!(
             space.current_buffer().is_some(),
-            "a window always shows something"
+            "the window falls back to the buffer beside the one that went"
         );
     });
 }
 
 #[test]
-fn closing_the_last_buffer_leaves_an_empty_one() {
-    // `:bd` on a lone buffer is not a way to have no buffer.
+fn closing_the_last_buffer_leaves_the_window_empty() {
+    // A window with nothing in it is a real state. Conjuring a scratch buffer instead would put a
+    // file nobody asked for on the buffer line every time the last one was closed.
     in_scope(|| {
         let space = workspace();
         let only = space.order()[0];
         assert!(space.close_buffer(only));
-        assert_eq!(space.order().len(), 1);
-        let left = space.current_buffer().expect("something is shown");
-        assert_ne!(left.id, only);
-        assert!(left.path.is_none());
+
+        assert!(space.order().is_empty());
+        assert!(space.current_buffer().is_none());
+        assert!(
+            space.window(space.focused_untracked()).is_some(),
+            "the window is still there — it is showing nothing, not gone"
+        );
+    });
+}
+
+#[test]
+fn opening_something_fills_an_empty_window_again() {
+    in_scope(|| {
+        let space = workspace();
+        let only = space.order()[0];
+        space.close_buffer(only);
+
+        let id = space.open_document(Some("/project/a.rs".into()), zgui_editor::Document::new(""));
+        assert_eq!(space.current_buffer().map(|buffer| buffer.id), Some(id));
     });
 }
 
