@@ -770,7 +770,16 @@ desc = "Search word backwards"
 [[map]]
 mode = ["n"]
 keys = ":"
-action = "command.start"
+action = "cmdline.open"
+desc = "Command line"
+
+# From a visual selection the range is already there, which is what makes `:'<,'>s/a/b/` two keys
+# rather than six.
+[[map]]
+mode = ["x"]
+keys = ":"
+action = "cmdline.open"
+args = { start = "'<,'>" }
 desc = "Command line"
 
 # ---- Marks, jumps and macros --------------------------------------------------------------------
@@ -1121,6 +1130,35 @@ keys = "<C-l>"
 action = "window.focus"
 args = { direction = "right" }
 desc = "Window right"
+
+# The text in this window alone, which is what a person zooming a split is asking for.
+[[map]]
+mode = ["n", "i", "x", "t"]
+keys = "<C-+>"
+action = "window.zoom"
+args = { step = 1 }
+desc = "Larger text"
+
+[[map]]
+mode = ["n", "i", "x", "t"]
+keys = "<C-=>"
+action = "window.zoom"
+args = { step = 1 }
+desc = "Larger text"
+
+[[map]]
+mode = ["n", "i", "x", "t"]
+keys = "<C-->"
+action = "window.zoom"
+args = { step = -1 }
+desc = "Smaller text"
+
+[[map]]
+mode = ["n", "i", "x", "t"]
+keys = "<C-0>"
+action = "window.zoom"
+args = { step = 0 }
+desc = "Reset text size"
 
 # ---- Find ------------------------------------------------------------------------------------
 

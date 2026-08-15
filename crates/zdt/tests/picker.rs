@@ -131,7 +131,8 @@ fn a_row_carries_the_file_it_stands_for() {
         row.target,
         Target::File {
             path: temp.0.join("src/main.rs"),
-            line: None
+            line: None,
+            matched: None
         }
     );
 }
@@ -184,10 +185,14 @@ fn a_search_finds_lines_and_says_which() {
     let rows = picker.rows();
     assert_eq!(rows.len(), 2, "one in each file");
     for row in &rows {
-        let Target::File { line, .. } = &row.target else {
+        let Target::File { line, matched, .. } = &row.target else {
             panic!("a hit stands for a file at a line");
         };
         assert!(line.is_some());
+        assert!(
+            matched.as_ref().is_some_and(|range| !range.is_empty()),
+            "and says which bytes of the line to pick out in the preview"
+        );
         assert!(row.detail.contains("alpha"), "and shows the line");
     }
 }

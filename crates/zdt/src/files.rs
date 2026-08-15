@@ -175,7 +175,10 @@ pub fn save_as(
         match written {
             Ok(()) => {
                 if let Some(entry) = workspace.buffer_untracked(buffer) {
-                    entry.saved_revision.set(revision);
+                    // What was written is now what is on disk, so the mark goes and the
+                    // fingerprint an undo will be compared against is this text.
+                    entry.revision.set(revision);
+                    entry.mark_saved();
                 }
                 // The servers hear about the save, and the signs are worked out again from what
                 // is now on disk.

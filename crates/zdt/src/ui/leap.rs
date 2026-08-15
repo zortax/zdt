@@ -50,7 +50,10 @@ pub fn LeapLabels(
                     // A place the editor cannot put on screen is one that has scrolled away since
                     // the labels were worked out. Leaving it out is better than drawing it at the
                     // origin.
-                    let rect = handle.point_for_byte(landing.at)?;
+                    //
+                    // Element-local, because these labels are placed inside a box that fills the
+                    // editor: a window coordinate would be out by wherever the pane happens to sit.
+                    let rect = handle.local_point_for_byte(landing.at)?;
                     Some((landing.label, rect.x, rect.y, rect.height))
                 })
                 .collect::<Vec<_>>()

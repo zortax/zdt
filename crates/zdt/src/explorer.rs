@@ -48,6 +48,14 @@ struct Inner {
     claims: RwSignal<u64, LocalStorage>,
     /// What a cut or a copy left waiting.
     clipboard: RwSignal<Option<Clipboard>, LocalStorage>,
+    /// Every row a person has picked out, beside the one the caret is on.
+    ///
+    /// By path rather than by index, because a directory opening above them moves every index
+    /// below it and a selection that slid down a screen would be a selection nobody meant.
+    marked: RwSignal<Vec<PathBuf>, LocalStorage>,
+    /// What is being dragged, and where it would land.
+    dragging: RwSignal<Option<PathBuf>, LocalStorage>,
+    over: RwSignal<Option<PathBuf>, LocalStorage>,
 }
 
 impl Explorer {
@@ -63,6 +71,9 @@ impl Explorer {
                 focused: RwSignal::new_local(false),
                 claims: RwSignal::new_local(0),
                 clipboard: RwSignal::new_local(None),
+                marked: RwSignal::new_local(Vec::new()),
+                dragging: RwSignal::new_local(None),
+                over: RwSignal::new_local(None),
             }),
         }
     }
@@ -152,6 +163,147 @@ impl Explorer {
     #[must_use]
     pub fn root(&self) -> PathBuf {
         self.inner.tree.borrow().root().to_path_buf()
+    }
+
+    // ---- Picking several out ------------------------------------------------------------
+
+    /// Every row a person has picked out. Tracked.
+    #[must_use]
+    pub fn marked(&self) -> Vec<PathBuf> {
+        self.inner.marked.get()
+    }
+
+    /// Whether `path` is one of them. Tracked.
+    #[must_use]
+    pub fn is_marked(&self, path: &Path) -> bool {
+        self.inner
+            .marked
+            .with(|marked| marked.iter().any(|held| held == path))
+    }
+
+    /// Adds `at` to the set, or takes it out — what a control-click does.
+    pub fn toggle_mark(&self, at: usize) {
+        let Some(row) = self.row_at(at) else {
+            return;
+        };
+        self.inner.marked.update(|marked| {
+            match marked.iter().position(|held| *held == row.entry.path) {
+                Some(index) => {
+                    marked.remove(index);
+                }
+                None => marked.push(row.entry.path.clone()),
+            }
+        });
+        self.go_to(at);
+    }
+
+    /// Picks out everything between the caret and `at` — what a shift-click does.
+    pub fn mark_through(&self, at: usize) {
+        let from = self.inner.at.get_untracked();
+        let (first, last) = if from <= at { (from, at) } else { (at, from) };
+        let paths: Vec<PathBuf> = self.inner.rows.with_untracked(|rows| {
+            rows.get(first..=last.min(rows.len().saturating_sub(1)))
+                .unwrap_or_default()
+                .iter()
+                .map(|row| row.entry.path.clone())
+                .collect()
+        });
+        self.inner.marked.set(paths);
+        self.go_to(at);
+    }
+
+    /// Forgets the set, which every ordinary click does.
+    pub fn clear_marks(&self) {
+        if !self.inner.marked.with_untracked(Vec::is_empty) {
+            self.inner.marked.set(Vec::new());
+        }
+    }
+
+    /// What an action should act on: everything picked out, or the row the caret is on.
+    #[must_use]
+    pub fn acting_on(&self) -> Vec<PathBuf> {
+        let marked = self.inner.marked.get_untracked();
+        if marked.is_empty() {
+            self.selected()
+                .map(|row| vec![row.entry.path])
+                .unwrap_or_default()
+        } else {
+            marked
+        }
+    }
+
+    /// The row at `at`, without subscribing.
+    #[must_use]
+    pub fn row_at(&self, at: usize) -> Option<Row> {
+        self.inner.rows.with_untracked(|rows| rows.get(at).cloned())
+    }
+
+    // ---- Dragging -------------------------------------------------------------------------
+
+    /// Says a drag of the row at `at` has begun.
+    pub fn start_drag(&self, at: usize) {
+        if let Some(row) = self.row_at(at) {
+            self.inner.dragging.set(Some(row.entry.path));
+        }
+    }
+
+    /// What is being dragged. Tracked.
+    #[must_use]
+    pub fn dragging(&self) -> Option<PathBuf> {
+        self.inner.dragging.get()
+    }
+
+    /// Says the pointer is over the row at `at` during a drag.
+    pub fn drag_over(&self, at: usize) {
+        if self.inner.dragging.with_untracked(Option::is_none) {
+            return;
+        }
+        let over = self.row_at(at).map(|row| row.entry.path);
+        if self.inner.over.get_untracked() != over {
+            self.inner.over.set(over);
+        }
+    }
+
+    /// Which row a drop would land on. Tracked.
+    #[must_use]
+    pub fn drop_target(&self) -> Option<PathBuf> {
+        self.inner.over.get()
+    }
+
+    /// Ends the drag, answering what should move where.
+    ///
+    /// The directory a drop lands in: the row itself when it is one, and the one holding it when
+    /// it is a file — which is what dropping *beside* something means.
+    pub fn finish_drag(&self) -> Option<(PathBuf, PathBuf)> {
+        let from = self.inner.dragging.get_untracked()?;
+        let onto = self.inner.over.get_untracked();
+        self.cancel_drag();
+
+        let onto = onto?;
+        let into = if self.inner.tree.borrow().is_directory(&onto) {
+            onto
+        } else {
+            onto.parent()?.to_path_buf()
+        };
+        // Onto itself, or into the directory it is already in: nothing to do.
+        if into == from || from.parent() == Some(into.as_path()) {
+            return None;
+        }
+        // A directory cannot be moved inside itself, which would take the tree with it.
+        if into.starts_with(&from) {
+            return None;
+        }
+        Some((from, into))
+    }
+
+    /// Ends the drag without moving anything.
+    pub fn cancel_drag(&self) {
+        if self.inner.dragging.with_untracked(Option::is_some) {
+            self.inner.dragging.set(None);
+        }
+        if self.inner.over.with_untracked(Option::is_some) {
+            self.inner.over.set(None);
+        }
     }
 
     // ---- Moving about --------------------------------------------------------------------

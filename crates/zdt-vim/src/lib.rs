@@ -9,6 +9,7 @@ pub mod chord;
 pub mod config;
 pub mod effect;
 pub mod engine;
+pub mod ex;
 pub mod keymap;
 pub mod leap;
 pub mod mode;

@@ -1,6 +1,7 @@
 //! Everything the window is drawn from.
 
 pub mod chrome;
+pub mod cmdline;
 pub mod diagnostics;
 pub mod frame;
 pub mod leap;
@@ -12,6 +13,7 @@ pub mod statusline;
 pub mod terminal;
 pub mod theme;
 pub mod tree;
+pub mod treemenu;
 pub mod whichkey;
 
 use zgui::prelude::*;

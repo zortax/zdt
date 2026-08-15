@@ -28,7 +28,7 @@ use zdt_core::search::{Cancel, Walk};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
-pub use crate::picker::source::{Reach, Row, Source, Target};
+pub use crate::picker::source::{Preview, Reach, Row, Source, Target};
 use crate::settings::Settings;
 use crate::workspace::Workspace;
 
@@ -73,6 +73,11 @@ struct Inner {
 
     /// Which question is being answered. An answer for an older one is thrown away.
     generation: Cell<u64>,
+    /// Whether what is shown belongs to a question nobody is asking any more.
+    ///
+    /// The rows of the last search, kept on screen until the new one has something to replace
+    /// them with. The first batch to arrive clears this and takes their place.
+    stale: Cell<bool>,
     /// The candidates of a standing source, before ranking.
     candidates: RefCell<Vec<Row>>,
     /// The matcher, for the file list.
@@ -101,6 +106,7 @@ impl Picker {
                 counts: RwSignal::new_local((0, 0)),
                 working: RwSignal::new_local(false),
                 generation: Cell::new(0),
+                stale: Cell::new(false),
                 candidates: RefCell::new(Vec::new()),
                 ranker: RefCell::new(None),
                 polling: RefCell::new(None),
@@ -258,7 +264,7 @@ impl Picker {
         self.close();
 
         match row.target {
-            Target::File { path, line } => crate::files::open_at(&workspace, path, line),
+            Target::File { path, line, .. } => crate::files::open_at(&workspace, path, line),
             Target::Buffer(id) => workspace.show(id),
             Target::Line(line) => {
                 if let Some(buffer) = workspace.current_buffer() {
@@ -468,13 +474,19 @@ impl Picker {
     // ---- Grep --------------------------------------------------------------------------------
 
     /// Starts a search after a pause, cancelling whatever was running.
+    ///
+    /// What is on screen stays there until the new search has something to put in its place. The
+    /// alternative — clearing on the keystroke — empties the list and the preview for as long as
+    /// the search takes, which at one search per keystroke is a flicker the whole time somebody
+    /// is typing.
     fn start_grep(&self, source: &Source, query: &str) {
         self.stop();
-        self.inner.rows.set(Vec::new());
-        self.inner.counts.set((0, 0));
         if query.is_empty() {
+            self.publish(Vec::new());
+            self.inner.counts.set((0, 0));
             return;
         }
+        self.inner.stale.set(true);
 
         let Some(timers) = self.inner.timers.clone() else {
             return;
@@ -536,6 +548,12 @@ impl Picker {
                 return;
             }
             picker.inner.working.set(false);
+            // Nothing was found, so nothing replaced the last search's rows: they go now. Waiting
+            // until the end to say so is what keeps them on screen while there is still hope.
+            if picker.inner.stale.replace(false) {
+                picker.publish(Vec::new());
+                picker.inner.counts.set((0, 0));
+            }
             if let Err(error) = outcome {
                 picker.inner.workspace.complain(error.to_string());
             }
@@ -567,6 +585,7 @@ impl Picker {
                 .map(|hit| {
                     Row::file(hit.path, &root, Some(hit.line))
                         .with_detail(hit.text.trim_start().to_owned())
+                        .with_match(hit.column..hit.column + hit.length)
                 })
                 .collect();
             picker.extend(rows, limit);
@@ -602,7 +621,14 @@ impl Picker {
         if rows.is_empty() {
             return;
         }
-        let mut held = self.inner.rows.get_untracked();
+        // The first batch of a new search replaces what the last one left; every batch after it
+        // adds to what this one has found.
+        let mut held = if self.inner.stale.replace(false) {
+            self.inner.at.set(0);
+            Vec::new()
+        } else {
+            self.inner.rows.get_untracked()
+        };
         if held.len() >= limit {
             return;
         }

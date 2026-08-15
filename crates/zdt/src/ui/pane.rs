@@ -140,11 +140,13 @@ fn BufferView(
             // The revision the buffer line's dirty mark is decided by. Written from here because
             // this is the only thing that hears the editor.
             let on_event = {
-                let revision = entry.revision;
+                let entry = entry.clone();
                 let language = zgui::reactive::use_local_context::<crate::language::Language>();
                 Box::new(move |event: zgui_editor::EditorEvent| {
-                    if let zgui_editor::EditorEvent::Edited { revision: at, .. } = event {
-                        revision.set(at);
+                    if let zgui_editor::EditorEvent::Edited { .. } = event {
+                        // Whether it is dirty is a question about the *text*, not the revision:
+                        // undoing back to what is on disk gives a new revision, not the old one.
+                        entry.refresh_dirty();
                         // The servers hear about it after a pause, so that typing a word is one
                         // notification rather than five.
                         if let Some(language) = language.as_ref() {
@@ -232,6 +234,14 @@ fn BufferView(
             // vim mode needs. A key it declines falls through to the editor's own handling —
             // which is what makes typing in insert mode the editor's business, with its
             // auto-indent and its undo grouping.
+            let font_step = {
+                let workspace = workspace.clone();
+                move || {
+                    let step = workspace.font_step(window);
+                    (step != 0).then(|| step.to_string())
+                }
+            };
+
             let vim = use_vim();
             let on_key: zgui_editor::KeyFilter = Box::new(
                 move |event: &zgui::vocab::KeyEvent,
@@ -253,6 +263,11 @@ fn BufferView(
                     LeapLabels(window = window, buffer = buffer)
                     Editor(
                         class = "pane__editor",
+                        // This window's own size, so `<C-+>` in a split grows that split alone.
+                        // A custom property rather than `font-size` itself: the editor reads its
+                        // metrics off the computed style, and the sheet decides what to do with
+                        // the number.
+                        style:--zdt-pane-font-step = font_step,
                         document = document.clone(),
                         config = config,
                         autofocus = false,

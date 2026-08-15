@@ -15,6 +15,9 @@
 }
 
 .chrome__button {
+    /* Flex, and said so: `align-items` and `justify-content` do nothing to a block, which is what
+     * put every one of these icons in its top-left corner. */
+    display: flex;
     width: 22px;
     height: 22px;
     flex: none;
@@ -77,12 +80,52 @@
     text-overflow: ellipsis;
 }
 
-/* Always in the row, so a buffer becoming dirty does not move the name beside it. */
-.tab__mark {
+/* One slot at the end of every tab, always the same size, so a buffer becoming dirty does not
+ * move the name beside it and neither does the pointer arriving. */
+.tab__slot {
+    position: relative;
     flex: none;
-    width: 10px;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab__mark {
     font-size: 9px;
+    line-height: 1;
     color: var(--zdt-warning);
+    opacity: 0;
+}
+
+.tab[data-dirty="true"] .tab__mark {
+    opacity: 1;
+}
+
+/* The close button takes the slot while the pointer is over the tab — in place of the dot, not
+ * beside it, so the tab is the same width either way. */
+.tab__close {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    color: var(--zui-color-muted-foreground);
+}
+
+.tab:hover .tab__close {
+    display: flex;
+}
+
+.tab:hover .tab__mark {
+    opacity: 0;
+}
+
+.tab__close:hover {
+    background-color: var(--zui-color-muted);
+    color: var(--zui-color-foreground);
 }
 
 .statusline {
@@ -194,4 +237,53 @@
     max-width: 40%;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* The command line.
+ *
+ * Where the status line is, because that is where vim puts it and because a line that floats over
+ * the text covers what the command is about. Same height, so nothing moves when it opens. */
+.cmdline {
+    flex: none;
+    height: var(--status);
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-xs);
+    padding: 0 var(--zui-space-md);
+    background-color: var(--zui-color-sidebar);
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 12px;
+}
+
+.cmdline__sigil {
+    flex: none;
+    color: var(--zui-color-primary);
+    font-weight: 600;
+}
+
+.cmdline__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 18px;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 12px;
+}
+
+/* Two classes, to out-specify the field's own scoped sheet: the command line *is* the field, and
+ * a border inside a bar is a box drawn around nothing. */
+.cmdline .cmdline__input,
+.cmdline .cmdline__input:focus,
+.cmdline .cmdline__input:focus-visible {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    outline: none;
+    background-color: transparent;
+    padding: 0;
+}
+
+/* The status line takes the sidebar's tone too, so the two bars read as the same plane and the
+ * editor is the one thing that is not. */
+.statusline {
+    background-color: var(--zui-color-sidebar);
 }

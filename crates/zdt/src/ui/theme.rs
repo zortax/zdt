@@ -73,8 +73,8 @@ pub fn settings_sheet(config: &zdt_core::Config) -> String {
          --tree-width: {tree_width}px;\n  \
          --terminal-float-width: {float_width}%;\n  \
          --terminal-float-height: {float_height}%;\n}}\n\
-         .pane__editor {{\n  --zdt-editor-font: \"{editor}\";\n  font-size: {editor_size}px;\n  \
-         tab-size: {tab};\n}}\n",
+         .pane__editor {{\n  --zdt-editor-font: \"{editor}\";\n  \
+         --zdt-editor-size: {editor_size}px;\n  tab-size: {tab};\n}}\n",
         ui = config.ui.font,
         ui_size = config.ui.font_size,
         editor = config.editor.font,

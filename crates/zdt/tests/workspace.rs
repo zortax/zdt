@@ -121,17 +121,19 @@ fn closing_the_last_buffer_leaves_an_empty_one() {
 }
 
 #[test]
-fn a_buffer_is_dirty_until_it_is_marked_saved() {
-    use zgui::reactive::prelude::*;
-
+fn a_buffer_opens_holding_what_is_on_disk() {
     in_scope(|| {
         let space = workspace();
-        let id = space.open_document(Some("/project/a.rs".into()), zgui_editor::Document::new(""));
+        let id = space.open_document(
+            Some("/project/a.rs".into()),
+            zgui_editor::Document::new("one\n"),
+        );
         let buffer = space.buffer_untracked(id).expect("it is open");
-        assert!(!buffer.is_dirty());
+        assert!(
+            !buffer.is_dirty(),
+            "what it opens with is what was read, so nothing differs yet"
+        );
 
-        buffer.revision.set(7);
-        assert!(buffer.is_dirty());
         buffer.mark_saved();
         assert!(!buffer.is_dirty());
     });

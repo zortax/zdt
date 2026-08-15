@@ -22,14 +22,24 @@
     border-width: 0;
 }
 
-/* The three rows the window is: the header, the body, the status line. The body is the tree
- * beside the windows, both of which manage their own scrolling. */
+/* The two rows the window is: the body and the status line. The body is the tree beside the work
+ * area, and the work area is the buffer line above the windows — so the tabs sit over what they
+ * are tabs for and the tree reaches the top of the window. */
 .frame__body {
     flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
     display: flex;
     flex-direction: row;
+    overflow: hidden;
+}
+
+.workarea {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -57,6 +67,7 @@
 /* The window buttons. Square, unfilled, and only tinted under the pointer — the close one red,
  * because that is the one press that cannot be taken back. */
 .wincontrols {
+    display: flex;
     align-items: center;
     gap: 1px;
     padding-right: 3px;
@@ -64,6 +75,7 @@
 }
 
 .wincontrol {
+    display: flex;
     width: 22px;
     height: 22px;
     align-items: center;

@@ -56,8 +56,57 @@ pub struct Buffer {
     pub lossy: bool,
     /// The revision the text is at, as the views report it.
     pub revision: RwSignal<u64, LocalStorage>,
-    /// The revision it was last written at. Different from `revision` means unsaved changes.
+    /// The revision it was last written at.
     pub saved_revision: RwSignal<u64, LocalStorage>,
+    /// What was written, as a length and a hash.
+    ///
+    /// The revision alone cannot answer whether a buffer is dirty: undoing back to the text that
+    /// is on disk produces a *new* revision, not the old one, so a buffer edited and then undone
+    /// would keep its mark for ever. What the mark means is "this differs from the file", and
+    /// that is a question about the text.
+    pub saved_text: RwSignal<Fingerprint, LocalStorage>,
+    /// Whether the text differs from what was written, worked out when the text moves.
+    ///
+    /// Held rather than computed on read, because the buffer line reads it every frame and the
+    /// answer costs a hash of the file.
+    pub dirty: RwSignal<bool, LocalStorage>,
+}
+
+/// Enough of a text to tell it apart from another, cheaply.
+///
+/// A length and a hash. The length is checked first and rules out almost every case without
+/// hashing anything: a buffer somebody has typed into is a different length nearly always.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Fingerprint {
+    /// How many bytes it was.
+    pub len: usize,
+    /// What it hashed to.
+    pub hash: u64,
+}
+
+impl Fingerprint {
+    /// The fingerprint of `rope`.
+    #[must_use]
+    pub fn of(rope: &ropey::Rope) -> Self {
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = rustc_hash::FxHasher::default();
+        for chunk in rope.chunks() {
+            chunk.hash(&mut hasher);
+        }
+        Self {
+            len: rope.len_bytes(),
+            hash: hasher.finish(),
+        }
+    }
+
+    /// Whether `rope` is what this was taken from.
+    ///
+    /// The length first: a mismatch there is an answer without hashing a megabyte.
+    #[must_use]
+    pub fn matches(&self, rope: &ropey::Rope) -> bool {
+        rope.len_bytes() == self.len && Self::of(rope) == *self
+    }
 }
 
 impl Buffer {
@@ -67,6 +116,9 @@ impl Buffer {
             .as_deref()
             .map(zdt_core::language::of)
             .unwrap_or(zdt_core::language::UNKNOWN);
+        // A buffer opens holding exactly what was read, so what it opens with *is* what is on
+        // disk — and a file that is not there yet is an empty buffer whose empty text matches.
+        let saved = Fingerprint::of(&document.rope());
         Self {
             id,
             path,
@@ -77,6 +129,8 @@ impl Buffer {
             lossy: false,
             revision: RwSignal::new_local(0),
             saved_revision: RwSignal::new_local(0),
+            saved_text: RwSignal::new_local(saved),
+            dirty: RwSignal::new_local(false),
         }
     }
 
@@ -94,6 +148,8 @@ impl Buffer {
             lossy: false,
             revision: RwSignal::new_local(0),
             saved_revision: RwSignal::new_local(0),
+            saved_text: RwSignal::new_local(Fingerprint::default()),
+            dirty: RwSignal::new_local(false),
         }
     }
 
@@ -140,20 +196,89 @@ impl Buffer {
         }
     }
 
-    /// Whether the text has changed since it was last written.
+    /// Whether the text differs from what is on disk.
     ///
-    /// Tracked: a buffer tab reading this wakes when the text moves and at no other time.
+    /// Tracked: a buffer tab reading this wakes when the answer changes and at no other time.
     pub fn is_dirty(&self) -> bool {
-        self.revision.get() != self.saved_revision.get()
+        self.dirty.get()
     }
 
-    /// Marks the buffer as written at the revision it is at now.
+    /// Works out whether it still differs, and remembers the answer.
+    ///
+    /// Called when the text moves. The revision is checked first — equal revisions cannot differ
+    /// — and then the fingerprint, whose length check settles nearly every case for nothing.
+    pub fn refresh_dirty(&self) {
+        let Some(document) = self.document() else {
+            return;
+        };
+        let revision = document.revision();
+        self.revision.set(revision);
+
+        let dirty = revision != self.saved_revision.get_untracked()
+            && !self
+                .saved_text
+                .with_untracked(|saved| saved.matches(&document.rope()));
+        if self.dirty.get_untracked() != dirty {
+            self.dirty.set(dirty);
+        }
+    }
+
+    /// Marks the buffer as written at the revision and text it is at now.
     pub fn mark_saved(&self) {
         self.saved_revision.set(self.revision.get_untracked());
+        if let Some(document) = self.document() {
+            self.saved_text.set(Fingerprint::of(&document.rope()));
+        }
+        if self.dirty.get_untracked() {
+            self.dirty.set(false);
+        }
     }
 
     /// Whether this buffer is the file at `path`.
     pub fn is_at(&self, path: &Path) -> bool {
         self.path.as_deref() == Some(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Fingerprint;
+
+    #[test]
+    fn a_fingerprint_knows_its_own_text() {
+        let rope = ropey::Rope::from_str("hello\nworld\n");
+        let taken = Fingerprint::of(&rope);
+        assert!(taken.matches(&rope));
+    }
+
+    #[test]
+    fn text_that_changed_and_changed_back_matches_again() {
+        // The whole reason a fingerprint is used rather than the revision: undoing produces a new
+        // revision, never the old one, so only the text can answer whether anything differs.
+        let saved = Fingerprint::of(&ropey::Rope::from_str("hello\n"));
+
+        assert!(!saved.matches(&ropey::Rope::from_str("goodbye\n")));
+        assert!(saved.matches(&ropey::Rope::from_str("hello\n")));
+    }
+
+    #[test]
+    fn a_different_length_is_answered_without_hashing() {
+        // Not observable from outside, which is the point: the length check is what makes this
+        // cheap enough to run on every keystroke. What is observable is that it still answers.
+        let saved = Fingerprint::of(&ropey::Rope::from_str("hello"));
+        assert!(!saved.matches(&ropey::Rope::from_str("hello world")));
+    }
+
+    #[test]
+    fn the_same_length_and_different_text_is_caught() {
+        let saved = Fingerprint::of(&ropey::Rope::from_str("abcd"));
+        assert!(!saved.matches(&ropey::Rope::from_str("abce")));
+    }
+
+    #[test]
+    fn an_empty_text_is_its_own_fingerprint() {
+        let empty = ropey::Rope::from_str("");
+        assert!(Fingerprint::of(&empty).matches(&empty));
+        assert!(!Fingerprint::of(&empty).matches(&ropey::Rope::from_str("x")));
     }
 }

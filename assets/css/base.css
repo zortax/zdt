@@ -50,6 +50,7 @@
     --zgui-stroke-width: 2px;
 }
 
+.icon--xs { width: 10px; height: 10px; }
 .icon--sm { width: var(--zui-icon-sm); height: var(--zui-icon-sm); }
 .icon--lg { width: var(--zui-icon-lg); height: var(--zui-icon-lg); }
 

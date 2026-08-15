@@ -43,6 +43,11 @@ pub struct WindowState {
     pub current: BufferId,
     /// Which buffers have an editor mounted here, most recently seen first.
     pub mounted: Vec<BufferId>,
+    /// How much larger or smaller this window's text is than the setting, in steps of one pixel.
+    ///
+    /// Per window rather than per application: `<C-+>` in a split is a request to read *this*
+    /// file more comfortably, and shrinking the status line along with it is not what was asked.
+    pub font_step: i32,
 }
 
 /// Everything that is open.
@@ -97,6 +102,7 @@ impl Workspace {
         let window = windows.insert(WindowState {
             current: scratch,
             mounted: vec![scratch],
+            font_step: 0,
         });
 
         Self {
@@ -425,6 +431,7 @@ impl Workspace {
                 windows.insert(WindowState {
                     current,
                     mounted: vec![current],
+                    font_step: 0,
                 })
             })
             .expect("the window map is writable");
@@ -552,6 +559,30 @@ impl Workspace {
     ///
     /// Answers whether there was one. Nothing that way is not an error: `<C-w>h` in the leftmost
     /// window is a key that does nothing, the same as in vim.
+    /// Makes this window's text `step` pixels larger, or puts it back when `step` is zero.
+    pub fn zoom(&self, window: WindowId, step: i32) {
+        self.inner.windows.update(|windows| {
+            let Some(state) = windows.get_mut(window) else {
+                return;
+            };
+            state.font_step = if step == 0 {
+                0
+            } else {
+                // Bounded either way: text of no pixels draws nothing, and text the size of the
+                // window leaves no room for any.
+                (state.font_step + step).clamp(-6, 24)
+            };
+        });
+    }
+
+    /// How much larger this window's text is than the setting. Tracked.
+    #[must_use]
+    pub fn font_step(&self, window: WindowId) -> i32 {
+        self.inner
+            .windows
+            .with(|windows| windows.get(window).map_or(0, |state| state.font_step))
+    }
+
     pub fn focus_direction(&self, direction: crate::workspace::Direction) -> bool {
         let from = self.focused_untracked();
         let Some(next) = self

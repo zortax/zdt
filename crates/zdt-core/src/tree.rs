@@ -100,6 +100,25 @@ impl Tree {
         }
     }
 
+    /// Whether `path` is a directory, as the rows that have been read say.
+    ///
+    /// Answered from what has been walked rather than from the filesystem: this is asked while a
+    /// pointer moves, and a `stat` per frame is a `stat` too many.
+    #[must_use]
+    pub fn is_directory(&self, path: &Path) -> bool {
+        if path == self.root {
+            return true;
+        }
+        let Some(parent) = path.parent() else {
+            return false;
+        };
+        self.children.get(parent).is_some_and(|entries| {
+            entries
+                .iter()
+                .any(|entry| entry.path == path && entry.directory)
+        })
+    }
+
     /// Whether `path` is an open directory.
     #[must_use]
     pub fn is_expanded(&self, path: &Path) -> bool {

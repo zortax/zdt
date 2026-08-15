@@ -38,6 +38,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "lsp" => lsp::run(workspace, leaf, handle),
         "git" => git::run(workspace, leaf, handle),
         "session" => session(workspace, leaf, handle),
+        "cmdline" => cmdline(workspace, leaf, args),
         "diagnostic" => lsp::diagnostic(workspace, leaf, handle),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
@@ -144,19 +145,62 @@ fn window(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::Args) {
             vim.reset();
         }
         "focus" => {
-            let moved = match args.str("direction").and_then(Direction::named) {
-                Some(direction) => workspace.focus_direction(direction),
+            let Some(direction) = args.str("direction").and_then(Direction::named) else {
                 // No direction named: `<C-w>w`, which walks the windows in order.
-                None => {
-                    workspace.cycle_window(true);
-                    true
-                }
+                workspace.cycle_window(true);
+                vim.reset();
+                return;
             };
-            if moved {
+
+            let explorer = zgui::reactive::use_local_context::<Explorer>();
+
+            // Out of the tree first: it is not a window, so no amount of walking the layout
+            // finds it, and a person in it pressing `<C-l>` means the editor.
+            if let Some(explorer) = explorer.as_ref()
+                && explorer.is_focused_untracked()
+            {
+                if direction != Direction::Left {
+                    explorer.unfocus();
+                    workspace.focus_editor();
+                    vim.reset();
+                }
+                return;
+            }
+
+            if workspace.focus_direction(direction) {
+                vim.reset();
+                return;
+            }
+
+            // Nothing that way among the windows. To the left, that is the tree — the one thing
+            // beside them that takes the keyboard.
+            if direction == Direction::Left
+                && let Some(explorer) = explorer
+                && explorer.is_open()
+            {
+                explorer.focus();
                 vim.reset();
             }
         }
+        "zoom" => {
+            let step = args.number("step").unwrap_or(0) as i32;
+            workspace.zoom(workspace.focused_untracked(), step);
+        }
         other => workspace.say(format!("window.{other} is not built yet")),
+    }
+}
+
+/// The command line.
+///
+/// `:` opens an empty one. From a visual selection it opens holding `'<,'>`, so the range is
+/// already there — which is what vim does and what makes `:'<,'>s/a/b/` two keys rather than six.
+fn cmdline(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
+    let Some(cmdline) = zgui::reactive::use_local_context::<crate::cmdline::CommandLine>() else {
+        return;
+    };
+    match leaf {
+        "open" => cmdline.open(args.str("start").unwrap_or("")),
+        other => workspace.say(format!("cmdline.{other} is not built yet")),
     }
 }
 
@@ -614,6 +658,39 @@ fn delete(workspace: &Workspace, explorer: &Explorer) {
             )
         },
     );
+}
+
+/// Moves `from` into `into`, which is what a drop in the tree does.
+///
+/// Public because the tree's pointer handling calls it: a drag is not a key, so it has no action
+/// name, but what it does is the same work `p` does after an `x`.
+pub fn move_into(
+    workspace: &Workspace,
+    explorer: &Explorer,
+    from: &std::path::Path,
+    into: &std::path::Path,
+) {
+    let Some(name) = from.file_name() else {
+        return;
+    };
+    let target = into.join(name);
+    let (from, explorer, workspace) = (from.to_path_buf(), explorer.clone(), workspace.clone());
+
+    crate::task::detached(async move {
+        let done = zgui::task::blocking(move || {
+            let to = zdt_core::paths::free_name(&target);
+            zdt_core::paths::rename(&from, &to).map(|()| to)
+        })
+        .await;
+        match done {
+            Ok(landed) => {
+                explorer.refresh();
+                explorer.reveal(&landed);
+                workspace.say(format!("moved to {}", landed.display()));
+            }
+            Err(error) => workspace.complain(error.to_string()),
+        }
+    });
 }
 
 /// Puts what was held into the selected directory.

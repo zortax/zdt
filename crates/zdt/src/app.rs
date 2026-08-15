@@ -13,6 +13,7 @@ use zgui::reactive::{LocalStorage, RenderEffect, RwSignal};
 use zgui::{component, view};
 use zgui_ui_tokens::ColorScheme;
 
+use crate::cmdline::CommandLine;
 use crate::explorer::Explorer;
 use crate::git::Git;
 use crate::language::Language;
@@ -21,6 +22,7 @@ use crate::prompt::Prompt;
 use crate::settings::Settings;
 use crate::terminals::Terminals;
 use crate::ui::chrome::ChromeProps;
+use crate::ui::cmdline::CommandLineProps;
 use crate::ui::frame::FrameProps;
 use crate::ui::panes::PanesProps;
 use crate::ui::picker::PickerProps;
@@ -29,6 +31,7 @@ use crate::ui::statusline::StatusLineProps;
 use crate::ui::terminal::FloatingTerminalProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
 use crate::ui::tree::ExplorerProps;
+use crate::ui::treemenu::TreeMenuProps;
 use crate::ui::whichkey::WhichKeyProps;
 use crate::vim::Vim;
 use crate::workspace::{self, BufferId, Workspace};
@@ -71,6 +74,8 @@ pub fn Root(
     }
 
     crate::prompt::provide(Prompt::new());
+    crate::ui::treemenu::provide();
+    crate::cmdline::provide(CommandLine::new(space.clone()));
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
 
@@ -164,15 +169,22 @@ pub fn Root(
     view! {
         ZdtTheme(theme = theme, scheme = scheme) {
             Frame {
-                Chrome()
+                // The tree runs the whole height of the window and the buffer line sits over the
+                // panes alone: a tab bar reaching across a file tree says the tabs belong to the
+                // tree, and they do not.
                 row(class = "frame__body") {
                     Explorer()
-                    Panes()
+                    column(class = "workarea") {
+                        Chrome()
+                        Panes()
+                    }
                 }
+                TreeMenu()
                 FloatingTerminal()
                 Picker()
                 Prompt()
                 WhichKey()
+                CommandLine()
                 StatusLine()
             }
         }

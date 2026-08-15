@@ -63,6 +63,22 @@ pub fn Chrome() -> impl IntoView {
     }
 }
 
+/// Closes a buffer, keeping one that has unsaved changes.
+///
+/// The same rule the `<Leader>c` key follows: a mouse is not a reason to lose work, and the way
+/// to close anyway is the key that says so.
+fn close(workspace: &crate::workspace::Workspace, buffer: BufferId) {
+    let dirty = workspace
+        .buffer_untracked(buffer)
+        .is_some_and(|entry| entry.is_dirty());
+    if dirty {
+        workspace.show(buffer);
+        workspace.complain("unsaved changes; <Leader>C closes anyway");
+    } else {
+        workspace.close_buffer(buffer);
+    }
+}
+
 /// One buffer, on the buffer line.
 #[component]
 fn BufferTab(
@@ -94,22 +110,55 @@ fn BufferTab(
 
     let window = use_window();
 
+    let drag = window.no_drag_handler();
+    let press = {
+        let workspace = workspace.clone();
+        move |event: &mut EventCx<'_, events::PointerDown>| {
+            drag(event);
+            match event.button {
+                // The middle button closes, as it does on every tab strip.
+                Some(PointerButton::Middle) => close(&workspace, buffer),
+                // On the press, not the release: a tab that waits for the button to come up feels
+                // like it is deciding, and every other tab strip switches on the way down.
+                _ => workspace.show(buffer),
+            }
+        }
+    };
+
+    let closing = {
+        let workspace = workspace.clone();
+        move |event: &mut EventCx<'_, events::PointerDown>| {
+            // Before the tab beneath it hears the press: closing a tab is not switching to it.
+            event.stop_propagation();
+            close(&workspace, buffer);
+        }
+    };
+
     view! {
         control(
             class = "tab",
             tabindex = Focus::Programmatic,
             attr:data-current = move || current().then(|| "true".to_owned()),
+            attr:data-dirty = move || dirty().then(|| "true".to_owned()),
             a11y:label = name.clone(),
-            on:pointer_down = window.no_drag_handler(),
-            on:click = {
-                let workspace = workspace.clone();
-                move |_| workspace.show(buffer)
-            }
+            on:pointer_down = press
         ) {
             label(class = "glyph", style:color = move || Some(tint.clone())) {{glyph}}
             label(class = "tab__name") {{name}}
-            // Always in the row, so a buffer becoming dirty does not shift the text beside it.
-            label(class = "tab__mark") {{move || if dirty() { "\u{25cf}" } else { "" }}}
+            // One slot, three things: a dot when the buffer is dirty, a cross while the pointer
+            // is over the tab, and nothing otherwise — always present, so the name beside it does
+            // not shift when a buffer is edited.
+            box(class = "tab__slot") {
+                label(class = "tab__mark") {"\u{25cf}"}
+                control(
+                    class = "tab__close",
+                    tabindex = Focus::Programmatic,
+                    a11y:label = "Close",
+                    on:pointer_down = closing
+                ) {
+                    Icon(icon = icons::X, class = "icon--xs")
+                }
+            }
         }
     }
     .any()

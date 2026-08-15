@@ -26,6 +26,8 @@ pub struct Hit {
     pub line: u64,
     /// Where in the line the match began, in bytes.
     pub column: usize,
+    /// How long the match was, in bytes.
+    pub length: usize,
     /// The line itself, with the ends trimmed.
     pub text: String,
 }
@@ -167,6 +169,7 @@ pub fn search(
             let mut collected = Collect {
                 path: relative,
                 hits: Vec::new(),
+                matcher: &matcher,
             };
             let _ = searcher.search_path(&matcher, path, &mut collected);
 
@@ -191,12 +194,17 @@ fn pattern_of(query: &Query) -> String {
 }
 
 /// Gathers one file's hits.
-struct Collect {
+struct Collect<'a, M> {
     path: String,
     hits: Vec<Hit>,
+    /// The same matcher the search ran with, asked again for *where* in the line it matched.
+    ///
+    /// The searcher reports which lines matched, not which characters; a preview that wants to
+    /// underline the word has to ask a second time.
+    matcher: &'a M,
 }
 
-impl Sink for Collect {
+impl<M: grep_matcher::Matcher> Sink for Collect<'_, M> {
     type Error = std::io::Error;
 
     fn matched(
@@ -204,7 +212,8 @@ impl Sink for Collect {
         _searcher: &grep_searcher::Searcher,
         matched: &SinkMatch<'_>,
     ) -> Result<bool, Self::Error> {
-        let text = String::from_utf8_lossy(matched.bytes());
+        let bytes = matched.bytes();
+        let text = String::from_utf8_lossy(bytes);
         // A line with a thousand columns of minified JavaScript in it is not a line anybody reads
         // in a picker, and shipping it costs more than leaving it out.
         let trimmed: String = text
@@ -212,10 +221,19 @@ impl Sink for Collect {
             .chars()
             .take(400)
             .collect();
+
+        let (column, length) = self
+            .matcher
+            .find_at(bytes, 0)
+            .ok()
+            .flatten()
+            .map_or((0, 0), |found| (found.start(), found.end() - found.start()));
+
         self.hits.push(Hit {
             path: self.path.clone(),
             line: matched.line_number().unwrap_or(0),
-            column: 0,
+            column,
+            length,
             text: trimmed,
         });
         Ok(true)
@@ -270,6 +288,24 @@ mod tests {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         found.sort_by(|left, right| (&left.path, left.line).cmp(&(&right.path, right.line)));
         found
+    }
+
+    #[test]
+    fn a_hit_says_where_in_the_line_it_matched() {
+        // What a preview underlines. The searcher reports the line; the column is asked of the
+        // matcher a second time, and a preview without it can only highlight the whole line.
+        let temp = Temp::new("column");
+        let found = run(
+            &temp.0,
+            &Query {
+                pattern: "beta".to_owned(),
+                ..Query::default()
+            },
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].text, "fn beta() {}");
+        assert_eq!(found[0].column, 3, "`beta` begins three bytes in");
+        assert_eq!(found[0].length, 4);
     }
 
     #[test]

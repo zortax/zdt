@@ -19,6 +19,7 @@ use zgui_ui::prelude::*;
 use crate::explorer::use_explorer;
 use crate::icons::{self, IconProps};
 use crate::vim::use_vim;
+use crate::workspace::use_workspace;
 
 /// How tall one row is, which the list is told rather than measuring.
 const ROW: f32 = 22.0;
@@ -140,6 +141,30 @@ fn TreeRow(
         let explorer = explorer.clone();
         move || (explorer.at() == index).then(|| "true".to_owned())
     };
+    let marked = {
+        let (explorer, row) = (explorer.clone(), row.clone());
+        move || {
+            let row = row()?;
+            explorer
+                .is_marked(&row.entry.path)
+                .then(|| "true".to_owned())
+        }
+    };
+    let cut = {
+        let (explorer, row) = (explorer.clone(), row.clone());
+        move || {
+            let row = row()?;
+            let held = explorer.clipboard()?;
+            (held.cut && held.path == row.entry.path).then(|| "true".to_owned())
+        }
+    };
+    let dropping = {
+        let (explorer, row) = (explorer.clone(), row.clone());
+        move || {
+            let row = row()?;
+            (explorer.drop_target()? == row.entry.path).then(|| "into".to_owned())
+        }
+    };
     let directory = {
         let row = row.clone();
         move || {
@@ -148,11 +173,9 @@ fn TreeRow(
                 .map(|_| "true".to_owned())
         }
     };
-    // Twelve pixels a level: enough to read the shape, narrow enough that a deep tree still fits
-    // in a panel this width.
-    let indent = {
+    let depth = {
         let row = row.clone();
-        move || Some(format!("{}px", 8 + row().map_or(0, |row| row.depth) * 12))
+        move || row().map_or(0, |row| row.depth)
     };
     let glyph = {
         let row = row.clone();
@@ -176,18 +199,88 @@ fn TreeRow(
         move || row().map_or_else(String::new, |row| row.entry.name)
     };
 
+    // A press picks the row; what kind of press decides whether it also adds to the set, opens
+    // it, or begins a drag. Selection happens on the *press* rather than the release, because a
+    // drag begins from a press that never becomes a click.
+    let press = {
+        let explorer = explorer.clone();
+        move |event: &mut EventCx<'_, events::PointerDown>| {
+            explorer.focus();
+            match event.button {
+                Some(PointerButton::Secondary) => {
+                    // A right click on a row nobody has picked out acts on that row; on one of
+                    // several, it acts on all of them.
+                    if !explorer
+                        .row_at(index)
+                        .is_some_and(|row| explorer.is_marked(&row.entry.path))
+                    {
+                        explorer.clear_marks();
+                        explorer.go_to(index);
+                    }
+                    crate::ui::treemenu::open_at(event.position);
+                    return;
+                }
+                Some(PointerButton::Middle) => return,
+                _ => {}
+            }
+
+            if event.modifiers.control() {
+                explorer.toggle_mark(index);
+            } else if event.modifiers.shift() {
+                explorer.mark_through(index);
+            } else {
+                explorer.clear_marks();
+                explorer.go_to(index);
+                explorer.start_drag(index);
+            }
+        }
+    };
+
+    // A release without a drag is a click, and a click opens. Dropping is the other half.
+    let release = {
+        let explorer = explorer.clone();
+        let workspace = use_workspace();
+        move |event: &mut EventCx<'_, events::PointerUp>| {
+            if event.button == Some(PointerButton::Secondary) {
+                return;
+            }
+            match explorer.finish_drag() {
+                Some((from, into)) => {
+                    crate::actions::move_into(&workspace, &explorer, &from, &into)
+                }
+                None => {
+                    if !event.modifiers.control() && !event.modifiers.shift() {
+                        explorer.go_to(index);
+                        if let Some(path) = explorer.open_selected() {
+                            crate::files::open(&workspace, path);
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    let over = {
+        let explorer = explorer.clone();
+        move |_: &mut EventCx<'_, events::PointerEnter>| explorer.drag_over(index)
+    };
+
     view! {
         row(
             class = "tree__row",
             attr:data-selected = selected,
+            attr:data-marked = marked,
+            attr:data-cut = cut,
+            attr:data-drop = dropping,
             attr:data-directory = directory,
-            style:padding-left = indent,
             a11y:role = Role::TreeItem,
-            on:pointer_down = move |_| {
-                explorer.go_to(index);
-                explorer.focus();
-            }
+            on:pointer_down = press,
+            on:pointer_up = release,
+            on:pointer_enter = over
         ) {
+            // One rail per level of nesting, each drawing the line that traces back to the
+            // directory it belongs to.
+            {move || (0..depth()).map(|_| view! { box(class = "tree__rail") {} }).collect::<Vec<_>>()}
             label(class = "glyph", style:color = tint) {{glyph}}
             label(class = "tree__name nowrap") {{name}}
         }

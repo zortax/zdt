@@ -7,6 +7,7 @@
 pub mod actions;
 pub mod app;
 pub mod assets;
+pub mod cmdline;
 pub mod explorer;
 pub mod files;
 pub mod git;

@@ -41,7 +41,8 @@
     min-width: 0;
     min-height: 0;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 14px;
+    /* The setting, plus whatever `<C-+>` has asked for in this window alone. */
+    font-size: calc(var(--zdt-editor-size, 14px) + var(--zdt-pane-font-step, 0) * 1px);
     line-height: 1.45;
     tab-size: 4;
     background-color: var(--editor-bg);
@@ -93,7 +94,8 @@
     background-color: var(--zui-color-primary);
     color: var(--zui-color-primary-foreground);
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 14px;
+    /* The setting, plus whatever `<C-+>` has asked for in this window alone. */
+    font-size: calc(var(--zdt-editor-size, 14px) + var(--zdt-pane-font-step, 0) * 1px);
     font-weight: 700;
     line-height: 1;
 }

@@ -27,6 +27,58 @@ const ROW: f32 = 22.0;
 /// How long the caret has to rest on a row before its file is read.
 const PREVIEW_DEBOUNCE: Duration = Duration::from_millis(40);
 
+/// The layer the previewed match is banded in.
+const MATCH_LAYER: &str = "picker-match";
+
+/// Puts the previewed file at the place the row stands for, and picks the match out.
+///
+/// Centred rather than merely visible: a hit at the bottom of the preview with nothing under it
+/// reads as the end of the file even when it is not.
+fn show_place(handle: &zgui_editor::EditorHandle, preview: &crate::picker::Preview) {
+    let Some(line) = preview.line else {
+        handle.clear_decorations(MATCH_LAYER);
+        handle.command(zgui_editor::Command::Scroll(
+            zgui_editor::ScrollCmd::ToLine(0),
+        ));
+        return;
+    };
+
+    let (at, matched) = handle.query(|snapshot| {
+        let rope = snapshot.rope();
+        let line = (line as usize)
+            .saturating_sub(1)
+            .min(rope.len_lines().saturating_sub(1));
+        let start = rope.char_to_byte(rope.line_to_char(line));
+        // The match is a range within the line, which is where the searcher measured it.
+        let matched = preview.matched.as_ref().map(|range| {
+            let end = rope.len_bytes();
+            (start + range.start).min(end)..(start + range.end).min(end)
+        });
+        (start, matched)
+    });
+
+    handle.command(zgui_editor::Command::SetSelections {
+        selections: vec![zgui_editor::Selection::caret(at)],
+        primary: 0,
+    });
+    handle.command(zgui_editor::Command::Scroll(
+        zgui_editor::ScrollCmd::CursorCenter,
+    ));
+
+    match matched.filter(|range| !range.is_empty()) {
+        Some(range) => handle.set_decorations(
+            MATCH_LAYER,
+            vec![zgui_editor::Decoration {
+                range,
+                kind: zgui_editor::DecorationKind::Background(
+                    zgui_editor::decoration::Paint::Property("editor-search-current".into()),
+                ),
+            }],
+        ),
+        None => handle.clear_decorations(MATCH_LAYER),
+    }
+}
+
 /// How much of a file is worth previewing.
 ///
 /// Only the head is ever on the screen, and reading a hundred megabytes to show forty lines of it
@@ -311,6 +363,11 @@ fn Preview(
     let waiting: std::rc::Rc<std::cell::RefCell<Option<zgui::view::time::TimeoutHandle>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
 
+    // Which file is on screen, so that moving the caret between two hits in the same file
+    // scrolls rather than re-reading it — which is what made the preview flash on every
+    // keystroke of a search.
+    let showing: RwSignal<Option<std::path::PathBuf>, LocalStorage> = RwSignal::new_local(None);
+
     let following = {
         let picker = picker.clone();
         let waiting = std::rc::Rc::clone(&waiting);
@@ -318,10 +375,12 @@ fn Preview(
             // Read first, so this runs again when either changes.
             let (_, at) = (picker.len(), picker.at());
             let _ = at;
-            let Some((path, line)) = picker.selected().and_then(|row| row.preview()) else {
+            let Some(preview) = picker.selected().and_then(|row| row.preview()) else {
                 if let Some(handle) = handle.get_untracked() {
                     handle.set_text("");
+                    handle.clear_decorations(MATCH_LAYER);
                 }
+                showing.set(None);
                 empty.set(true);
                 return;
             };
@@ -329,44 +388,31 @@ fn Preview(
                 return;
             };
 
-            let (language, handle) = (language, handle);
             *waiting.borrow_mut() = Some(timers.set_timeout(PREVIEW_DEBOUNCE, move || {
-                let reading = path.clone();
+                let Some(handle) = handle.get_untracked() else {
+                    return;
+                };
+                // Already showing this file: only the place in it has moved.
+                if showing.get_untracked().as_deref() == Some(preview.path.as_path()) {
+                    show_place(&handle, &preview);
+                    return;
+                }
+
+                let reading = preview.path.clone();
                 crate::task::detached(async move {
                     let text = zgui::task::blocking(move || head_of(&reading)).await;
-                    let Some(handle) = handle.get_untracked() else {
-                        return;
-                    };
                     handle.set_text(&text.unwrap_or_default());
+                    showing.set(Some(preview.path.clone()));
                     empty.set(false);
 
-                    let named = zdt_core::language::of(&path).language.map(str::to_owned);
+                    let named = zdt_core::language::of(&preview.path)
+                        .language
+                        .map(str::to_owned);
                     if language.get_untracked() != named {
                         language.set(named.clone());
                         handle.set_language(named.as_deref());
                     }
-
-                    // The line the hit was on, put in the middle where it can be read in context.
-                    if let Some(line) = line {
-                        let at = handle.query(|snapshot| {
-                            let rope = snapshot.rope();
-                            let line = (line as usize)
-                                .saturating_sub(1)
-                                .min(rope.len_lines().saturating_sub(1));
-                            rope.char_to_byte(rope.line_to_char(line))
-                        });
-                        handle.command(zgui_editor::Command::SetSelections {
-                            selections: vec![zgui_editor::Selection::caret(at)],
-                            primary: 0,
-                        });
-                        handle.command(zgui_editor::Command::Scroll(
-                            zgui_editor::ScrollCmd::CursorCenter,
-                        ));
-                    } else {
-                        handle.command(zgui_editor::Command::Scroll(
-                            zgui_editor::ScrollCmd::ToLine(0),
-                        ));
-                    }
+                    show_place(&handle, &preview);
                 });
             }));
         })

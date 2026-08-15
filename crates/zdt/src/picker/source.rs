@@ -156,6 +156,8 @@ pub enum Target {
         path: PathBuf,
         /// Which line, counting from one.
         line: Option<u64>,
+        /// Which bytes of that line matched, for the preview to pick out.
+        matched: Option<std::ops::Range<usize>>,
     },
     /// Shows a buffer that is already open.
     Buffer(crate::workspace::BufferId),
@@ -167,6 +169,17 @@ pub enum Target {
     Action(zdt_vim::Action),
     /// Nothing — a row that is there to be read.
     Nothing,
+}
+
+/// What the preview shows for one row.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Preview {
+    /// Which file.
+    pub path: PathBuf,
+    /// Which line to put in the middle, counting from one.
+    pub line: Option<u64>,
+    /// Which bytes of that line the search matched.
+    pub matched: Option<std::ops::Range<usize>>,
 }
 
 /// One row of a picker.
@@ -214,6 +227,7 @@ impl Row {
             target: Target::File {
                 path: root.join(&relative),
                 line,
+                matched: None,
             },
         }
     }
@@ -232,11 +246,30 @@ impl Row {
         self
     }
 
-    /// The file this row previews, when it previews one.
+    /// The same row, saying which bytes of its line the search matched.
     #[must_use]
-    pub fn preview(&self) -> Option<(PathBuf, Option<u64>)> {
+    pub fn with_match(mut self, matched: std::ops::Range<usize>) -> Self {
+        if let Target::File { matched: held, .. } = &mut self.target
+            && !matched.is_empty()
+        {
+            *held = Some(matched);
+        }
+        self
+    }
+
+    /// The file this row previews, the line to scroll to, and what to pick out on it.
+    #[must_use]
+    pub fn preview(&self) -> Option<Preview> {
         match &self.target {
-            Target::File { path, line } => Some((path.clone(), *line)),
+            Target::File {
+                path,
+                line,
+                matched,
+            } => Some(Preview {
+                path: path.clone(),
+                line: *line,
+                matched: matched.clone(),
+            }),
             _ => None,
         }
     }
