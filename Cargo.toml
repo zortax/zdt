@@ -49,6 +49,7 @@ tower = "0.5"
 
 # --- platform ----------------------------------------------------------------------------
 tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync"] }
+tokio-util = { version = "0.7", features = ["compat"] }
 notify = "8"
 notify-debouncer-full = "0.5"
 dirs = "6"

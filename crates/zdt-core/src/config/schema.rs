@@ -269,7 +269,7 @@ impl Default for Lsp {
     fn default() -> Self {
         Self {
             enabled: true,
-            servers: BTreeMap::new(),
+            servers: shipped_servers(),
         }
     }
 }
@@ -292,6 +292,60 @@ pub struct Server {
     pub settings: Option<toml::Value>,
     /// What to add to its environment.
     pub env: BTreeMap<String, String>,
+}
+
+/// The servers the editor knows about without being told.
+///
+/// A short list on purpose. These are the ones whose name and arguments are stable and whose root
+/// markers are not a matter of opinion; anything else is a row somebody adds, which is two lines in
+/// `config.toml`. A server named here that is not installed says so once and is not tried again,
+/// which costs a line in the status line and nothing else.
+fn shipped_servers() -> BTreeMap<String, Server> {
+    let mut servers = BTreeMap::new();
+
+    servers.insert(
+        "rust-analyzer".to_owned(),
+        Server {
+            command: "rust-analyzer".to_owned(),
+            filetypes: vec!["rust".to_owned()],
+            root_markers: vec!["Cargo.toml".to_owned(), "rust-project.json".to_owned()],
+            ..Server::default()
+        },
+    );
+    servers.insert(
+        "basedpyright".to_owned(),
+        Server {
+            command: "basedpyright-langserver".to_owned(),
+            args: vec!["--stdio".to_owned()],
+            filetypes: vec!["python".to_owned()],
+            root_markers: vec![
+                "pyproject.toml".to_owned(),
+                "setup.py".to_owned(),
+                "requirements.txt".to_owned(),
+            ],
+            ..Server::default()
+        },
+    );
+    servers.insert(
+        "gopls".to_owned(),
+        Server {
+            command: "gopls".to_owned(),
+            filetypes: vec!["go".to_owned()],
+            root_markers: vec!["go.work".to_owned(), "go.mod".to_owned()],
+            ..Server::default()
+        },
+    );
+    servers.insert(
+        "lua-language-server".to_owned(),
+        Server {
+            command: "lua-language-server".to_owned(),
+            filetypes: vec!["lua".to_owned()],
+            root_markers: vec![".luarc.json".to_owned(), "stylua.toml".to_owned()],
+            ..Server::default()
+        },
+    );
+
+    servers
 }
 
 #[cfg(test)]

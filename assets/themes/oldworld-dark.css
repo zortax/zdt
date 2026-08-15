@@ -141,6 +141,13 @@
 --syntax-variable-builtin: #f5a191;
 --syntax-variable-parameter: #f5a191;
 
+/* --- what the language servers say ------------------------------------------------------- */
+
+--zdt-diagnostic-error: #ea83a5;
+--zdt-diagnostic-warning: #e6b99d;
+--zdt-diagnostic-information: #92a2d5;
+--zdt-diagnostic-hint: #85b5ba;
+
 /* --- the terminal element ---------------------------------------------------------------- */
 
 --terminal-background: #161617;

@@ -98,6 +98,25 @@ pub fn StatusLine() -> impl IntoView {
         }
     };
 
+    // What the servers say about this file, and what they are busy with. Both empty when there is
+    // nothing to say, so the status line does not reserve space for a silence.
+    let language = zgui::reactive::use_local_context::<crate::language::Language>();
+    let diagnostics = {
+        let (language, workspace) = (language.clone(), workspace.clone());
+        move || {
+            let language = language.as_ref()?;
+            // Read first, so this follows what the servers say.
+            let _ = language.revision();
+            let path = workspace.current_buffer().and_then(|buffer| buffer.path)?;
+            let parts = crate::ui::diagnostics::summary(language, Some(&path));
+            (!parts.is_empty()).then_some(parts)
+        }
+    };
+    let busy = {
+        let language = language.clone();
+        move || language.as_ref().and_then(crate::language::Language::busy)
+    };
+
     view! {
         row(class = "statusline") {
             box(
@@ -113,7 +132,24 @@ pub fn StatusLine() -> impl IntoView {
             label(class = "statusline__name nowrap") {{name}}
             label(class = "statusline__mark") {{move || if dirty() { "[+]" } else { "" }}}
 
+            row(class = "statusline__diagnostics") {
+                {move || {
+                    diagnostics()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|part| view! {
+                            label(
+                                class = "statusline__count nowrap",
+                                attr:data-tone = Some(part.tone.to_owned())
+                            ) {{part.text}}
+                        })
+                        .collect::<Vec<_>>()
+                }}
+            }
+
             box(class = "fill") {}
+
+            label(class = "statusline__busy nowrap") {{move || busy().unwrap_or_default()}}
 
             label(
                 class = "statusline__message",

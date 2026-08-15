@@ -14,6 +14,7 @@ use zgui::{component, view};
 use zgui_ui_tokens::ColorScheme;
 
 use crate::explorer::Explorer;
+use crate::language::Language;
 use crate::picker::Picker;
 use crate::prompt::Prompt;
 use crate::settings::Settings;
@@ -29,7 +30,7 @@ use crate::ui::theme::{ZdtThemeProps, fallback};
 use crate::ui::tree::ExplorerProps;
 use crate::ui::whichkey::WhichKeyProps;
 use crate::vim::Vim;
-use crate::workspace::{self, Workspace};
+use crate::workspace::{self, BufferId, Workspace};
 
 /// The application.
 #[component]
@@ -71,6 +72,13 @@ pub fn Root(
     crate::prompt::provide(Prompt::new());
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
+
+    // The language servers. Nothing starts until a file that wants one is opened.
+    let language = Language::new(space.clone(), settings.clone());
+    language.listen();
+    crate::language::provide(language.clone());
+    let servers = follow_buffers(&language, &space);
+    on_cleanup_local(move || drop(servers));
 
     // The keys leap labels are drawn from, and again whenever the settings change.
     let alphabet = {
@@ -173,6 +181,35 @@ fn read_theme(settings: &Settings) -> ThemeSource {
     zdt_core::theme::resolve_theme(directory.as_deref(), &name).unwrap_or_else(|| {
         tracing::warn!("no theme called {name}; using the built-in one");
         fallback()
+    })
+}
+
+/// Tells the language layer about every file that is opened.
+///
+/// Watching the buffer list rather than being called from `open`: a buffer arrives from the
+/// picker, the tree, the command line and the command line arguments, and one place that notices
+/// all four is fewer places to forget.
+fn follow_buffers(language: &Language, workspace: &Workspace) -> RenderEffect<Vec<BufferId>> {
+    let (language, workspace) = (language.clone(), workspace.clone());
+    RenderEffect::new(move |previous: Option<Vec<BufferId>>| {
+        let order = workspace.order();
+        let previous = previous.unwrap_or_default();
+
+        for id in &order {
+            if !previous.contains(id) {
+                language.opened(*id);
+            }
+        }
+        for id in &previous {
+            if !order.contains(id)
+                && let Some(path) = workspace
+                    .buffer_untracked(*id)
+                    .and_then(|buffer| buffer.path)
+            {
+                language.closed(&path);
+            }
+        }
+        order
     })
 }
 

@@ -1,6 +1,7 @@
 //! Everything the window is drawn from.
 
 pub mod chrome;
+pub mod diagnostics;
 pub mod frame;
 pub mod leap;
 pub mod pane;

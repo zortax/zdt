@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+mod lsp;
+
 use zdt_vim::Action;
 use zgui_editor::EditorHandle;
 
@@ -32,6 +34,8 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "tree" => tree(workspace, leaf, args),
         "picker" => picker(workspace, leaf, args, handle),
         "terminal" => terminal(workspace, vim, leaf, args),
+        "lsp" => lsp::run(workspace, leaf, handle),
+        "diagnostic" => lsp::diagnostic(workspace, leaf, handle),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.

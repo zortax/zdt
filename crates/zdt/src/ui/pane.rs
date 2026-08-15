@@ -141,9 +141,15 @@ fn BufferView(
             // this is the only thing that hears the editor.
             let on_event = {
                 let revision = entry.revision;
+                let language = zgui::reactive::use_local_context::<crate::language::Language>();
                 Box::new(move |event: zgui_editor::EditorEvent| {
                     if let zgui_editor::EditorEvent::Edited { revision: at, .. } = event {
                         revision.set(at);
+                        // The servers hear about it after a pause, so that typing a word is one
+                        // notification rather than five.
+                        if let Some(language) = language.as_ref() {
+                            language.changed(buffer);
+                        }
                     }
                 }) as Box<dyn Fn(zgui_editor::EditorEvent)>
             };
@@ -187,6 +193,14 @@ fn BufferView(
                     drop(focus);
                     drop(claim);
                 });
+            }
+
+            // What the servers say, painted into the editor's own decoration layer.
+            if let Some(language) = zgui::reactive::use_local_context::<crate::language::Language>()
+            {
+                let following =
+                    crate::ui::diagnostics::follow(&workspace, &language, window, buffer);
+                on_cleanup_local(move || drop(following));
             }
 
             // The settings that the editor can be told about after it is mounted. The rest — the

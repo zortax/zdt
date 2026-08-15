@@ -153,3 +153,45 @@
 .statusline__pos {
     color: var(--zui-color-foreground);
 }
+
+/* What the servers say about the file, in the status line. Each count carries its own colour:
+ * three errors and a hint are two pieces of news, and greying both says neither. */
+.statusline__diagnostics {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 2);
+}
+
+.statusline__count {
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-variant-numeric: tabular-nums;
+    color: var(--zui-color-muted-foreground);
+}
+
+.statusline__count[data-tone="error"] {
+    color: var(--zdt-diagnostic-error);
+}
+
+.statusline__count[data-tone="warning"] {
+    color: var(--zdt-diagnostic-warning);
+}
+
+.statusline__count[data-tone="information"] {
+    color: var(--zdt-diagnostic-information);
+}
+
+.statusline__count[data-tone="hint"] {
+    color: var(--zdt-diagnostic-hint);
+}
+
+/* What a server is busy with. Dimmer than everything else on the line: it is the one thing there
+ * that nobody is waiting on. */
+.statusline__busy {
+    color: var(--zui-color-muted-foreground);
+    opacity: 0.6;
+    padding: 0 calc(var(--zui-space-base) * 2);
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
