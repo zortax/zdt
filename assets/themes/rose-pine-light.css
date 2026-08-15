@@ -1,0 +1,184 @@
+/* Rosé Pine Dawn, for a light surface.
+ *
+ * The `dawn` variant. The text is `#464261`, which is the current canonical value — the alacritty
+ * distribution still ships the older `#575279`.
+ *
+ * Written by `assets/themes/generate.py` — change the palette there, not the colours here.
+ *
+ * Two vocabularies live in this file. `--zui-*` are the component library's tokens, read by the
+ * theme provider; everything else is this application's own, read straight from the cascade by
+ * the editor, the terminal and the chrome. */
+
+/* --- the component library ------------------------------------------------------------- */
+
+--zui-color-background: #faf4ed;
+--zui-color-foreground: #464261;
+--zui-color-card: #faf4ed;
+--zui-color-card-foreground: #464261;
+--zui-color-popover: #fffaf3;
+--zui-color-popover-foreground: #464261;
+
+--zui-color-primary: #56949f;
+--zui-color-primary-foreground: #faf4ed;
+--zui-color-secondary: #dfdad9;
+--zui-color-secondary-foreground: #464261;
+
+--zui-color-muted: #f4ede8;
+--zui-color-muted-foreground: #797593;
+--zui-color-accent: #dfdad9;
+--zui-color-accent-foreground: #464261;
+
+--zui-color-destructive: #b4637a;
+--zui-color-destructive-foreground: #faf4ed;
+--zui-color-success: #286983;
+--zui-color-success-foreground: #faf4ed;
+--zui-color-warning: #ea9d34;
+--zui-color-warning-foreground: #faf4ed;
+--zui-color-info: #56949f;
+--zui-color-info-foreground: #faf4ed;
+
+/* Borders are alpha over whatever is behind them, never a solid grey — a solid line is visible
+ * as a line, and this interface wants planes told apart by tone. */
+--zui-color-border: oklch(0 0 0 / 9%);
+--zui-color-input: oklch(0 0 0 / 14%);
+--zui-color-ring: #56949f;
+--zui-color-scrim: oklch(0 0 0 / 55%);
+
+--zui-color-sidebar: #f8f0e7;
+--zui-color-sidebar-foreground: #797593;
+--zui-color-sidebar-primary: #56949f;
+--zui-color-sidebar-primary-foreground: #faf4ed;
+--zui-color-sidebar-accent: #dfdad9;
+--zui-color-sidebar-accent-foreground: #464261;
+--zui-color-sidebar-border: oklch(0 0 0 / 10%);
+--zui-color-sidebar-ring: #56949f;
+
+/* --- the application ------------------------------------------------------------------- */
+
+--zdt-danger: #b4637a;
+--zdt-warning: #ea9d34;
+--zdt-info: #56949f;
+--zdt-hint: #d7827e;
+--zdt-added: #286983;
+--zdt-changed: #ea9d34;
+--zdt-removed: #b4637a;
+--zdt-leap-label: #ea9d34;
+--zdt-leap-label-fg: #faf4ed;
+--zdt-match: #ea9d34;
+
+/* Mode colours, used by the status line block and nothing else. */
+--zdt-mode-normal: #56949f;
+--zdt-mode-insert: #286983;
+--zdt-mode-visual: #907aa9;
+--zdt-mode-replace: #b4637a;
+--zdt-mode-command: #ea9d34;
+--zdt-mode-terminal: #d7827e;
+
+/* --- devicon tints ------------------------------------------------------------------------ */
+
+--zdt-icon-rust: #ea9d34;
+--zdt-icon-python: #ea9d34;
+--zdt-icon-ts: #56949f;
+--zdt-icon-js: #ea9d34;
+--zdt-icon-go: #d7827e;
+--zdt-icon-c: #56949f;
+--zdt-icon-lua: #56949f;
+--zdt-icon-shell: #286983;
+--zdt-icon-html: #ea9d34;
+--zdt-icon-css: #56949f;
+--zdt-icon-config: #ea9d34;
+--zdt-icon-doc: #464261;
+--zdt-icon-image: #907aa9;
+--zdt-icon-git: #ea9d34;
+
+/* --- the editor element ----------------------------------------------------------------- */
+
+--editor-bg: #faf4ed;
+--editor-fg: #464261;
+--editor-selection: #dfdad9;
+--editor-cursor: #464261;
+--editor-cursor-text: #faf4ed;
+--editor-current-line: #f4ede8;
+--editor-gutter-bg: #faf4ed;
+--editor-gutter-fg: #9893a5;
+--editor-gutter-current-fg: #797593;
+--editor-scrollbar-thumb: oklch(0 0 0 / 14%);
+--editor-scrollbar-track: transparent;
+--editor-search: #dfdad9;
+--editor-search-current: #ea9d34;
+--editor-search-current-text: #faf4ed;
+--editor-indent-guide: #dfdad9;
+
+/* --- syntax, one property per tree-sitter capture ---------------------------------------- */
+
+--syntax-attribute: #b4637a;
+--syntax-comment: #797593;
+--syntax-comment-doc: #9893a5;
+--syntax-constant: #ea9d34;
+--syntax-constant-builtin: #ea9d34;
+--syntax-constructor: #ea9d34;
+--syntax-embedded: #464261;
+--syntax-escape: #ea9d34;
+--syntax-function: #56949f;
+--syntax-function-builtin: #56949f;
+--syntax-function-macro: #b4637a;
+--syntax-function-method: #56949f;
+--syntax-keyword: #907aa9;
+--syntax-label: #907aa9;
+--syntax-module: #d7827e;
+--syntax-number: #ea9d34;
+--syntax-operator: #d7827e;
+--syntax-property: #797593;
+--syntax-punctuation: #797593;
+--syntax-punctuation-bracket: #797593;
+--syntax-punctuation-delimiter: #797593;
+--syntax-punctuation-special: #ea9d34;
+--syntax-string: #286983;
+--syntax-string-special: #ea9d34;
+--syntax-tag: #b4637a;
+--syntax-type: #ea9d34;
+--syntax-type-builtin: #ea9d34;
+--syntax-variable: #464261;
+--syntax-variable-builtin: #b4637a;
+--syntax-variable-parameter: #ea9d34;
+
+/* --- what git says ------------------------------------------------------------------------ */
+
+--zdt-git-added: #286983;
+--zdt-git-changed: #56949f;
+--zdt-git-removed: #b4637a;
+
+/* --- what the language servers say ------------------------------------------------------- */
+
+--zdt-diagnostic-error: #b4637a;
+--zdt-diagnostic-warning: #ea9d34;
+--zdt-diagnostic-information: #56949f;
+--zdt-diagnostic-hint: #d7827e;
+
+/* --- the terminal element ---------------------------------------------------------------- */
+
+--terminal-background: #faf4ed;
+--terminal-foreground: #464261;
+--terminal-cursor: #464261;
+--terminal-cursor-text: #faf4ed;
+--terminal-selection: #dfdad9;
+--terminal-match: #dfdad9;
+--terminal-match-current: #ea9d34;
+
+--terminal-black: #f2e9e1;
+--terminal-red: #b4637a;
+--terminal-green: #286983;
+--terminal-yellow: #ea9d34;
+--terminal-blue: #56949f;
+--terminal-magenta: #907aa9;
+--terminal-cyan: #d7827e;
+--terminal-white: #464261;
+
+--terminal-bright-black: #797593;
+--terminal-bright-red: #b4637a;
+--terminal-bright-green: #286983;
+--terminal-bright-yellow: #ea9d34;
+--terminal-bright-blue: #56949f;
+--terminal-bright-magenta: #907aa9;
+--terminal-bright-cyan: #d7827e;
+--terminal-bright-white: #464261;

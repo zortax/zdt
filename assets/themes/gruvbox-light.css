@@ -1,0 +1,183 @@
+/* Gruvbox Light, for a light surface.
+ *
+ * The light medium contrast, with the faded accent row its authors pair with it.
+ *
+ * Written by `assets/themes/generate.py` — change the palette there, not the colours here.
+ *
+ * Two vocabularies live in this file. `--zui-*` are the component library's tokens, read by the
+ * theme provider; everything else is this application's own, read straight from the cascade by
+ * the editor, the terminal and the chrome. */
+
+/* --- the component library ------------------------------------------------------------- */
+
+--zui-color-background: #fbf1c7;
+--zui-color-foreground: #3c3836;
+--zui-color-card: #fbf1c7;
+--zui-color-card-foreground: #3c3836;
+--zui-color-popover: #f2e5bc;
+--zui-color-popover-foreground: #3c3836;
+
+--zui-color-primary: #076678;
+--zui-color-primary-foreground: #fbf1c7;
+--zui-color-secondary: #ebdbb2;
+--zui-color-secondary-foreground: #3c3836;
+
+--zui-color-muted: #ebdbb2;
+--zui-color-muted-foreground: #928374;
+--zui-color-accent: #ebdbb2;
+--zui-color-accent-foreground: #3c3836;
+
+--zui-color-destructive: #9d0006;
+--zui-color-destructive-foreground: #fbf1c7;
+--zui-color-success: #79740e;
+--zui-color-success-foreground: #fbf1c7;
+--zui-color-warning: #b57614;
+--zui-color-warning-foreground: #fbf1c7;
+--zui-color-info: #076678;
+--zui-color-info-foreground: #fbf1c7;
+
+/* Borders are alpha over whatever is behind them, never a solid grey — a solid line is visible
+ * as a line, and this interface wants planes told apart by tone. */
+--zui-color-border: oklch(0 0 0 / 9%);
+--zui-color-input: oklch(0 0 0 / 14%);
+--zui-color-ring: #076678;
+--zui-color-scrim: oklch(0 0 0 / 55%);
+
+--zui-color-sidebar: #f2e5bc;
+--zui-color-sidebar-foreground: #665c54;
+--zui-color-sidebar-primary: #076678;
+--zui-color-sidebar-primary-foreground: #fbf1c7;
+--zui-color-sidebar-accent: #ebdbb2;
+--zui-color-sidebar-accent-foreground: #3c3836;
+--zui-color-sidebar-border: oklch(0 0 0 / 10%);
+--zui-color-sidebar-ring: #076678;
+
+/* --- the application ------------------------------------------------------------------- */
+
+--zdt-danger: #9d0006;
+--zdt-warning: #b57614;
+--zdt-info: #076678;
+--zdt-hint: #427b58;
+--zdt-added: #79740e;
+--zdt-changed: #b57614;
+--zdt-removed: #9d0006;
+--zdt-leap-label: #af3a03;
+--zdt-leap-label-fg: #fbf1c7;
+--zdt-match: #b57614;
+
+/* Mode colours, used by the status line block and nothing else. */
+--zdt-mode-normal: #076678;
+--zdt-mode-insert: #79740e;
+--zdt-mode-visual: #8f3f71;
+--zdt-mode-replace: #9d0006;
+--zdt-mode-command: #b57614;
+--zdt-mode-terminal: #427b58;
+
+/* --- devicon tints ------------------------------------------------------------------------ */
+
+--zdt-icon-rust: #af3a03;
+--zdt-icon-python: #b57614;
+--zdt-icon-ts: #076678;
+--zdt-icon-js: #b57614;
+--zdt-icon-go: #427b58;
+--zdt-icon-c: #076678;
+--zdt-icon-lua: #076678;
+--zdt-icon-shell: #79740e;
+--zdt-icon-html: #af3a03;
+--zdt-icon-css: #076678;
+--zdt-icon-config: #b57614;
+--zdt-icon-doc: #3c3836;
+--zdt-icon-image: #8f3f71;
+--zdt-icon-git: #af3a03;
+
+/* --- the editor element ----------------------------------------------------------------- */
+
+--editor-bg: #fbf1c7;
+--editor-fg: #3c3836;
+--editor-selection: #bdae93;
+--editor-cursor: #3c3836;
+--editor-cursor-text: #fbf1c7;
+--editor-current-line: #ebdbb2;
+--editor-gutter-bg: #fbf1c7;
+--editor-gutter-fg: #a89984;
+--editor-gutter-current-fg: #665c54;
+--editor-scrollbar-thumb: oklch(0 0 0 / 14%);
+--editor-scrollbar-track: transparent;
+--editor-search: #ebdbb2;
+--editor-search-current: #b57614;
+--editor-search-current-text: #fbf1c7;
+--editor-indent-guide: #ebdbb2;
+
+/* --- syntax, one property per tree-sitter capture ---------------------------------------- */
+
+--syntax-attribute: #9d0006;
+--syntax-comment: #928374;
+--syntax-comment-doc: #a89984;
+--syntax-constant: #af3a03;
+--syntax-constant-builtin: #af3a03;
+--syntax-constructor: #b57614;
+--syntax-embedded: #3c3836;
+--syntax-escape: #af3a03;
+--syntax-function: #076678;
+--syntax-function-builtin: #076678;
+--syntax-function-macro: #9d0006;
+--syntax-function-method: #076678;
+--syntax-keyword: #8f3f71;
+--syntax-label: #8f3f71;
+--syntax-module: #427b58;
+--syntax-number: #af3a03;
+--syntax-operator: #427b58;
+--syntax-property: #665c54;
+--syntax-punctuation: #665c54;
+--syntax-punctuation-bracket: #665c54;
+--syntax-punctuation-delimiter: #928374;
+--syntax-punctuation-special: #af3a03;
+--syntax-string: #79740e;
+--syntax-string-special: #af3a03;
+--syntax-tag: #9d0006;
+--syntax-type: #b57614;
+--syntax-type-builtin: #b57614;
+--syntax-variable: #3c3836;
+--syntax-variable-builtin: #9d0006;
+--syntax-variable-parameter: #af3a03;
+
+/* --- what git says ------------------------------------------------------------------------ */
+
+--zdt-git-added: #79740e;
+--zdt-git-changed: #076678;
+--zdt-git-removed: #9d0006;
+
+/* --- what the language servers say ------------------------------------------------------- */
+
+--zdt-diagnostic-error: #9d0006;
+--zdt-diagnostic-warning: #b57614;
+--zdt-diagnostic-information: #076678;
+--zdt-diagnostic-hint: #427b58;
+
+/* --- the terminal element ---------------------------------------------------------------- */
+
+--terminal-background: #fbf1c7;
+--terminal-foreground: #3c3836;
+--terminal-cursor: #3c3836;
+--terminal-cursor-text: #fbf1c7;
+--terminal-selection: #bdae93;
+--terminal-match: #ebdbb2;
+--terminal-match-current: #b57614;
+
+--terminal-black: #fbf1c7;
+--terminal-red: #cc241d;
+--terminal-green: #98971a;
+--terminal-yellow: #d79921;
+--terminal-blue: #458588;
+--terminal-magenta: #b16286;
+--terminal-cyan: #689d6a;
+--terminal-white: #7c6f64;
+
+--terminal-bright-black: #928374;
+--terminal-bright-red: #9d0006;
+--terminal-bright-green: #79740e;
+--terminal-bright-yellow: #b57614;
+--terminal-bright-blue: #076678;
+--terminal-bright-magenta: #8f3f71;
+--terminal-bright-cyan: #427b58;
+--terminal-bright-white: #3c3836;

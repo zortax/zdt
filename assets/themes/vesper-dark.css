@@ -1,0 +1,187 @@
+/* Vesper, for a dark surface.
+ *
+ * Rauno Freiberg's, and the reason it looks unlike the rest: the whole palette is seven colours —
+ * a flat near-black, white text, a peach and a mint. There is no blue, no cyan and no magenta, so
+ * the tokens that name those hold the peach and the mint instead. Vesper publishes no cursor
+ * colour, no current-line tint and no terminal palette; the cursor is the peach, the current line
+ * is the tab tone, and the sixteen are built from what there is.
+ *
+ * Written by `assets/themes/generate.py` — change the palette there, not the colours here.
+ *
+ * Two vocabularies live in this file. `--zui-*` are the component library's tokens, read by the
+ * theme provider; everything else is this application's own, read straight from the cascade by
+ * the editor, the terminal and the chrome. */
+
+/* --- the component library ------------------------------------------------------------- */
+
+--zui-color-background: #101010;
+--zui-color-foreground: #ffffff;
+--zui-color-card: #101010;
+--zui-color-card-foreground: #ffffff;
+--zui-color-popover: #161616;
+--zui-color-popover-foreground: #ffffff;
+
+--zui-color-primary: #a0a0a0;
+--zui-color-primary-foreground: #101010;
+--zui-color-secondary: #232323;
+--zui-color-secondary-foreground: #ffffff;
+
+--zui-color-muted: #1c1c1c;
+--zui-color-muted-foreground: #575757;
+--zui-color-accent: #232323;
+--zui-color-accent-foreground: #ffffff;
+
+--zui-color-destructive: #ff8080;
+--zui-color-destructive-foreground: #101010;
+--zui-color-success: #99ffe4;
+--zui-color-success-foreground: #101010;
+--zui-color-warning: #ffc799;
+--zui-color-warning-foreground: #101010;
+--zui-color-info: #a0a0a0;
+--zui-color-info-foreground: #101010;
+
+/* Borders are alpha over whatever is behind them, never a solid grey — a solid line is visible
+ * as a line, and this interface wants planes told apart by tone. */
+--zui-color-border: oklch(1 0 0 / 8%);
+--zui-color-input: oklch(1 0 0 / 12%);
+--zui-color-ring: #a0a0a0;
+--zui-color-scrim: oklch(0 0 0 / 55%);
+
+--zui-color-sidebar: #0c0c0c;
+--zui-color-sidebar-foreground: #a0a0a0;
+--zui-color-sidebar-primary: #a0a0a0;
+--zui-color-sidebar-primary-foreground: #101010;
+--zui-color-sidebar-accent: #232323;
+--zui-color-sidebar-accent-foreground: #ffffff;
+--zui-color-sidebar-border: oklch(1 0 0 / 10%);
+--zui-color-sidebar-ring: #a0a0a0;
+
+/* --- the application ------------------------------------------------------------------- */
+
+--zdt-danger: #ff8080;
+--zdt-warning: #ffc799;
+--zdt-info: #a0a0a0;
+--zdt-hint: #99ffe4;
+--zdt-added: #99ffe4;
+--zdt-changed: #ffc799;
+--zdt-removed: #ff8080;
+--zdt-leap-label: #ffc799;
+--zdt-leap-label-fg: #101010;
+--zdt-match: #ffc799;
+
+/* Mode colours, used by the status line block and nothing else. */
+--zdt-mode-normal: #a0a0a0;
+--zdt-mode-insert: #99ffe4;
+--zdt-mode-visual: #ffcfa8;
+--zdt-mode-replace: #ff8080;
+--zdt-mode-command: #ffc799;
+--zdt-mode-terminal: #99ffe4;
+
+/* --- devicon tints ------------------------------------------------------------------------ */
+
+--zdt-icon-rust: #ffc799;
+--zdt-icon-python: #ffc799;
+--zdt-icon-ts: #a0a0a0;
+--zdt-icon-js: #ffc799;
+--zdt-icon-go: #99ffe4;
+--zdt-icon-c: #a0a0a0;
+--zdt-icon-lua: #a0a0a0;
+--zdt-icon-shell: #99ffe4;
+--zdt-icon-html: #ffc799;
+--zdt-icon-css: #a0a0a0;
+--zdt-icon-config: #ffc799;
+--zdt-icon-doc: #ffffff;
+--zdt-icon-image: #ffcfa8;
+--zdt-icon-git: #ffc799;
+
+/* --- the editor element ----------------------------------------------------------------- */
+
+--editor-bg: #101010;
+--editor-fg: #ffffff;
+--editor-selection: #333333;
+--editor-cursor: #ffc799;
+--editor-cursor-text: #101010;
+--editor-current-line: #1c1c1c;
+--editor-gutter-bg: #101010;
+--editor-gutter-fg: #505050;
+--editor-gutter-current-fg: #a0a0a0;
+--editor-scrollbar-thumb: oklch(1 0 0 / 10%);
+--editor-scrollbar-track: transparent;
+--editor-search: #232323;
+--editor-search-current: #ffc799;
+--editor-search-current-text: #101010;
+--editor-indent-guide: #232323;
+
+/* --- syntax, one property per tree-sitter capture ---------------------------------------- */
+
+--syntax-attribute: #ff8080;
+--syntax-comment: #575757;
+--syntax-comment-doc: #505050;
+--syntax-constant: #ffc799;
+--syntax-constant-builtin: #ffc799;
+--syntax-constructor: #ffc799;
+--syntax-embedded: #ffffff;
+--syntax-escape: #ffc799;
+--syntax-function: #a0a0a0;
+--syntax-function-builtin: #a0a0a0;
+--syntax-function-macro: #ff8080;
+--syntax-function-method: #a0a0a0;
+--syntax-keyword: #ffcfa8;
+--syntax-label: #ffcfa8;
+--syntax-module: #99ffe4;
+--syntax-number: #ffc799;
+--syntax-operator: #99ffe4;
+--syntax-property: #a0a0a0;
+--syntax-punctuation: #a0a0a0;
+--syntax-punctuation-bracket: #a0a0a0;
+--syntax-punctuation-delimiter: #575757;
+--syntax-punctuation-special: #ffc799;
+--syntax-string: #99ffe4;
+--syntax-string-special: #ffc799;
+--syntax-tag: #ff8080;
+--syntax-type: #ffc799;
+--syntax-type-builtin: #ffc799;
+--syntax-variable: #ffffff;
+--syntax-variable-builtin: #ff8080;
+--syntax-variable-parameter: #ffc799;
+
+/* --- what git says ------------------------------------------------------------------------ */
+
+--zdt-git-added: #99ffe4;
+--zdt-git-changed: #a0a0a0;
+--zdt-git-removed: #ff8080;
+
+/* --- what the language servers say ------------------------------------------------------- */
+
+--zdt-diagnostic-error: #ff8080;
+--zdt-diagnostic-warning: #ffc799;
+--zdt-diagnostic-information: #a0a0a0;
+--zdt-diagnostic-hint: #99ffe4;
+
+/* --- the terminal element ---------------------------------------------------------------- */
+
+--terminal-background: #101010;
+--terminal-foreground: #ffffff;
+--terminal-cursor: #ffc799;
+--terminal-cursor-text: #101010;
+--terminal-selection: #333333;
+--terminal-match: #232323;
+--terminal-match-current: #ffc799;
+
+--terminal-black: #232323;
+--terminal-red: #ff8080;
+--terminal-green: #99ffe4;
+--terminal-yellow: #ffc799;
+--terminal-blue: #a0a0a0;
+--terminal-magenta: #ffcfa8;
+--terminal-cyan: #99ffe4;
+--terminal-white: #a0a0a0;
+
+--terminal-bright-black: #505050;
+--terminal-bright-red: #ff8080;
+--terminal-bright-green: #99ffe4;
+--terminal-bright-yellow: #ffcfa8;
+--terminal-bright-blue: #65737e;
+--terminal-bright-magenta: #ffcfa8;
+--terminal-bright-cyan: #99ffe4;
+--terminal-bright-white: #ffffff;

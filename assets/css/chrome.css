@@ -231,6 +231,9 @@
 /* What a server is busy with. Dimmer than everything else on the line: it is the one thing there
  * that nobody is waiting on. */
 .statusline__busy {
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-xs);
     color: var(--zui-color-muted-foreground);
     opacity: 0.6;
     padding: 0 calc(var(--zui-space-base) * 2);

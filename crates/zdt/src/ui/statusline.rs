@@ -5,6 +5,8 @@
 
 use zgui::prelude::*;
 use zgui::{component, view};
+
+use crate::ui::spinner::SpinnerProps;
 use zgui_editor::CursorPos;
 
 use crate::vim::use_vim;
@@ -149,7 +151,19 @@ pub fn StatusLine() -> impl IntoView {
 
             box(class = "fill") {}
 
-            label(class = "statusline__busy nowrap") {{move || busy().unwrap_or_default()}}
+            row(class = "statusline__busy") {
+                {move || {
+                    use crate::ui::Erase;
+                    match busy() {
+                        Some(doing) => view! {
+                            Spinner()
+                            label(class = "nowrap") {{doing}}
+                        }
+                        .any(),
+                        None => ().any(),
+                    }
+                }}
+            }
 
             label(
                 class = "statusline__message",

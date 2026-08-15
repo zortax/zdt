@@ -134,8 +134,8 @@ fn references(workspace: &Workspace, language: &Language, handle: Option<&Editor
 
 /// `K`.
 ///
-/// In the status line rather than a popover for now: the answer is markdown, and rendering that
-/// properly is its own piece of work. The first line of it is what most hovers are anyway.
+/// A panel anchored to the caret. The answer is markdown; what a hover holds is a signature and a
+/// sentence, so the fences come out and the rest is shown as written.
 fn hover(workspace: &Workspace, language: &Language, handle: Option<&EditorHandle>) {
     let Some((handle, path)) = editing(workspace, handle) else {
         return;
@@ -152,7 +152,18 @@ fn hover(workspace: &Workspace, language: &Language, handle: Option<&EditorHandl
             zgui::task::background(async move { client.hover(&path, position).await }).await
         };
         match found {
-            Ok(Some(hover)) => workspace.say(hover_text(&hover)),
+            Ok(Some(found)) => {
+                let panel = zgui::reactive::use_local_context::<crate::ui::hover::Hover>();
+                // Where the caret is *now*: the answer took a round trip, and anchoring it to
+                // where the caret was would put the panel somewhere nothing is.
+                let at = handle.query(|snapshot| snapshot.selections().primary().head);
+                match (panel, handle.point_for_byte(at)) {
+                    (Some(panel), Some(rect)) => panel.show(&hover_text(&found), rect),
+                    // Off screen, or no panel: the first line in the status bar still says
+                    // something, which beats a key that appears to do nothing.
+                    _ => workspace.say(one_line(&hover_text(&found))),
+                }
+            }
             Ok(None) => workspace.say("nothing here"),
             Err(error) => workspace.complain(error.to_string()),
         }
@@ -302,11 +313,11 @@ fn open_location(workspace: &Workspace, location: &lsp_types::Location) {
     );
 }
 
-/// A hover's contents, as one line for the status line.
+/// A hover's contents, as text.
 fn hover_text(hover: &lsp_types::Hover) -> String {
     use lsp_types::{HoverContents, MarkedString};
 
-    let text = match &hover.contents {
+    match &hover.contents {
         HoverContents::Scalar(MarkedString::String(text)) => text.clone(),
         HoverContents::Scalar(MarkedString::LanguageString(block)) => block.value.clone(),
         HoverContents::Markup(markup) => markup.value.clone(),
@@ -317,9 +328,8 @@ fn hover_text(hover: &lsp_types::Hover) -> String {
                 MarkedString::LanguageString(block) => block.value.clone(),
             })
             .collect::<Vec<_>>()
-            .join(" "),
-    };
-    one_line(&text)
+            .join("\n\n"),
+    }
 }
 
 /// The first line worth reading out of a block of text.
@@ -365,6 +375,8 @@ mod tests {
         };
         assert_eq!(hover_text(&scalar), "plain");
 
+        // The markdown comes through as written: the panel strips its own fences, because it is
+        // the thing that knows it is a monospace box.
         let markup = lsp_types::Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
@@ -372,7 +384,7 @@ mod tests {
             }),
             range: None,
         };
-        assert_eq!(hover_text(&markup), "let x: i32");
+        assert_eq!(crate::ui::hover::tidy(&hover_text(&markup)), "let x: i32");
 
         let array = lsp_types::Hover {
             contents: HoverContents::Array(vec![
@@ -381,6 +393,6 @@ mod tests {
             ]),
             range: None,
         };
-        assert_eq!(hover_text(&array), "second");
+        assert_eq!(crate::ui::hover::tidy(&hover_text(&array)), "second");
     }
 }

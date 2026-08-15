@@ -39,9 +39,14 @@ impl ThemeSource {
     }
 }
 
-/// Declares the built-in themes and reads their two files.
+/// Declares the built-in themes and reads their files.
+///
+/// A theme with a light and a dark file is written `"name" => "Label"`. One that only exists on
+/// one surface — Vesper publishes no light variant, and inventing one would be putting words in
+/// its author's mouth — is written `"name" => "Label", dark only`, and asking for it on a light
+/// surface gets the dark one rather than nothing.
 macro_rules! builtins {
-    ($($file:literal => $label:literal,)*) => {
+    ($($file:literal => $label:literal $(, $only:ident only)? ;)*) => {
         /// Every built-in theme, as it is written in the configuration file.
         pub const BUILTIN: &[(&str, &str)] = &[$(($file, $label)),*];
 
@@ -52,18 +57,44 @@ macro_rules! builtins {
                 $(
                     $file => Some(ThemeSource::new(
                         $file,
-                        include_str!(concat!("../../../assets/themes/", $file, "-light.css")),
-                        include_str!(concat!("../../../assets/themes/", $file, "-dark.css")),
+                        builtins!(@light $file $(, $only)?),
+                        builtins!(@dark $file $(, $only)?),
                     )),
                 )*
                 _ => None,
             }
         }
     };
+
+    // A theme with both surfaces reads both files; one with a single surface reads that file for
+    // both, so a person on the wrong scheme still gets the theme they asked for.
+    (@light $file:literal) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-light.css"))
+    };
+    (@light $file:literal, dark) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-dark.css"))
+    };
+    (@light $file:literal, light) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-light.css"))
+    };
+    (@dark $file:literal) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-dark.css"))
+    };
+    (@dark $file:literal, dark) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-dark.css"))
+    };
+    (@dark $file:literal, light) => {
+        include_str!(concat!("../../../assets/themes/", $file, "-light.css"))
+    };
 }
 
 builtins! {
-    "oldworld" => "Oldworld",
+    "oldworld" => "Oldworld";
+    "vesper" => "Vesper", dark only;
+    "rose-pine" => "Rosé Pine";
+    "catppuccin" => "Catppuccin";
+    "tokyonight" => "Tokyo Night", dark only;
+    "gruvbox" => "Gruvbox";
 }
 
 /// The name and label of every built-in theme, in the order they are offered.

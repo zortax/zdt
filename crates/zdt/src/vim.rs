@@ -271,6 +271,14 @@ impl Vim {
     ///
     /// This is what an editor's key filter is: `true` means the key is used up.
     pub fn key(&self, chord: Chord, handle: &EditorHandle) -> bool {
+        // Documentation stays up until the next key, whatever that key is. It takes no keyboard
+        // of its own, so this is the only thing that has to know it is there.
+        if let Some(hover) = zgui::reactive::use_local_context::<crate::ui::hover::Hover>()
+            && hover.is_showing()
+        {
+            hover.hide();
+        }
+
         // A leap in progress takes every key: once it has started, each one is either a character
         // it is aiming at or a label, and a keymap that answered any of them would put some
         // letters out of reach.

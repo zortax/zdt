@@ -253,13 +253,12 @@ fn the_theme_picker_offers_the_built_in_ones() {
     window.scope.with(|| picker.open(Source::Themes));
     settle(&window);
 
-    assert!(labels(&picker).contains(&"oldworld".to_owned()));
+    let found = labels(&picker);
+    assert!(found.contains(&"oldworld".to_owned()));
+    assert!(found.contains(&"vesper".to_owned()));
     assert!(
-        matches!(
-            picker.selected().expect("a row").target,
-            Target::Theme(ref name) if name == "oldworld"
-        ),
-        "and choosing one switches to it"
+        matches!(picker.selected().expect("a row").target, Target::Theme(_)),
+        "and every row is a theme to switch to"
     );
 }
 

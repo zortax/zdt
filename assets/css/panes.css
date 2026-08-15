@@ -99,3 +99,40 @@
     font-weight: 700;
     line-height: 1;
 }
+
+/* What a language server says about the thing under the caret.
+ *
+ * Anchored under the caret's line: the panel describes what the caret is on, and covering it to
+ * do so is not a help. A floating surface, so the one border and the one shadow. */
+.hover {
+    position: absolute;
+    z-index: 38;
+    max-width: 560px;
+    max-height: 320px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    color: var(--zui-color-popover-foreground);
+    box-shadow: var(--zui-shadow-md);
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    /* Read, never clicked: a pointer that could catch this could not select the text under it. */
+    pointer-events: none;
+}
+
+/* One element per line, so a blank line between a signature and its description survives. */
+.hover__line {
+    white-space: pre;
+    min-height: 1em;
+}
+
+/* The spinner beside what a server is busy with. */
+.spinner {
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    color: var(--zui-color-primary);
+}

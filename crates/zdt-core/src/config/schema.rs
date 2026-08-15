@@ -96,6 +96,11 @@ pub struct Editor {
     pub expand_tab: bool,
     /// Whether the view glides rather than jumping.
     pub smooth_scroll: bool,
+    /// How far the view may move and still jump rather than glide, in lines.
+    ///
+    /// Zero animates every scroll, `j` at the bottom of the view included. Raise it if a
+    /// line-at-a-time glide feels like the view lagging behind the keystroke.
+    pub smooth_scroll_min_lines: f64,
     /// Whether the caret's line is tinted.
     pub cursorline: bool,
     /// How many editors one window keeps ready for buffers it is not showing.
@@ -112,6 +117,7 @@ impl Default for Editor {
             tab_size: 4,
             expand_tab: true,
             smooth_scroll: true,
+            smooth_scroll_min_lines: 0.0,
             cursorline: true,
             mounted_per_window: 8,
         }

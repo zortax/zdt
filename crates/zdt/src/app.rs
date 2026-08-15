@@ -24,6 +24,7 @@ use crate::terminals::Terminals;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::cmdline::CommandLineProps;
 use crate::ui::frame::FrameProps;
+use crate::ui::hover::{Hover, HoverPanelProps};
 use crate::ui::panes::PanesProps;
 use crate::ui::picker::PickerProps;
 use crate::ui::prompt::PromptProps;
@@ -76,6 +77,7 @@ pub fn Root(
     crate::prompt::provide(Prompt::new());
     crate::ui::treemenu::provide();
     crate::cmdline::provide(CommandLine::new(space.clone()));
+    crate::ui::hover::provide(Hover::new());
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
 
@@ -179,6 +181,7 @@ pub fn Root(
                         Panes()
                     }
                 }
+                HoverPanel()
                 TreeMenu()
                 FloatingTerminal()
                 Picker()

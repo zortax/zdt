@@ -63,17 +63,15 @@
 }
 
 /* One rail per level of nesting, so the eye can follow a deep file back to the directory it is
- * in. The line is on the rail's left edge, which puts it under the parent's own glyph. */
+ * in. The line is on the rail's left edge, which puts it under the parent's own glyph.
+ *
+ * Every level gets one, the first included: the root is the header rather than a row, so a row at
+ * depth one is already the child of a directory that is on screen. */
 .tree__rail {
     width: 12px;
     flex: 0 0 auto;
     align-self: stretch;
     border-left: 1px solid var(--zui-color-sidebar-border);
-}
-
-/* The first rail carries no line: there is no parent above the root to trace back to. */
-.tree__rail:first-child {
-    border-left-color: transparent;
 }
 
 .tree__row[data-directory="true"] .tree__name {

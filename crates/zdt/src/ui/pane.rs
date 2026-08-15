@@ -115,6 +115,7 @@ fn BufferView(
                 cursor_style: zgui_editor::CursorStyle::Block,
                 scrolloff: held.editor.scrolloff,
                 smooth_scroll: held.editor.smooth_scroll,
+                glide_threshold_lines: held.editor.smooth_scroll_min_lines,
                 edit: zgui_editor::EditOptions {
                     indent: if held.editor.expand_tab {
                         " ".repeat(held.editor.tab_size.clamp(1, 16) as usize)
