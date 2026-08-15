@@ -26,6 +26,8 @@ rustc-hash.workspace = true
 serde.workspace = true
 slotmap.workspace = true
 smallvec.workspace = true
+notify.workspace = true
+tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 

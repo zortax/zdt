@@ -62,6 +62,7 @@ struct Inner {
     /// A region's own keys, in front of the base map: the tree, a picker, a terminal.
     overlay: RefCell<Option<(String, Keymap)>>,
     workspace: Workspace,
+    settings: crate::settings::Settings,
     /// How deep a replay is, so a macro that plays itself stops.
     depth: std::cell::Cell<u32>,
     // What the interface shows, and nothing else.
@@ -75,7 +76,7 @@ impl Vim {
     ///
     /// A keymap that does not read is a bug in the editor rather than in anybody's configuration,
     /// so it is reported and the editor carries on with whatever did read.
-    pub fn new(workspace: Workspace) -> Self {
+    pub fn new(workspace: Workspace, settings: crate::settings::Settings) -> Self {
         let mut keymap = Keymap::new();
         if let Err(problems) = merge(&mut keymap, DEFAULTS, Leaders::default()) {
             for problem in problems {
@@ -89,6 +90,7 @@ impl Vim {
                 keymap: RefCell::new(keymap),
                 overlay: RefCell::new(None),
                 workspace,
+                settings,
                 depth: std::cell::Cell::new(0),
                 mode: RwSignal::new_local(Mode::Normal),
                 pending: RwSignal::new_local(String::new()),
@@ -150,6 +152,20 @@ impl Vim {
                 .collect(),
             Resolution::Run(_) | Resolution::None => Vec::new(),
         }
+    }
+
+    /// Puts the keymap back to the one the editor ships with.
+    ///
+    /// What a reload does before reading a person's file again: layering the new file onto what is
+    /// already there would leave behind every row they have since deleted.
+    pub fn reset_keymap(&self) {
+        let mut keymap = Keymap::new();
+        if let Err(problems) = merge(&mut keymap, DEFAULTS, Leaders::default()) {
+            for problem in problems {
+                tracing::error!("the shipped keymap: {problem}");
+            }
+        }
+        *self.inner.keymap.borrow_mut() = keymap;
     }
 
     /// Reads more keymap text on top of what is there, which is what a user's file is.
@@ -309,20 +325,36 @@ impl Vim {
     }
 
     /// What the editor looks like in `mode`.
-    fn enter(&self, mode: Mode, handle: &EditorHandle) {
+    pub fn enter(&self, mode: Mode, handle: &EditorHandle) {
+        use zdt_core::config::LineNumbers;
         use zgui_editor::{CursorStyle, GutterMode};
+
         handle.set_cursor_style(match mode {
             Mode::Insert | Mode::Command => CursorStyle::Bar,
             Mode::Replace => CursorStyle::Underline,
             _ => CursorStyle::Block,
         });
+
         // Relative numbering is for moving around; while typing, the absolute number is the one
-        // worth having.
-        handle.set_gutter(if mode.is_inserting() {
-            GutterMode::Absolute
-        } else {
-            GutterMode::Relative
+        // worth having. A person who asked for absolute or for none gets what they asked for in
+        // every mode.
+        let numbers = self
+            .inner
+            .settings
+            .with_untracked(|config| config.editor.line_numbers);
+        handle.set_gutter(match (numbers, mode.is_inserting()) {
+            (LineNumbers::None, _) => GutterMode::None,
+            (LineNumbers::Absolute, _) | (LineNumbers::Relative, true) => GutterMode::Absolute,
+            (LineNumbers::Relative, false) => GutterMode::Relative,
         });
+    }
+
+    /// Puts the editor back into whatever the current mode looks like.
+    ///
+    /// What a settings change calls: the gutter and the caret are decided by the mode and the
+    /// settings together, and only one of the two has just moved.
+    pub fn refresh(&self, handle: &EditorHandle) {
+        self.enter(self.inner.engine.borrow().mode(), handle);
     }
 
     /// An action the engine handed back because the application owns it.

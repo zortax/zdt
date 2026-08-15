@@ -56,6 +56,30 @@ pub fn app_sheet(theme: &ThemeSource, scheme: ColorScheme) -> String {
     css
 }
 
+/// The name the settings' own properties are installed under.
+///
+/// Between the theme and a person's own sheet: a font named in `config.toml` beats the theme's,
+/// and a rule in `user.css` beats both.
+pub const SETTINGS_SHEET: &str = "zdt-settings";
+
+/// Writes the settings that are style rather than behaviour into the cascade.
+///
+/// Fonts and sizes are CSS, so they belong in a sheet rather than being threaded through every
+/// component that draws text.
+#[must_use]
+pub fn settings_sheet(config: &zdt_core::Config) -> String {
+    format!(
+        ":root {{\n  --zdt-ui-font: \"{ui}\";\n  font-size: {ui_size}px;\n}}\n\
+         .pane__editor {{\n  --zdt-editor-font: \"{editor}\";\n  font-size: {editor_size}px;\n  \
+         tab-size: {tab};\n}}\n",
+        ui = config.ui.font,
+        ui_size = config.ui.font_size,
+        editor = config.editor.font,
+        editor_size = config.editor.font_size,
+        tab = config.editor.tab_size,
+    )
+}
+
 /// Puts a theme into the window and keeps it there.
 ///
 /// Wraps its children in the token provider, so every component below is themed, and installs the
@@ -98,6 +122,22 @@ pub fn ZdtTheme(
         ThemeProvider(scheme = scheme, light = light, dark = dark) {
             {children.into_view_once()}
         }
+    }
+}
+
+/// The name a person's own style sheet is installed under.
+///
+/// Last of the three, so it wins: the compiled-in sheet, then the theme, then this.
+pub const USER_SHEET: &str = "zdt-user";
+
+/// Installs a person's own style sheet, or takes it away when there is none.
+///
+/// Replacing under the same name keeps its place in the cascade, which is what makes editing it
+/// while the editor runs a repaint rather than a re-cascade.
+pub fn install_user_css(css: Option<&str>) {
+    match css {
+        Some(css) => install_stylesheet(USER_SHEET, css),
+        None => remove_stylesheet(USER_SHEET),
     }
 }
 

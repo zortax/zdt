@@ -10,6 +10,7 @@
 use zdt_vim::Action;
 use zgui_editor::EditorHandle;
 
+use crate::settings::Settings;
 use crate::vim::Vim;
 use crate::workspace::{Axis, Workspace};
 
@@ -23,6 +24,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: &EditorHan
         "window" => window(workspace, vim, leaf, args),
         "app" => app(workspace, leaf),
         "editor" => editor(handle, leaf),
+        "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.
         _ => workspace.say(format!("{} is not built yet", action.name)),
@@ -158,6 +160,55 @@ fn app(workspace: &Workspace, leaf: &str) {
             }
         }
         other => workspace.say(format!("app.{other} is not built yet")),
+    }
+}
+
+/// The `<Leader>u` toggles.
+///
+/// Each writes into the settings, which everything that follows one reads — so a toggle is one
+/// line here rather than a second copy of the truth beside the configuration.
+fn ui(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
+    use zdt_core::config::LineNumbers;
+
+    let Some(settings) = zgui::reactive::use_local_context::<Settings>() else {
+        return;
+    };
+
+    if leaf == "dismiss" {
+        workspace.hush();
+        return;
+    }
+    if leaf != "toggle" {
+        workspace.say(format!("ui.{leaf} is not built yet"));
+        return;
+    }
+
+    let setting = args.str("setting").unwrap_or("");
+    match setting {
+        "scheme" => {
+            settings.toggle_scheme();
+            let now = settings.with(|config| config.ui.scheme);
+            workspace.say(format!("{now:?} theme").to_lowercase());
+        }
+        "line_numbers" => settings.update(|config| {
+            config.editor.line_numbers = match config.editor.line_numbers {
+                LineNumbers::None => LineNumbers::Absolute,
+                _ => LineNumbers::None,
+            };
+        }),
+        "relative_numbers" => settings.update(|config| {
+            config.editor.line_numbers = match config.editor.line_numbers {
+                LineNumbers::Relative => LineNumbers::Absolute,
+                _ => LineNumbers::Relative,
+            };
+        }),
+        "cursorline" => settings.update(|config| {
+            config.editor.cursorline = !config.editor.cursorline;
+        }),
+        "smooth_scroll" => settings.update(|config| {
+            config.editor.smooth_scroll = !config.editor.smooth_scroll;
+        }),
+        other => workspace.say(format!("there is no `{other}` to toggle yet")),
     }
 }
 

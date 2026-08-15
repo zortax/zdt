@@ -13,6 +13,8 @@ pub mod files;
 #[allow(dead_code)]
 pub mod icons;
 pub mod keys;
+pub mod reload;
+pub mod settings;
 pub mod ui;
 pub mod vim;
 pub mod workspace;

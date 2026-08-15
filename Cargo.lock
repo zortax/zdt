@@ -5815,11 +5815,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "compact_str",
+ "notify",
  "ropey",
  "rustc-hash 2.1.3",
  "serde",
  "slotmap",
  "smallvec",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "zdt-core",

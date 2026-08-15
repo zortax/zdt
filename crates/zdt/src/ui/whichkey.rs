@@ -19,15 +19,14 @@ use zgui::reactive::{LocalStorage, RenderEffect, RwSignal};
 use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 
+use crate::settings::use_settings;
 use crate::vim::{Continuation, use_vim};
-
-/// How long a sequence has to sit before the panel appears.
-const DELAY: Duration = Duration::from_millis(300);
 
 /// The panel.
 #[component]
 pub fn WhichKey() -> impl IntoView {
     let vim = use_vim();
+    let settings = use_settings();
 
     // What is shown, which is not what is pending: the delay sits between them.
     let shown: RwSignal<Option<(String, Vec<Continuation>)>, LocalStorage> =
@@ -39,6 +38,7 @@ pub fn WhichKey() -> impl IntoView {
 
     let watching = {
         let vim = vim.clone();
+        let settings = settings.clone();
         let waiting = Rc::clone(&waiting);
         RenderEffect::new(move |_| {
             let pending = vim.pending();
@@ -67,8 +67,9 @@ pub fn WhichKey() -> impl IntoView {
             let Some(timers) = timers.as_ref() else {
                 return;
             };
+            let delay = Duration::from_millis(settings.with(|config| config.ui.whichkey_delay));
             let vim = vim.clone();
-            *waiting.borrow_mut() = Some(timers.set_timeout(DELAY, move || {
+            *waiting.borrow_mut() = Some(timers.set_timeout(delay, move || {
                 let pending = vim.pending();
                 let next = vim.continuations();
                 if !pending.is_empty() && !next.is_empty() {
@@ -97,8 +98,12 @@ pub fn WhichKey() -> impl IntoView {
                     }
                 }
                 box(class = "whichkey__keys") {
+                    // Keyed by the whole row rather than by its key alone. A row's label is a
+                    // construction-time value, so a row reused across a change would keep the
+                    // label it was built with — and walking from the leader map into a group
+                    // shares plenty of keys with it.
                     for entry in move || shown.get().map(|(_, next)| next).unwrap_or_default(),
-                        key = |entry: &Continuation| entry.keys.clone()
+                        key = |entry: &Continuation| (entry.keys.clone(), entry.label.clone())
                     {
                         Entry(entry = entry)
                     }

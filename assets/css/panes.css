@@ -54,7 +54,8 @@
     --editor-gutter-current-fg: var(--editor-gutter-current-fg);
 }
 
-.pane:not([data-focused="true"]) .pane__editor {
+.pane:not([data-focused="true"]) .pane__editor,
+.pane[data-cursorline="off"] .pane__editor {
     --editor-current-line: transparent;
 }
 

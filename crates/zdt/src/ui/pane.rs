@@ -19,6 +19,7 @@ use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
+use crate::settings::use_settings;
 use crate::ui::Erase;
 use crate::vim::use_vim;
 use crate::workspace::{BufferId, BufferKind, WindowId, use_workspace};
@@ -54,6 +55,12 @@ pub fn Pane(
         box(
             class = "pane",
             attr:data-focused = move || focused().then(|| "true".to_owned()),
+            // The caret's own line is tinted unless somebody said not to. A class rather than a
+            // command, because it is a colour and colours are the sheet's.
+            attr:data-cursorline = {
+                let settings = use_settings();
+                move || (!settings.with(|config| config.editor.cursorline)).then(|| "off".to_owned())
+            },
             on:pointer_down = {
                 let workspace = workspace.clone();
                 move |_| workspace.focus_window(window)
@@ -63,6 +70,15 @@ pub fn Pane(
                 BufferView(window = window, buffer = buffer)
             }
         }
+    }
+}
+
+/// How the gutter numbers its lines, as the editor says it.
+fn gutter_of(numbers: zdt_core::config::LineNumbers) -> GutterMode {
+    match numbers {
+        zdt_core::config::LineNumbers::Absolute => GutterMode::Absolute,
+        zdt_core::config::LineNumbers::Relative => GutterMode::Relative,
+        zdt_core::config::LineNumbers::None => GutterMode::None,
     }
 }
 
@@ -91,12 +107,22 @@ fn BufferView(
 
     match &entry.kind {
         BufferKind::Text { document } => {
-            let config = EditorConfig {
-                gutter: GutterMode::Relative,
+            let settings = use_settings();
+            let config = settings.with(|held| EditorConfig {
+                gutter: gutter_of(held.editor.line_numbers),
                 cursor_style: zgui_editor::CursorStyle::Block,
-                scrolloff: 3,
+                scrolloff: held.editor.scrolloff,
+                smooth_scroll: held.editor.smooth_scroll,
+                edit: zgui_editor::EditOptions {
+                    indent: if held.editor.expand_tab {
+                        " ".repeat(held.editor.tab_size.clamp(1, 16) as usize)
+                    } else {
+                        "\t".to_owned()
+                    },
+                    ..zgui_editor::EditOptions::default()
+                },
                 ..EditorConfig::default()
-            };
+            });
 
             // The language is set through the handle rather than through the prop, because the
             // prop takes a name and this has an answer that may be "none".
@@ -159,6 +185,24 @@ fn BufferView(
                     drop(focus);
                     drop(claim);
                 });
+            }
+
+            // The settings that the editor can be told about after it is mounted. The rest — the
+            // fonts, the tab width — are CSS and reach it through the cascade.
+            {
+                let settings = settings.clone();
+                let workspace = workspace.clone();
+                let vim = use_vim();
+                let following = RenderEffect::new(move |previous: Option<()>| {
+                    let _ = settings.with(|config| config.editor.line_numbers);
+                    // The first run is the config the editor was just built with.
+                    if previous.is_some()
+                        && let Some(handle) = workspace.handle_for(window, buffer)
+                    {
+                        vim.refresh(&handle);
+                    }
+                });
+                on_cleanup_local(move || drop(following));
             }
 
             // Every key reaches the modal layer before the editor does, which is the whole seam a

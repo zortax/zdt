@@ -39,7 +39,8 @@ fn mount(text: &str) -> Modal {
         let kept = Rc::clone(&vim);
         window.scope.with(|| {
             let workspace = Workspace::new(Project::at("/project"));
-            let layer = Vim::new(workspace);
+            let settings = zdt::settings::Settings::new(zdt_core::Config::default(), None);
+            let layer = Vim::new(workspace, settings);
             kept.borrow_mut().replace(layer.clone());
 
             let filter: zgui_editor::KeyFilter = Box::new(
