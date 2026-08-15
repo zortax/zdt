@@ -19,6 +19,7 @@ pub mod prompt;
 pub mod reload;
 pub mod settings;
 pub mod task;
+pub mod terminals;
 pub mod ui;
 pub mod vim;
 pub mod workspace;

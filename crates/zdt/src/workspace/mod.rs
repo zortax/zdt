@@ -273,6 +273,42 @@ impl Workspace {
         });
     }
 
+    /// Opens a terminal buffer called `name`, and answers it.
+    ///
+    /// The program itself is [`crate::terminals`]'s business; what this makes is the buffer it
+    /// will be drawn in, so that a terminal is on the buffer line like everything else.
+    /// A floating terminal is `listed = false`: it is reachable by the key that toggles it and by
+    /// nothing else, which is what makes it a scratch terminal rather than another tab to close.
+    pub fn open_terminal(&self, name: &str, listed: bool) -> BufferId {
+        let id = self
+            .inner
+            .buffers
+            .try_update(|buffers| buffers.insert_with_key(|id| Buffer::terminal(id, name)))
+            .expect("the buffer map is writable");
+        if listed {
+            self.inner.order.update(|order| order.push(id));
+            self.show(id);
+        }
+        id
+    }
+
+    /// Puts the title a program asked for on its buffer.
+    pub fn rename_terminal(&self, id: BufferId, title: Option<String>) {
+        let Some(buffer) = self.buffer_untracked(id) else {
+            return;
+        };
+        let crate::workspace::BufferKind::Terminal { title: held } = &buffer.kind else {
+            return;
+        };
+        // A program that clears its title leaves the one it had: an empty tab says less than a
+        // stale one.
+        if let Some(title) = title.filter(|title| !title.is_empty())
+            && held.get_untracked().as_deref() != Some(title.as_str())
+        {
+            held.set(Some(title));
+        }
+    }
+
     /// Closes `id`, showing something else wherever it was.
     ///
     /// The buffer's text goes with it: a closed buffer is closed, and its undo history is not

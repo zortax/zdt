@@ -146,6 +146,13 @@ const BY_NAME: &[(&str, FileType)] = &[
     ),
 ];
 
+/// What a terminal buffer shows on the buffer line.
+pub const TERMINAL: FileType = FileType {
+    language: None,
+    glyph: "\u{f489}",
+    tint: "zui-color-muted-foreground",
+};
+
 /// What `path` is.
 ///
 /// Whole names win over extensions, because `Cargo.lock` is a lock file before it is a `.lock`

@@ -17,12 +17,14 @@ use crate::explorer::Explorer;
 use crate::picker::Picker;
 use crate::prompt::Prompt;
 use crate::settings::Settings;
+use crate::terminals::Terminals;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::frame::FrameProps;
 use crate::ui::panes::PanesProps;
 use crate::ui::picker::PickerProps;
 use crate::ui::prompt::PromptProps;
 use crate::ui::statusline::StatusLineProps;
+use crate::ui::terminal::FloatingTerminalProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
 use crate::ui::tree::ExplorerProps;
 use crate::ui::whichkey::WhichKeyProps;
@@ -68,6 +70,7 @@ pub fn Root(
 
     crate::prompt::provide(Prompt::new());
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
+    crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
 
     // The tree keeps up with the editor, and with the settings.
     let following_buffer = follow_buffer(&explorer, &space, &settings);
@@ -143,6 +146,7 @@ pub fn Root(
                     Explorer()
                     Panes()
                 }
+                FloatingTerminal()
                 Picker()
                 Prompt()
                 WhichKey()

@@ -7,6 +7,7 @@ pub mod panes;
 pub mod picker;
 pub mod prompt;
 pub mod statusline;
+pub mod terminal;
 pub mod theme;
 pub mod tree;
 pub mod whichkey;

@@ -80,6 +80,23 @@ impl Buffer {
         }
     }
 
+    /// A terminal buffer called `name`.
+    pub fn terminal(id: BufferId, name: &str) -> Self {
+        Self {
+            id,
+            path: None,
+            kind: BufferKind::Terminal {
+                title: RwSignal::new_local(Some(name.to_owned())),
+            },
+            file_type: zdt_core::language::TERMINAL,
+            encoding: Encoding::default(),
+            line_ending: LineEnding::default(),
+            lossy: false,
+            revision: RwSignal::new_local(0),
+            saved_revision: RwSignal::new_local(0),
+        }
+    }
+
     /// The document, when this is text.
     pub fn document(&self) -> Option<&zgui_editor::Document> {
         match &self.kind {

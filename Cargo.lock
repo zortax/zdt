@@ -5816,6 +5816,7 @@ dependencies = [
  "anyhow",
  "compact_str",
  "notify",
+ "portable-pty",
  "ropey",
  "rustc-hash 2.1.3",
  "serde",

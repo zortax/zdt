@@ -285,19 +285,31 @@ impl Vim {
     /// The same keymap with that region's rows in front, resolved in normal mode — a region has no
     /// modes of its own — and no editor to apply anything to. Answers whether the key was used.
     pub fn key_in_region(&self, chord: Chord, region: &str) -> bool {
+        self.key_in_region_as(chord, region, Mode::Normal)
+    }
+
+    /// The same, resolved in `mode`.
+    ///
+    /// For a terminal being typed into: almost nothing is bound in terminal mode, so almost every
+    /// key falls through to the program — which is the point. What *is* bound there is what vim's
+    /// own `maps.t` binds, and it wins over the program deliberately.
+    pub fn key_in_region_as(&self, chord: Chord, region: &str, mode: Mode) -> bool {
         let overlay = self.inner.overlays.borrow();
-        let Some(map) = overlay.get(region) else {
-            return false;
-        };
+        let map = overlay.get(region);
         let keymap = self.inner.keymap.borrow();
-        let layered = Layered::new(map, &keymap);
+        // A region with no keymap of its own still gets the base map: a terminal in normal mode
+        // has no rows of its own, and `<Leader>ff` from inside one has to work.
+        let layered = match map {
+            Some(map) => Layered::new(map, &keymap),
+            None => Layered::plain(&keymap),
+        };
 
         // A region's keys have no grammar: no counts, no operators, nothing to hold between
         // presses but the sequence itself.
         let mut keys = self.inner.region_keys.borrow_mut();
         keys.push(chord);
 
-        match layered.resolve(Mode::Normal, &keys) {
+        match layered.resolve(mode, &keys) {
             Resolution::Pending(_) => {
                 drop(keys);
                 self.publish_region();

@@ -19,6 +19,7 @@ zgui-ui-icons = { git = "https://github.com/zortax/zgui" }
 zgui-ui-primitives = { git = "https://github.com/zortax/zgui" }
 zgui-editor = { path = "/home/leo/Projects/zgui-editor" }
 zgui-terminal = { path = "/home/leo/Projects/zgui-terminal", features = ["pty"] }
+portable-pty = "0.9"
 
 # --- this workspace ----------------------------------------------------------------------
 zdt-core = { path = "crates/zdt-core" }

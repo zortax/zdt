@@ -75,6 +75,17 @@ impl Node {
         node
     }
 
+    /// Whether anything is bound here or anywhere under here.
+    ///
+    /// Not the same as having children. A group label — `<Leader>f` is "Find" — is written into
+    /// every mode's trie, because a label is not a mode's business; so a mode with nothing bound
+    /// under `<Leader>` still has the whole group tree in it. Without this, `<Space>` in a
+    /// terminal would be a prefix waiting for a key that can never come, and the space bar would
+    /// stop working.
+    fn binds_anything(&self) -> bool {
+        self.binding.is_some() || self.children.values().any(Node::binds_anything)
+    }
+
     /// Whether anything is bound here or under here.
     fn is_bare(&self) -> bool {
         self.binding.is_none() && self.children.is_empty()
@@ -157,13 +168,11 @@ impl Keymap {
         if let Some(binding) = node.binding.as_ref() {
             return Resolution::Run(binding);
         }
-        if node.children.is_empty() {
-            return Resolution::None;
-        }
-
         let mut continuations: Vec<Continuation<'_>> = node
             .children
             .iter()
+            // A child that only carries a label leads nowhere in this mode.
+            .filter(|(_, child)| child.binds_anything())
             .map(|(chord, child)| Continuation {
                 chord: *chord,
                 label: child
@@ -175,6 +184,9 @@ impl Keymap {
                 runs: child.binding.is_some(),
             })
             .collect();
+        if continuations.is_empty() {
+            return Resolution::None;
+        }
         continuations.sort_by_key(|one| sort_key(one.chord));
         Resolution::Pending(continuations)
     }
@@ -184,7 +196,7 @@ impl Keymap {
     pub fn has_prefix(&self, mode: Mode, keys: &[Chord]) -> bool {
         self.modes[slot(mode)]
             .walk(keys)
-            .is_some_and(|node| !node.is_bare())
+            .is_some_and(Node::binds_anything)
     }
 
     /// What the keymap calls the prefix `keys`, when it named it.
@@ -527,6 +539,48 @@ mod tests {
                     ],
                     "characters in their own order, then the named keys"
                 );
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_group_label_is_not_a_prefix_in_a_mode_with_nothing_under_it() {
+        // A group is a name, and a name has no mode: `<Leader>f` is "Find" wherever it appears.
+        // But labelling it must not make `<Leader>` a prefix in a mode where nothing is bound
+        // under it — in a terminal that would swallow the space bar, which was exactly the bug.
+        let mut map = Keymap::new();
+        let everywhere = ModeSet::ALL;
+        let normal = ModeSet::of(Mode::Normal);
+
+        map.name_group(everywhere, &keys("<Leader>f"), "Find");
+        map.bind(normal, &keys("<Leader>ff"), binding("files"));
+
+        assert!(
+            matches!(
+                map.resolve(Mode::Normal, &keys("<Leader>")),
+                Resolution::Pending(_)
+            ),
+            "in normal mode it leads somewhere"
+        );
+        assert_eq!(
+            map.resolve(Mode::Terminal, &keys("<Leader>")),
+            Resolution::None,
+            "in terminal mode it leads nowhere, so the key belongs to the program"
+        );
+        assert!(!map.has_prefix(Mode::Terminal, &keys("<Leader>")));
+    }
+
+    #[test]
+    fn a_prefix_offers_only_the_keys_that_lead_somewhere() {
+        let mut map = Keymap::new();
+        map.name_group(ModeSet::ALL, &keys("gz"), "Nothing here");
+        map.bind(ModeSet::of(Mode::Normal), &keys("ga"), binding("ga"));
+
+        match map.resolve(Mode::Normal, &keys("g")) {
+            Resolution::Pending(next) => {
+                let chords: Vec<Chord> = next.iter().map(|one| one.chord).collect();
+                assert_eq!(chords, vec![Chord::char('a')], "`z` names an empty group");
             }
             other => panic!("{other:?}"),
         }

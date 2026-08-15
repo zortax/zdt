@@ -70,9 +70,20 @@ pub fn StatusLine() -> impl IntoView {
         move || workspace.message()
     };
 
+    // A terminal being typed into is a mode the engine knows nothing about: it is not answering
+    // while a program is, so what mode the editor is in says nothing about where the keys go.
     let mode = {
         let vim = vim.clone();
-        move || vim.mode()
+        let terminals = zgui::reactive::use_local_context::<crate::terminals::Terminals>();
+        move || {
+            if terminals
+                .as_ref()
+                .is_some_and(|terminals| terminals.typing().is_some())
+            {
+                return zdt_vim::Mode::Terminal;
+            }
+            vim.mode()
+        }
     };
     let pending = {
         let vim = vim.clone();

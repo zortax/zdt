@@ -21,6 +21,7 @@ use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::settings::use_settings;
 use crate::ui::Erase;
+use crate::ui::terminal::EmulatorProps;
 use crate::vim::use_vim;
 use crate::workspace::{BufferId, BufferKind, WindowId, use_workspace};
 
@@ -240,12 +241,11 @@ fn BufferView(
             }
             .any()
         }
+        // The emulator hides itself when its window is showing something else, for the same
+        // reason an editor does: a terminal taken out of the tree is a program shut down.
         BufferKind::Terminal { .. } => view! {
-            box(
-                class = "pane__buffer pane__buffer--pending",
-                style:display = move || (!current()).then(|| "none".to_owned())
-            ) {
-                label(class = "muted") {"terminal buffers arrive with the terminal"}
+            box(class = "pane__buffer") {
+                Emulator(buffer = buffer, floating = false)
             }
         }
         .any(),

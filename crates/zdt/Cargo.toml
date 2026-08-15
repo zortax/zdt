@@ -37,6 +37,7 @@ zdt-vim.workspace = true
 
 zgui.workspace = true
 zgui-editor.workspace = true
+portable-pty.workspace = true
 zgui-terminal.workspace = true
 zgui-ui.workspace = true
 zgui-ui-icons.workspace = true
