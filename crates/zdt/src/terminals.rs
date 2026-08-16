@@ -49,6 +49,12 @@ struct Inner {
     showing: RwSignal<Option<BufferId>, LocalStorage>,
     /// Which terminal has the keyboard, and is therefore taking keys away from the keymap.
     typing: RwSignal<Option<BufferId>, LocalStorage>,
+    /// The window a terminal was given a split of its own for, when it was.
+    ///
+    /// A terminal opened with `<Leader>tv` gets a window made for it, and that window has nothing
+    /// to show once the terminal has gone — so it goes too. One opened into a window that was
+    /// already showing something is not in here, and closing it goes back to what was there.
+    owned_windows: RefCell<FxHashMap<BufferId, crate::workspace::WindowId>>,
     /// Whether `<C-\>` has been pressed and the `<C-n>` that would complete it is awaited.
     ///
     /// Held here rather than in the vim engine, because the engine is not answering while a
@@ -112,6 +118,7 @@ impl Terminals {
                 floats: RefCell::new(FxHashMap::default()),
                 showing: RwSignal::new_local(None),
                 typing: RwSignal::new_local(None),
+                owned_windows: RefCell::new(FxHashMap::default()),
                 escaping: std::cell::Cell::new(false),
             }),
         }
@@ -210,11 +217,31 @@ impl Terminals {
     }
 
     /// Shuts the program in `buffer` down and forgets everything about it.
+    /// Remembers that `window` was split off for `buffer` and should go when it does.
+    pub fn owns_window(&self, buffer: BufferId, window: crate::workspace::WindowId) {
+        self.inner.owned_windows.borrow_mut().insert(buffer, window);
+    }
+
+    /// Ends a terminal and takes away what it was in.
+    ///
+    /// The program is shut down, the buffer closed, and a window that was split off for it closed
+    /// with it: a split made for a terminal has nothing left to show, and leaving it behind
+    /// duplicates whatever is beside it.
+    pub fn end(&self, workspace: &Workspace, buffer: BufferId) {
+        let window = self.inner.owned_windows.borrow_mut().remove(&buffer);
+        self.close(buffer);
+        workspace.close_buffer(buffer);
+        if let Some(window) = window {
+            workspace.close_window_at(window);
+        }
+    }
+
     pub fn close(&self, buffer: BufferId) {
         if let Some(handle) = self.inner.handles.borrow_mut().remove(&buffer) {
             handle.shutdown();
         }
         self.inner.pending.borrow_mut().remove(&buffer);
+        self.inner.owned_windows.borrow_mut().remove(&buffer);
         self.inner
             .floats
             .borrow_mut()

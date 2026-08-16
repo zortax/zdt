@@ -17,6 +17,11 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/prompt.css"),
     include_str!("../../../assets/css/picker.css"),
     include_str!("../../../assets/css/terminal.css"),
+    include_str!("../../../assets/css/markdown.css"),
+    include_str!("../../../assets/css/toast.css"),
+    include_str!("../../../assets/css/completion.css"),
+    include_str!("../../../assets/css/settings.css"),
+    include_str!("../../../assets/css/git.css"),
     // Last, so that what moves is decided in one place rather than beside each thing that moves.
     include_str!("../../../assets/css/motion.css"),
     include_str!("../../../assets/css/whichkey.css"),
@@ -27,6 +32,30 @@ pub const KEYMAP: &str = include_str!("../../../assets/keymap.toml");
 
 /// The file tree's own keys, read in front of the base map while the keyboard is in the panel.
 pub const TREE_KEYMAP: &str = include_str!("../../../assets/keymap-tree.toml");
+
+/// Every region that answers keys of its own: what it is called, the keys it ships with, and the
+/// file a person overrides them in.
+///
+/// The tree is not in this table because it is loaded before anything else is built — it is what
+/// makes `j` in the panel the tree's `j` rather than the editor's, and a window that started
+/// without it would be a window whose file tree does nothing.
+pub const OVERLAYS: &[(&str, &str, &str)] = &[
+    (
+        "hover",
+        include_str!("../../../assets/keymap-hover.toml"),
+        "keymap-hover.toml",
+    ),
+    (
+        "completion",
+        include_str!("../../../assets/keymap-completion.toml"),
+        "keymap-completion.toml",
+    ),
+    (
+        "git",
+        include_str!("../../../assets/keymap-git.toml"),
+        "keymap-git.toml",
+    ),
+];
 
 /// Every compiled-in style sheet, joined.
 #[must_use]

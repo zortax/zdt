@@ -65,14 +65,15 @@
     --editor-current-line: transparent;
 }
 
-/* The divider between two windows is one hairline that thickens under the pointer. */
-.zui-resizable-handle {
-    background-color: var(--zui-color-border);
+/* The divider between two windows. The library already draws it as one hairline inside a nine-pixel
+ * strip the pointer can actually catch, so all this adds is what the pointer turns into over it —
+ * and the strip stays invisible, as it is everywhere else in this window. */
+.zui-resizable__handle {
+    cursor: col-resize;
 }
 
-.zui-resizable-handle:hover,
-.zui-resizable-handle:focus-visible {
-    background-color: var(--zui-color-primary);
+[data-direction="vertical"] > .zui-resizable__handle {
+    cursor: row-resize;
 }
 
 /* The leap labels.
@@ -117,23 +118,41 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    /* No padding of its own: the scroll container inside carries it, so the bar runs against this
+       box's border rather than floating a gutter's width inside it. */
     border: 1px solid var(--zui-color-border);
     border-radius: var(--zui-radius-base);
     background-color: var(--zui-color-popover);
     color: var(--zui-color-popover-foreground);
     box-shadow: var(--zui-shadow-md);
-    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 12px;
-    line-height: 1.5;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
     /* Read, never clicked: a pointer that could catch this could not select the text under it. */
     pointer-events: none;
 }
 
-/* One element per line, so a blank line between a signature and its description survives. */
-.hover__line {
-    white-space: pre;
-    min-height: 1em;
+/* Focused, it is being read rather than glanced at, so it says so — a ring rather than a colour,
+ * because the thing that changed is where the keyboard is and nothing about the content. */
+.hover[data-focused="true"] {
+    border-color: var(--zui-color-ring);
+}
+
+/* What moves when the panel is scrolled. A real scroll container rather than a transform: a
+ * transform moves the drawing without re-fragmenting it, so anything laid out below the panel
+ * scrolls up into view as blank space. */
+.hover__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* The panel's inset belongs to the text, not to the box that scrolls it: a scroll container's own
+   padding sits outside its bar, so an inset stated there holds the bar that far off the panel's
+   edge. Stated on the content, the bar runs against the border and the words are still inset. */
+.hover__body > .md {
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
 }
 
 /* The spinner beside what a server is busy with. */
@@ -164,12 +183,12 @@
 }
 
 .pane__empty-title {
-    font-size: 13px;
+    font-size: calc(var(--zdt-ui-size, 12px) + 1px);
     color: var(--zui-color-muted-foreground);
 }
 
 .pane__empty-hint {
-    font-size: 11px;
+    font-size: var(--zdt-ui-size-small, 11px);
     opacity: 0.6;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
 }

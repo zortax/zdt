@@ -66,19 +66,45 @@ pub const SETTINGS_SHEET: &str = "zdt-settings";
 ///
 /// Fonts and sizes are CSS, so they belong in a sheet rather than being threaded through every
 /// component that draws text.
+/// The size everything in the interface is drawn at, when nothing says otherwise.
+///
+/// The interface's own sheets are written in terms of `--zdt-ui-size` rather than in whole pixels,
+/// which is what makes the size setting reach further than the one or two places that happened to
+/// inherit from `:root`. A rule that says `12px` is a rule that ignores the setting, so there
+/// should be none — and this is the fallback for a document with no settings installed yet.
+pub const DEFAULT_UI_SIZE: f32 = 12.0;
 #[must_use]
 pub fn settings_sheet(config: &zdt_core::Config) -> String {
+    // Two derived sizes rather than a ladder: the interface has one size and a smaller one for the
+    // things that annotate it — a heading over a group, a count beside a name — and everything
+    // else is the first.
+    let ui_size = config.ui.font_size.clamp(6.0, 32.0);
+    let small = (ui_size - 1.0).max(6.0);
+
     format!(
-        ":root {{\n  --zdt-ui-font: \"{ui}\";\n  font-size: {ui_size}px;\n  \
-         --tree-width: {tree_width}px;\n  \
-         --terminal-float-width: {float_width}%;\n  \
-         --terminal-float-height: {float_height}%;\n}}\n\
-         .pane__editor {{\n  --zdt-editor-font: \"{editor}\";\n  \
-         --zdt-editor-size: {editor_size}px;\n  tab-size: {tab};\n}}\n",
+        ":root {{\n  \
+           --zdt-ui-font: \"{ui}\";\n  \
+           --zdt-ui-size: {ui_size}px;\n  \
+           --zdt-ui-size-small: {small}px;\n  \
+           --zdt-ui-weight: {ui_weight};\n  \
+           font-size: var(--zdt-ui-size);\n  \
+           font-weight: var(--zdt-ui-weight);\n  \
+           --tree-width: {tree_width}px;\n  \
+           --terminal-float-width: {float_width}%;\n  \
+           --terminal-float-height: {float_height}%;\n\
+         }}\n\
+         .pane__editor {{\n  \
+           --zdt-editor-font: \"{editor}\";\n  \
+           --zdt-editor-size: {editor_size}px;\n  \
+           --zdt-editor-weight: {editor_weight};\n  \
+           font-weight: var(--zdt-editor-weight);\n  \
+           tab-size: {tab};\n\
+         }}\n",
         ui = config.ui.font,
-        ui_size = config.ui.font_size,
+        ui_weight = config.ui.font_weight.clamp(100, 900),
         editor = config.editor.font,
         editor_size = config.editor.font_size,
+        editor_weight = config.editor.font_weight.clamp(100, 900),
         tab = config.editor.tab_size,
         tree_width = config.tree.width,
         float_width = (config.terminal.float_width * 100.0).round() as u32,

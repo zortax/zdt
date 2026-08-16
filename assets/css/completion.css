@@ -1,0 +1,138 @@
+/* The suggestions.
+ *
+ * A list under the caret and, once somebody has rested on a row, what the server says about it
+ * beside the list. Both float, so both get the one border and the one shadow that floating things
+ * get here; everything else about them is the same 22px-grid vocabulary as the picker.
+ *
+ * The rows are shorter than the rest of the interface — 20px rather than 22 — because this list
+ * appears *over* code somebody is reading, and two extra pixels per row is a line and a half of
+ * that code hidden by the time twelve rows are showing. */
+
+.completion {
+    position: absolute;
+    z-index: 39;
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    color: var(--zui-color-popover-foreground);
+    box-shadow: var(--zui-shadow-md);
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 20px;
+}
+
+.completion__list {
+    /* Twelve rows: enough to be worth scrolling, few enough that the popup does not become the
+       window. Twenty pixels each, declared rather than measured — the virtual list is told. */
+    max-height: 240px;
+    min-height: 0;
+}
+
+.completion__row {
+    height: 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 2);
+    overflow: hidden;
+}
+
+/* A tone rather than a bar, like every other list in this interface. */
+.completion__row[data-selected="true"] {
+    background-color: var(--zui-color-accent);
+}
+
+/* The kind's glyph, coloured by which of the four groups it is in. The colour is doing the work
+   here — at twelve pixels the glyphs are nearly indistinguishable, and what somebody actually
+   reads is "blue means callable". */
+.completion__kind {
+    flex: none;
+    width: 12px;
+    text-align: center;
+    color: var(--zdt-completion-text);
+}
+
+.completion__kind[data-kind="function"] { color: var(--zdt-completion-function); }
+.completion__kind[data-kind="type"]     { color: var(--zdt-completion-type); }
+.completion__kind[data-kind="value"]    { color: var(--zdt-completion-value); }
+.completion__kind[data-kind="keyword"]  { color: var(--zdt-completion-keyword); }
+
+.completion__label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* The type, at the trailing edge and dim: it is what tells two suggestions apart once the name has
+   already been read, so it must be there and must not compete. */
+.completion__detail {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 55%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--zui-color-muted-foreground);
+    opacity: 0.75;
+}
+
+/* ---- The documentation beside it ---------------------------------------------------------- */
+
+.completion__docs {
+    position: absolute;
+    z-index: 39;
+    width: 380px;
+    max-height: 260px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    color: var(--zui-color-popover-foreground);
+    box-shadow: var(--zui-shadow-md);
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+    pointer-events: none;
+}
+
+.completion__docs-body {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* ---- The rename box ------------------------------------------------------------------------ */
+
+/* Over the symbol rather than in the middle of the window, because a rename is about a particular
+ * word and a box somewhere else makes somebody hold that word in their head while they type its
+ * replacement. The symbol underneath is banded in its own decoration layer, which is what says
+ * *this* is the thing being renamed. */
+.rename {
+    position: absolute;
+    z-index: 41;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--zui-color-ring);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    box-shadow: var(--zui-shadow-md);
+    overflow: hidden;
+}
+
+.rename__input {
+    height: 22px;
+    width: 220px;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    padding: 0 calc(var(--zui-space-base) * 2);
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 22px;
+}

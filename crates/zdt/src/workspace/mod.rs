@@ -26,7 +26,7 @@ use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
 pub use crate::workspace::buffer::{Buffer, BufferId, BufferKind};
-pub use crate::workspace::layout::{Axis, Direction, Layout, WindowId};
+pub use crate::workspace::layout::{Axis, Direction, Layout, Shape, WindowId};
 
 /// How many editors one window keeps mounted for buffers it is not showing.
 ///
@@ -172,6 +172,16 @@ impl Workspace {
         self.inner.layout.get()
     }
 
+    /// The arrangement of windows, without the shares. Tracked.
+    pub fn shape(&self) -> Shape {
+        self.inner.layout.with(Layout::shape)
+    }
+
+    /// The whole layout, without subscribing.
+    pub fn layout_untracked(&self) -> Layout {
+        self.inner.layout.get_untracked()
+    }
+
     /// Which window has the keyboard. Tracked.
     pub fn focused(&self) -> WindowId {
         self.inner.focused.get()
@@ -202,6 +212,17 @@ impl Workspace {
     /// Reads one window. Tracked.
     pub fn window(&self, id: WindowId) -> Option<WindowState> {
         self.inner.windows.with(|windows| windows.get(id).cloned())
+    }
+
+    /// Every window there is, without subscribing.
+    ///
+    /// For the few things that have to ask all of them — finding which window an editor handle
+    /// belongs to, mostly — rather than for drawing, which walks the layout instead.
+    #[must_use]
+    pub fn windows(&self) -> Vec<WindowId> {
+        self.inner
+            .windows
+            .with_untracked(|windows| windows.keys().collect())
     }
 
     /// The buffer the focused window is showing. Tracked.
@@ -335,6 +356,35 @@ impl Workspace {
             self.inner.order.update(|order| order.push(id));
             self.show(id);
         }
+        id
+    }
+
+    /// Opens a panel buffer of `kind`, or shows the one that is already open.
+    ///
+    /// One at a time: a second settings tab would be a second copy of the same page, and closing
+    /// the first would leave somebody wondering which one they had been changing.
+    pub fn open_panel(&self, kind: BufferKind) -> BufferId {
+        let wanted = std::mem::discriminant(&kind);
+        let existing = self.inner.order.with_untracked(|order| {
+            order.iter().copied().find(|id| {
+                self.buffer_untracked(*id)
+                    .is_some_and(|buffer| std::mem::discriminant(&buffer.kind) == wanted)
+            })
+        });
+        if let Some(id) = existing {
+            self.show(id);
+            return id;
+        }
+
+        let id = self
+            .owned(|| {
+                self.inner
+                    .buffers
+                    .try_update(|buffers| buffers.insert_with_key(|id| Buffer::panel(id, kind)))
+            })
+            .expect("the buffer map is writable");
+        self.inner.order.update(|order| order.push(id));
+        self.show(id);
         id
     }
 
@@ -491,6 +541,29 @@ impl Workspace {
             windows.remove(focused);
         });
         if let Some(next) = self.inner.layout.get_untracked().windows().first().copied() {
+            self.inner.focused.set(next);
+        }
+        true
+    }
+
+    /// Closes `window`, whichever it is.
+    ///
+    /// The last one stays: a workspace with no window in it has nowhere to put the next buffer.
+    pub fn close_window_at(&self, window: WindowId) -> bool {
+        let closed = self
+            .inner
+            .layout
+            .try_update(|layout| layout.close(window))
+            .unwrap_or(false);
+        if !closed {
+            return false;
+        }
+        self.inner.windows.update(|windows| {
+            windows.remove(window);
+        });
+        if self.focused_untracked() == window
+            && let Some(next) = self.inner.layout.get_untracked().windows().first().copied()
+        {
             self.inner.focused.set(next);
         }
         true

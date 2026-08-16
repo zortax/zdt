@@ -29,6 +29,7 @@ use zdt_lsp::pool::{Key, Pool};
 use zdt_lsp::registry::Wanted;
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
+use zgui_ui::toast::{Toast, ToastKind};
 
 use crate::settings::Settings;
 use crate::workspace::{BufferId, Workspace};
@@ -42,6 +43,52 @@ const SYNC_DEBOUNCE: Duration = Duration::from_millis(120);
 /// How often what the servers have said is taken off the channel.
 const DRAIN: Duration = Duration::from_millis(50);
 
+/// What the servers answering for a file are doing.
+///
+/// One word for the status line. The status line says *state* — what things are, which is true
+/// until it changes — and announcements say *events*, which are true once. Mixing them is what
+/// makes a status line that flickers and a stack of toasts nobody reads.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ServerState {
+    /// Nothing claims this file, or servers are switched off altogether.
+    #[default]
+    Inactive,
+    /// One is on its way up.
+    Starting,
+    /// One is working through the project.
+    Indexing,
+    /// One is up and idle.
+    Ready,
+    /// One could not be started, and is not being tried again.
+    Failed,
+}
+
+impl ServerState {
+    /// The word the status line shows.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Inactive => "inactive",
+            Self::Starting => "starting",
+            Self::Indexing => "indexing",
+            Self::Ready => "ready",
+            Self::Failed => "failed",
+        }
+    }
+
+    /// How this is written as an attribute value, which is what the style sheet colours by.
+    #[must_use]
+    pub const fn tone(self) -> &'static str {
+        self.label()
+    }
+
+    /// Whether it is worth turning a spinner for.
+    #[must_use]
+    pub const fn is_working(self) -> bool {
+        matches!(self, Self::Starting | Self::Indexing)
+    }
+}
+
 /// The language servers.
 #[derive(Clone)]
 pub struct Language {
@@ -51,6 +98,12 @@ pub struct Language {
 struct Inner {
     workspace: Workspace,
     settings: Settings,
+    /// Where a server's news goes.
+    ///
+    /// Taken once at construction rather than looked up where it is used: most of what is
+    /// announced here happens inside a task's continuation or a timer's callback, and neither is
+    /// inside the scope that has one.
+    notify: Option<crate::notify::Notify>,
     /// The window's clock, taken once where there certainly is one.
     timers: Option<zgui::view::time::Timers>,
 
@@ -93,6 +146,7 @@ impl Language {
             inner: Rc::new(Inner {
                 workspace,
                 settings,
+                notify: crate::notify::use_notify(),
                 timers: zgui::view::time::Timers::current(),
                 pool: RefCell::new(Pool::new()),
                 store: RefCell::new(Store::new()),
@@ -107,6 +161,15 @@ impl Language {
                 enabled: Cell::new(enabled),
             }),
         }
+    }
+
+    /// Where anything a server says unasked is posted.
+    ///
+    /// Cloned into each client as it starts. Public so that what a server would say can be posted
+    /// without starting one, which is the only way to assert what a flood of progress does.
+    #[must_use]
+    pub fn notices(&self) -> Sender<Notice> {
+        self.inner.notices.clone()
     }
 
     /// Starts taking what the servers say off the channel.
@@ -146,10 +209,58 @@ impl Language {
         self.inner.busy.get()
     }
 
+    /// What the servers answering for `path` are doing. Tracked.
+    ///
+    /// The worst thing any of them is doing, in the order a person would want to hear it: a
+    /// failure first, then work in progress, then readiness. A file two servers answer for is one
+    /// line in the status line, and the line has to say the thing worth acting on.
+    #[must_use]
+    pub fn state(&self, path: Option<&Path>) -> ServerState {
+        // Read first, so this follows the pool.
+        let _ = self.inner.revision.get();
+        let busy = self.inner.busy.get().is_some();
+
+        if !self.inner.enabled.get() {
+            return ServerState::Inactive;
+        }
+        let Some(path) = path else {
+            return ServerState::Inactive;
+        };
+        let files = self.inner.files.borrow();
+        let Some(keys) = files.get(path) else {
+            return ServerState::Inactive;
+        };
+
+        let pool = self.inner.pool.borrow();
+        let mut state = ServerState::Inactive;
+        for key in keys {
+            let found = match pool.state(key) {
+                Some(zdt_lsp::pool::Asked::Running) if busy => ServerState::Indexing,
+                Some(zdt_lsp::pool::Asked::Running) => ServerState::Ready,
+                Some(zdt_lsp::pool::Asked::Starting) => ServerState::Starting,
+                Some(zdt_lsp::pool::Asked::Failed(_)) => ServerState::Failed,
+                None => ServerState::Inactive,
+            };
+            if rank(found) > rank(state) {
+                state = found;
+            }
+        }
+        state
+    }
+
     /// Everything wrong with `path`.
     #[must_use]
     pub fn diagnostics(&self, path: &Path) -> Vec<lsp_types::Diagnostic> {
         self.inner.store.borrow().for_file(path)
+    }
+
+    /// Every file anything has been said about.
+    ///
+    /// Which is not every file in the project: a server publishes about what it has looked at, and
+    /// what it has looked at is what somebody has opened plus whatever the project pulled in.
+    #[must_use]
+    pub fn files(&self) -> Vec<PathBuf> {
+        self.inner.store.borrow().files()
     }
 
     /// How many of each kind `path` has.
@@ -174,6 +285,38 @@ impl Language {
     #[must_use]
     pub fn on_line(&self, path: &Path, line: u32) -> Vec<lsp_types::Diagnostic> {
         self.inner.store.borrow().on_line(path, line)
+    }
+
+    /// The file the editor is showing, when it is showing a file.
+    ///
+    /// Here rather than at the call sites because every language request wants it and the walk
+    /// from workspace to buffer to path is three lines each time.
+    #[must_use]
+    pub fn current_path(&self) -> Option<PathBuf> {
+        self.inner
+            .workspace
+            .current_buffer()
+            .and_then(|buffer| buffer.path)
+    }
+
+    /// The file `handle` is editing, when it is one this layer knows about.
+    ///
+    /// Found by asking every window rather than assuming the focused one: a request started in one
+    /// window can be answered while the keyboard is in another.
+    #[must_use]
+    pub fn path_of_handle(&self, handle: &zgui_editor::EditorHandle) -> Option<PathBuf> {
+        let workspace = &self.inner.workspace;
+        for buffer in workspace.order() {
+            for window in workspace.windows() {
+                if workspace
+                    .handle_for(window, buffer)
+                    .is_some_and(|held| held == *handle)
+                {
+                    return workspace.buffer_untracked(buffer).and_then(|one| one.path);
+                }
+            }
+        }
+        self.current_path()
     }
 
     /// Which servers are answering for `path`.
@@ -300,9 +443,15 @@ impl Language {
         let clients = self.inner.pool.borrow_mut().drain();
         self.inner.files.borrow_mut().clear();
         *self.inner.store.borrow_mut() = Store::new();
+        if self.inner.busy.get_untracked().is_some() {
+            self.inner.busy.set(None);
+        }
         self.touch();
 
         for mut client in clients {
+            // A server stopped on purpose leaves nothing behind: the row saying it was starting,
+            // or that it is ready, is about a server that is now gone.
+            self.forget_announcement(&client.name);
             crate::task::detached(async move {
                 if let Err(error) = client.shutdown().await {
                     tracing::debug!("{}: {error}", client.name);
@@ -331,6 +480,12 @@ impl Language {
     fn start(&self, wanted: Wanted) {
         let language = self.clone();
         let notices = self.inner.notices.clone();
+        self.announce(
+            &wanted.name,
+            Toast::new(format!("starting {}", wanted.name))
+                .kind(ToastKind::Loading)
+                .persistent(),
+        );
         crate::task::detached(async move {
             let started = {
                 let wanted = wanted.clone();
@@ -344,14 +499,22 @@ impl Language {
                     for path in waiting {
                         language.open_now(&wanted, &path);
                     }
-                    language
-                        .inner
-                        .workspace
-                        .say(format!("{} is ready", wanted.name));
+                    // The row the "starting" announcement was holding becomes this one, rather
+                    // than a second row saying the opposite of the first.
+                    language.announce(
+                        &wanted.name,
+                        Toast::new(format!("{} is ready", wanted.name)).kind(ToastKind::Success),
+                    );
                 }
                 Err(error) => {
                     language.inner.pool.borrow_mut().failed(&wanted, &error);
-                    language.inner.workspace.complain(error.to_string());
+                    language.announce(
+                        &wanted.name,
+                        Toast::new(format!("{} did not start", wanted.name))
+                            .kind(ToastKind::Error)
+                            .description(error.to_string())
+                            .persistent(),
+                    );
                 }
             }
             language.touch();
@@ -469,11 +632,15 @@ impl Language {
                 severity,
                 text,
             } => {
-                let text = format!("{server}: {text}");
-                if severity == lsp_types::MessageType::ERROR {
-                    self.inner.workspace.complain(text);
-                } else {
-                    self.inner.workspace.say(text);
+                // A server talking unprompted is news rather than a reply, so it goes to the
+                // stack: two servers with something to say is two rows, not one that overwrote
+                // the other before anybody read it.
+                if let Some(notify) = self.inner.notify.as_ref() {
+                    match severity {
+                        lsp_types::MessageType::ERROR => notify.fail(server, Some(text)),
+                        lsp_types::MessageType::WARNING => notify.warn(format!("{server}: {text}")),
+                        _ => notify.say(format!("{server}: {text}")),
+                    }
                 }
                 false
             }
@@ -485,24 +652,75 @@ impl Language {
                 let now = if done {
                     None
                 } else {
-                    Some(match title {
+                    Some(match title.as_deref() {
                         Some(title) => format!("{server}: {title}"),
-                        None => server,
+                        None => server.clone(),
                     })
                 };
-                if self.inner.busy.get_untracked() != now {
-                    self.inner.busy.set(now);
+
+                let before = self.inner.busy.get_untracked();
+                if before == now {
+                    // The same message again, which most reports are. Nothing has changed, so
+                    // nothing is redrawn.
+                    return false;
                 }
+
+                // One toast for the whole job, not one per report.
+                //
+                // `rust-analyzer` reports once per crate it indexes — thousands of notices in a
+                // few seconds on a workspace of any size. A toast per report mounts a component,
+                // an expiry timer and two animations per crate and leaves every dismissed one on
+                // the stack until its exit finishes, which is enough work to stop the window
+                // answering the keyboard at all.
+                //
+                // So the toast is pushed when the server *starts* being busy and taken away when
+                // it stops. What it is busy *with* changes constantly and lives in the status
+                // line, which costs one signal write.
+                match (before.is_some(), now.is_some()) {
+                    (false, true) => self.announce(
+                        &server,
+                        Toast::new(title.clone().unwrap_or_else(|| "indexing".to_owned()))
+                            .description(server.clone())
+                            .kind(ToastKind::Loading)
+                            .persistent(),
+                    ),
+                    (true, false) => self.forget_announcement(&server),
+                    _ => {}
+                }
+
+                self.inner.busy.set(now);
+                // Setting `busy` is what re-runs the status line; the revision is for the things
+                // that draw diagnostics, and none of those has moved.
                 false
             }
             Notice::Exited { server } => {
                 self.inner.pool.borrow_mut().exited(&server);
                 self.inner.store.borrow_mut().forget_server(&server);
-                self.inner
-                    .workspace
-                    .complain(format!("{server} has stopped"));
+                self.announce(
+                    &server,
+                    Toast::new(format!("{server} has stopped"))
+                        .kind(ToastKind::Error)
+                        .persistent(),
+                );
                 true
             }
+        }
+    }
+
+    /// Says something about `server`, in the one row that server owns.
+    ///
+    /// Silent when nothing is listening, which is every test that mounts the language layer
+    /// without a toaster over it.
+    fn announce(&self, server: &str, toast: Toast) {
+        if let Some(notify) = self.inner.notify.as_ref() {
+            notify.progress(server, toast);
+        }
+    }
+
+    /// Gives `server`'s row back.
+    fn forget_announcement(&self, server: &str) {
+        if let Some(notify) = self.inner.notify.as_ref() {
+            notify.clear(server);
         }
     }
 
@@ -511,6 +729,20 @@ impl Language {
         self.inner
             .revision
             .update(|revision| *revision = revision.wrapping_add(1));
+    }
+}
+
+/// How much a state is worth saying, higher winning.
+///
+/// A failure beats work in progress beats readiness, because that is the order somebody would want
+/// to hear them in: the one that needs doing something about comes first.
+const fn rank(state: ServerState) -> u8 {
+    match state {
+        ServerState::Inactive => 0,
+        ServerState::Ready => 1,
+        ServerState::Indexing => 2,
+        ServerState::Starting => 3,
+        ServerState::Failed => 4,
     }
 }
 

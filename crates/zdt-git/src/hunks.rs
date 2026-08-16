@@ -1,11 +1,17 @@
-//! What git thinks has changed.
+//! What git thinks has changed, as the gutter shows it.
 //!
-//! One `git diff` per file, parsed into the three things a gutter shows: lines added, lines
-//! changed, and places where something was taken out.
+//! Three things: lines added, lines changed, and places where something was taken out. The whole
+//! vocabulary of a gutter mark.
 //!
-//! A process rather than a library. Reading a repository properly means the index, the object
-//! store, submodules, worktrees and whatever the person's `.gitattributes` says; git already does
-//! all of that correctly, and the answer wanted here is forty bytes of unified diff.
+//! # Where the diff comes from
+//!
+//! [`hunks`] runs `git diff` and reads the `@@` headers, and is what the gutter used before there
+//! was a git panel. It is kept because it is the cheapest possible answer to "has this file
+//! changed" — a process, forty bytes of output, no object store opened — and because a repository
+//! `gix` cannot open is one this still works in.
+//!
+//! Everything the panel needs — the graph, the index, staging a hunk — is in the sibling modules
+//! and goes through `gix`, because those questions cannot be answered in forty bytes.
 
 use std::path::Path;
 

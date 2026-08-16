@@ -249,6 +249,27 @@ def render(name: str, palette: Palette) -> str:
 --zdt-git-added: {palette.green};
 --zdt-git-changed: {palette.blue};
 --zdt-git-removed: {palette.red};
+--zdt-git-untracked: {palette.subtle};
+--zdt-git-conflict: {palette.orange};
+
+/* The grounds a diff's rows sit on. Barely there: what carries the meaning is the mark and the
+   colour of it, and a band strong enough to notice is a band that makes the code harder to read
+   than the plain file it came from. */
+
+--zdt-git-added-bg: color-mix(in oklch, {palette.green} 12%, transparent);
+--zdt-git-removed-bg: color-mix(in oklch, {palette.red} 12%, transparent);
+
+/* The graph's lanes. Eight, cycling: enough that two lines crossing are different colours, few
+   enough that each stays distinct at two pixels wide. */
+
+--zdt-git-lane-0: {palette.blue};
+--zdt-git-lane-1: {palette.green};
+--zdt-git-lane-2: {palette.magenta};
+--zdt-git-lane-3: {palette.yellow};
+--zdt-git-lane-4: {palette.cyan};
+--zdt-git-lane-5: {palette.orange};
+--zdt-git-lane-6: {palette.red};
+--zdt-git-lane-7: {palette.subtle};
 
 /* --- what the language servers say ------------------------------------------------------- */
 
@@ -256,6 +277,31 @@ def render(name: str, palette: Palette) -> str:
 --zdt-diagnostic-warning: {palette.yellow};
 --zdt-diagnostic-information: {palette.blue};
 --zdt-diagnostic-hint: {palette.cyan};
+
+/* What the servers say at length: a hover, a completion's documentation. The block ground is the
+   same plane a selection sits on, so a signature reads as inset rather than as a card. */
+
+--zdt-doc-heading: {palette.fg};
+--zdt-doc-rule: {palette.gutter};
+--zdt-doc-code: {palette.green};
+--zdt-doc-link: {palette.blue};
+--zdt-doc-block: {palette.muted};
+
+/* The kinds of thing a completion can offer. Four groups rather than twenty-five: what somebody
+   reads off the glyph is "is this a function, a type, a value or a word", and a palette with a
+   colour per protocol constant is a palette that says nothing. */
+
+--zdt-completion-function: {palette.blue};
+--zdt-completion-type: {palette.yellow};
+--zdt-completion-value: {palette.orange};
+--zdt-completion-keyword: {palette.magenta};
+--zdt-completion-text: {palette.subtle};
+
+/* Where a symbol is used, under the caret. Dimmer than a search hit, because it appears without
+   being asked for and must not compete with the text it is marking. */
+
+--zdt-highlight: {palette.accent};
+--zdt-highlight-write: {palette.selection};
 
 /* --- the terminal element ---------------------------------------------------------------- */
 

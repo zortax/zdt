@@ -28,7 +28,9 @@ use zdt_core::search::{Cancel, Walk};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
-pub use crate::picker::source::{Preview, Reach, Row, Source, Target};
+pub use crate::picker::source::{
+    Deed, Preview, Reach, Row, Source, Target, location_rows, symbol_rows,
+};
 use crate::settings::Settings;
 use crate::workspace::Workspace;
 
@@ -328,6 +330,7 @@ impl Picker {
                     vim.run(&action);
                 }
             }
+            Target::Run(deed) => deed.run(),
             Target::Nothing => {}
         }
     }
@@ -337,6 +340,8 @@ impl Picker {
     /// Puts whatever `source` picks from where the ranking can reach it.
     fn gather(&self, source: &Source, query: &str) {
         match source {
+            Source::Given { rows, .. } => self.stand(rows.clone(), query),
+            Source::WorkspaceSymbols => self.start_symbols(query),
             Source::Files { reach } => self.gather_files(*reach),
             Source::Grep { .. } => self.start_grep(source, query),
             Source::Buffers => self.stand(self.buffers(), query),
@@ -547,6 +552,78 @@ impl Picker {
         let handle = timers.set_timeout(GREP_DEBOUNCE, move || picker.run_grep(reach, &query));
         *self.inner.pending.borrow_mut() = Some(handle);
         self.inner.working.set(true);
+    }
+
+    /// Asks the language servers what in the project matches, after a pause.
+    ///
+    /// Live for the same reason grep is: no server will list every symbol in a project of ten
+    /// thousand files, and none should be asked to. The query is the request, so each keystroke
+    /// cancels the one before it — by moving the generation, since a request already sent cannot
+    /// be recalled and its answer can only be dropped.
+    fn start_symbols(&self, query: &str) {
+        self.stop();
+        if query.is_empty() {
+            self.publish(Vec::new());
+            self.inner.counts.set((0, 0));
+            return;
+        }
+        self.inner.stale.set(true);
+
+        let Some(timers) = self.inner.timers.clone() else {
+            return;
+        };
+        // The language layer is taken *now*, before the timer: a context looked up inside a timer
+        // callback is not there, and the search would silently find nothing — see
+        // `tests/context.rs`.
+        let language = zgui::reactive::use_local_context::<crate::language::Language>();
+        let query = query.to_owned();
+        let picker = self.clone();
+        let handle =
+            timers.set_timeout(GREP_DEBOUNCE, move || picker.run_symbols(&query, language));
+        *self.inner.pending.borrow_mut() = Some(handle);
+        self.inner.working.set(true);
+    }
+
+    /// Asks, now.
+    fn run_symbols(&self, query: &str, language: Option<crate::language::Language>) {
+        let generation = self.inner.generation.get();
+        let root = self.inner.workspace.project().root().to_path_buf();
+
+        let Some(language) = language else {
+            self.inner.working.set(false);
+            return;
+        };
+        let Some(mut client) = language
+            .current_path()
+            .and_then(|path| language.client_for(&path))
+        else {
+            self.inner.working.set(false);
+            self.inner.workspace.say("no language server for this file");
+            return;
+        };
+
+        let query = query.to_owned();
+        let picker = self.clone();
+        crate::task::detached(async move {
+            let found = {
+                let query = query.clone();
+                zgui::task::background(async move { client.workspace_symbols(&query).await }).await
+            };
+            // An answer for a question nobody is asking any more.
+            if picker.inner.generation.get() != generation {
+                return;
+            }
+            picker.inner.working.set(false);
+
+            match found {
+                Ok(symbols) => {
+                    let rows = symbol_rows(&symbols, &root);
+                    picker.inner.counts.set((rows.len(), rows.len()));
+                    picker.publish(rows);
+                }
+                Err(error) => picker.inner.workspace.complain(error.to_string()),
+            }
+        });
     }
 
     /// Runs one search, reporting its hits in batches.

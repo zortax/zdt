@@ -111,7 +111,8 @@ pub fn follow(
 }
 
 /// Which colour a severity is drawn in.
-const fn tint(severity: Option<DiagnosticSeverity>) -> &'static str {
+#[must_use]
+pub const fn tint(severity: Option<DiagnosticSeverity>) -> &'static str {
     match severity {
         Some(DiagnosticSeverity::WARNING) => "zdt-diagnostic-warning",
         Some(DiagnosticSeverity::INFORMATION) => "zdt-diagnostic-information",
@@ -121,7 +122,8 @@ const fn tint(severity: Option<DiagnosticSeverity>) -> &'static str {
 }
 
 /// Which glyph a severity gets in the gutter.
-const fn glyph(severity: Option<DiagnosticSeverity>) -> &'static str {
+#[must_use]
+pub const fn glyph(severity: Option<DiagnosticSeverity>) -> &'static str {
     match severity {
         Some(DiagnosticSeverity::WARNING) => "\u{f071}",
         Some(DiagnosticSeverity::INFORMATION) => "\u{f05a}",

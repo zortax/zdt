@@ -374,6 +374,76 @@ impl Client {
         Ok(locations(answer))
     }
 
+    /// Where what is at `position` is *declared*, which in a language with headers is somewhere
+    /// else.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn declaration(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Vec<lsp_types::Location>, ClientError> {
+        let params = lsp_types::request::GotoDeclarationParams {
+            text_document_position_params: self.at(path, position)?,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let answer = self
+            .socket
+            .declaration(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?;
+        Ok(locations(answer))
+    }
+
+    /// Where the *type* of what is at `position` is defined.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn type_definition(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Vec<lsp_types::Location>, ClientError> {
+        let params = lsp_types::request::GotoTypeDefinitionParams {
+            text_document_position_params: self.at(path, position)?,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let answer = self
+            .socket
+            .type_definition(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?;
+        Ok(locations(answer))
+    }
+
+    /// Everything that implements what is at `position`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn implementation(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Vec<lsp_types::Location>, ClientError> {
+        let params = lsp_types::request::GotoImplementationParams {
+            text_document_position_params: self.at(path, position)?,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let answer = self
+            .socket
+            .implementation(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?;
+        Ok(locations(answer))
+    }
+
     /// Every use of what is at `position`.
     ///
     /// # Errors
@@ -426,6 +496,294 @@ impl Client {
             Some(lsp_types::CompletionResponse::List(list)) => list.items,
             None => Vec::new(),
         })
+    }
+
+    /// What the server knows about a suggestion it has already offered.
+    ///
+    /// Servers send a list quickly and the documentation only when asked, because a hundred
+    /// suggestions with a paragraph each is a hundred paragraphs nobody will read. The one the
+    /// caret is resting on is the one worth asking about.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn resolve_completion(
+        &mut self,
+        item: lsp_types::CompletionItem,
+    ) -> Result<lsp_types::CompletionItem, ClientError> {
+        // A server that does not resolve gives the item back unchanged rather than failing, so
+        // that the caller has one shape of answer to deal with.
+        if self
+            .capabilities
+            .completion_provider
+            .as_ref()
+            .and_then(|provider| provider.resolve_provider)
+            != Some(true)
+        {
+            return Ok(item);
+        }
+        self.socket
+            .completion_item_resolve(item)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// What the thing being called at `position` takes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn signature_help(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Option<lsp_types::SignatureHelp>, ClientError> {
+        let params = lsp_types::SignatureHelpParams {
+            text_document_position_params: self.at(path, position)?,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            context: None,
+        };
+        self.socket
+            .signature_help(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// Whether what is at `position` can be renamed, and what exactly would be.
+    ///
+    /// Asked before the rename so that the box opens over the symbol rather than over whatever
+    /// happened to be under the caret — and so that a key pressed on a keyword says "no" before
+    /// somebody has typed a new name for it.
+    ///
+    /// `Ok(None)` from a server that does not offer this at all, which is not a refusal: the
+    /// caller falls back to the word under the caret.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn prepare_rename(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Option<lsp_types::PrepareRenameResponse>, ClientError> {
+        let prepares = matches!(
+            self.capabilities.rename_provider,
+            Some(lsp_types::OneOf::Right(lsp_types::RenameOptions {
+                prepare_provider: Some(true),
+                ..
+            }))
+        );
+        if !prepares {
+            return Ok(None);
+        }
+        self.socket
+            .prepare_rename(self.at(path, position)?)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// Renames what is at `position` to `to`, everywhere.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn rename(
+        &mut self,
+        path: &Path,
+        position: Position,
+        to: &str,
+    ) -> Result<Option<lsp_types::WorkspaceEdit>, ClientError> {
+        let params = lsp_types::RenameParams {
+            text_document_position: self.at(path, position)?,
+            new_name: to.to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        self.socket
+            .rename(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// What the server could do about `range`.
+    ///
+    /// The diagnostics overlapping the range are sent with it, because that is how a server knows
+    /// which fixes to offer: without them `rust-analyzer` offers refactors and no quick fixes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn code_action(
+        &mut self,
+        path: &Path,
+        range: lsp_types::Range,
+        diagnostics: Vec<lsp_types::Diagnostic>,
+    ) -> Result<Vec<lsp_types::CodeActionOrCommand>, ClientError> {
+        let Some(uri) = crate::convert::uri_of(path) else {
+            return Ok(Vec::new());
+        };
+        let params = lsp_types::CodeActionParams {
+            text_document: TextDocumentIdentifier { uri },
+            range,
+            context: lsp_types::CodeActionContext {
+                diagnostics,
+                only: None,
+                trigger_kind: Some(lsp_types::CodeActionTriggerKind::INVOKED),
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        Ok(self
+            .socket
+            .code_action(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?
+            .unwrap_or_default())
+    }
+
+    /// The edit a code action carries, asked for separately.
+    ///
+    /// Servers advertise actions cheaply and compute their edits only for the one that is chosen,
+    /// which is why an action can arrive with a title and nothing else.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn resolve_code_action(
+        &mut self,
+        action: lsp_types::CodeAction,
+    ) -> Result<lsp_types::CodeAction, ClientError> {
+        if action.edit.is_some() {
+            return Ok(action);
+        }
+        self.socket
+            .code_action_resolve(action.clone())
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+            // A server that says it resolves and then refuses is a server whose action is still
+            // worth trying as it arrived, which is usually a bare command.
+            .or(Ok(action))
+    }
+
+    /// Runs a command the server offered.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn execute_command(
+        &mut self,
+        command: lsp_types::Command,
+    ) -> Result<(), ClientError> {
+        let params = lsp_types::ExecuteCommandParams {
+            command: command.command,
+            arguments: command.arguments.unwrap_or_default(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        self.socket
+            .execute_command(params)
+            .await
+            .map(|_| ())
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// Everything the file declares, in the order and nesting the server sees it.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn document_symbols(
+        &mut self,
+        path: &Path,
+    ) -> Result<Option<lsp_types::DocumentSymbolResponse>, ClientError> {
+        let Some(uri) = crate::convert::uri_of(path) else {
+            return Ok(None);
+        };
+        let params = lsp_types::DocumentSymbolParams {
+            text_document: TextDocumentIdentifier { uri },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        self.socket
+            .document_symbol(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))
+    }
+
+    /// Everything in the project whose name matches `query`.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn workspace_symbols(&mut self, query: &str) -> Result<Vec<Symbol>, ClientError> {
+        let params = lsp_types::WorkspaceSymbolParams {
+            query: query.to_owned(),
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let answer = self
+            .socket
+            .symbol(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?;
+        Ok(symbols(answer))
+    }
+
+    /// The other places in this file the symbol at `position` is used.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn document_highlight(
+        &mut self,
+        path: &Path,
+        position: Position,
+    ) -> Result<Vec<lsp_types::DocumentHighlight>, ClientError> {
+        if self.capabilities.document_highlight_provider.is_none() {
+            return Ok(Vec::new());
+        }
+        let params = lsp_types::DocumentHighlightParams {
+            text_document_position_params: self.at(path, position)?,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        Ok(self
+            .socket
+            .document_highlight(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?
+            .unwrap_or_default())
+    }
+
+    /// How the server would lay `range` out.
+    ///
+    /// # Errors
+    ///
+    /// As [`Client::hover`].
+    pub async fn format_range(
+        &mut self,
+        path: &Path,
+        range: lsp_types::Range,
+        tab_size: u32,
+        spaces: bool,
+    ) -> Result<Vec<TextEdit>, ClientError> {
+        let Some(uri) = crate::convert::uri_of(path) else {
+            return Ok(Vec::new());
+        };
+        let params = lsp_types::DocumentRangeFormattingParams {
+            text_document: TextDocumentIdentifier { uri },
+            range,
+            options: lsp_types::FormattingOptions {
+                tab_size,
+                insert_spaces: spaces,
+                ..lsp_types::FormattingOptions::default()
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        Ok(self
+            .socket
+            .range_formatting(params)
+            .await
+            .map_err(|error| ClientError::Protocol(error.to_string()))?
+            .unwrap_or_default())
     }
 
     /// How the server would lay the file out.
@@ -493,6 +851,64 @@ impl Client {
     }
 }
 
+/// One thing a project declares, whichever shape the server said it in.
+///
+/// The protocol has two answers for "what is in this project" — a flat list with locations, and a
+/// nested one whose locations may be a file with no range in it — and a picker wants one. So both
+/// are flattened here rather than in the four places that would otherwise have to know.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Symbol {
+    /// What it is called.
+    pub name: String,
+    /// What kind of thing it is.
+    pub kind: lsp_types::SymbolKind,
+    /// What it is inside, when the server says.
+    pub container: Option<String>,
+    /// Which file it is in.
+    pub uri: Url,
+    /// Where in the file. The start of it when the server gave only a file.
+    pub range: lsp_types::Range,
+}
+
+/// The two shapes a workspace-symbol answer comes in, as one list.
+fn symbols(answer: Option<lsp_types::WorkspaceSymbolResponse>) -> Vec<Symbol> {
+    use lsp_types::{OneOf, WorkspaceSymbolResponse};
+
+    match answer {
+        None => Vec::new(),
+        Some(WorkspaceSymbolResponse::Flat(found)) => found
+            .into_iter()
+            .map(|one| Symbol {
+                name: one.name,
+                kind: one.kind,
+                container: one.container_name,
+                uri: one.location.uri,
+                range: one.location.range,
+            })
+            .collect(),
+        Some(WorkspaceSymbolResponse::Nested(found)) => found
+            .into_iter()
+            .map(|one| {
+                let (uri, range) = match one.location {
+                    OneOf::Left(location) => (location.uri, location.range),
+                    // A server allowed to answer with a file and no range, which it may do when
+                    // the client says it will resolve. This one does not, so the top of the file
+                    // is where the symbol is taken to be — which is wrong by a screenful and
+                    // right by a file, and a file is what somebody picking a symbol wanted.
+                    OneOf::Right(partial) => (partial.uri, lsp_types::Range::default()),
+                };
+                Symbol {
+                    name: one.name,
+                    kind: one.kind,
+                    container: one.container_name,
+                    uri,
+                    range,
+                }
+            })
+            .collect(),
+    }
+}
+
 /// The three shapes a "go to definition" answer comes in, as one list.
 fn locations(answer: Option<GotoDefinitionResponse>) -> Vec<lsp_types::Location> {
     match answer {
@@ -533,6 +949,19 @@ fn capabilities() -> ClientCapabilities {
                     insert_text_mode_support: Some(lsp_types::InsertTextModeSupport {
                         value_set: vec![InsertTextMode::AS_IS],
                     }),
+                    // What the popup asks for once the caret rests on a row, rather than for
+                    // every row up front: a hundred suggestions with a paragraph each is a
+                    // hundred paragraphs nobody will read.
+                    resolve_support: Some(lsp_types::CompletionItemCapabilityResolveSupport {
+                        properties: vec![
+                            "documentation".to_owned(),
+                            "detail".to_owned(),
+                            "additionalTextEdits".to_owned(),
+                        ],
+                    }),
+                    // The line beside the label. Claimed because the popup draws it; a server
+                    // that sends it unasked is one whose extra field would be ignored.
+                    label_details_support: Some(true),
                     ..CompletionItemCapability::default()
                 }),
                 ..CompletionClientCapabilities::default()
@@ -541,6 +970,59 @@ fn capabilities() -> ClientCapabilities {
                 content_format: Some(vec![MarkupKind::Markdown, MarkupKind::PlainText]),
                 ..lsp_types::HoverClientCapabilities::default()
             }),
+            signature_help: Some(lsp_types::SignatureHelpClientCapabilities {
+                signature_information: Some(lsp_types::SignatureInformationSettings {
+                    documentation_format: Some(vec![MarkupKind::Markdown, MarkupKind::PlainText]),
+                    // Which parameter is being typed, which is the whole point of the panel.
+                    parameter_information: Some(lsp_types::ParameterInformationSettings {
+                        label_offset_support: Some(true),
+                    }),
+                    active_parameter_support: Some(true),
+                }),
+                context_support: Some(false),
+                ..lsp_types::SignatureHelpClientCapabilities::default()
+            }),
+            // Claimed with `prepare_support`, because the rename box asks first: a key pressed on
+            // a keyword should say "no" before somebody has typed a new name for it.
+            rename: Some(lsp_types::RenameClientCapabilities {
+                prepare_support: Some(true),
+                ..lsp_types::RenameClientCapabilities::default()
+            }),
+            // The literal form, because a bare `Command` cannot say what kind of action it is and
+            // the picker groups by kind. Resolution is claimed because servers compute an action's
+            // edit only for the one that is chosen.
+            code_action: Some(lsp_types::CodeActionClientCapabilities {
+                code_action_literal_support: Some(lsp_types::CodeActionLiteralSupport {
+                    code_action_kind: lsp_types::CodeActionKindLiteralSupport {
+                        value_set: vec![
+                            String::new(),
+                            "quickfix".to_owned(),
+                            "refactor".to_owned(),
+                            "refactor.extract".to_owned(),
+                            "refactor.inline".to_owned(),
+                            "refactor.rewrite".to_owned(),
+                            "source".to_owned(),
+                            "source.organizeImports".to_owned(),
+                        ],
+                    },
+                }),
+                resolve_support: Some(lsp_types::CodeActionCapabilityResolveSupport {
+                    properties: vec!["edit".to_owned()],
+                }),
+                is_preferred_support: Some(true),
+                data_support: Some(true),
+                ..lsp_types::CodeActionClientCapabilities::default()
+            }),
+            document_symbol: Some(lsp_types::DocumentSymbolClientCapabilities {
+                hierarchical_document_symbol_support: Some(true),
+                ..lsp_types::DocumentSymbolClientCapabilities::default()
+            }),
+            document_highlight: Some(lsp_types::DocumentHighlightClientCapabilities::default()),
+            declaration: Some(lsp_types::GotoCapability::default()),
+            type_definition: Some(lsp_types::GotoCapability::default()),
+            implementation: Some(lsp_types::GotoCapability::default()),
+            formatting: Some(lsp_types::DocumentFormattingClientCapabilities::default()),
+            range_formatting: Some(lsp_types::DocumentRangeFormattingClientCapabilities::default()),
             publish_diagnostics: Some(lsp_types::PublishDiagnosticsClientCapabilities {
                 version_support: Some(true),
                 ..lsp_types::PublishDiagnosticsClientCapabilities::default()
@@ -550,6 +1032,24 @@ fn capabilities() -> ClientCapabilities {
                 ..lsp_types::TextDocumentSyncClientCapabilities::default()
             }),
             ..TextDocumentClientCapabilities::default()
+        }),
+        workspace: Some(lsp_types::WorkspaceClientCapabilities {
+            // A rename crosses files, so the edit that carries it does too. `document_changes`
+            // is what makes the edit versioned, which is what lets an edit against a buffer that
+            // has moved on be refused rather than applied to the wrong text.
+            workspace_edit: Some(lsp_types::WorkspaceEditClientCapabilities {
+                document_changes: Some(true),
+                resource_operations: Some(vec![
+                    lsp_types::ResourceOperationKind::Create,
+                    lsp_types::ResourceOperationKind::Rename,
+                    lsp_types::ResourceOperationKind::Delete,
+                ]),
+                failure_handling: Some(lsp_types::FailureHandlingKind::Abort),
+                ..lsp_types::WorkspaceEditClientCapabilities::default()
+            }),
+            symbol: Some(lsp_types::WorkspaceSymbolClientCapabilities::default()),
+            execute_command: Some(lsp_types::DynamicRegistrationClientCapabilities::default()),
+            ..lsp_types::WorkspaceClientCapabilities::default()
         }),
         window: Some(lsp_types::WindowClientCapabilities {
             work_done_progress: Some(true),
@@ -671,5 +1171,157 @@ mod tests {
             Some(false),
             "snippets are not expanded yet, so they are not claimed"
         );
+        assert!(
+            completion.resolve_support.is_some(),
+            "the popup asks for documentation a row at a time, so resolution is claimed"
+        );
+    }
+
+    #[test]
+    fn every_request_that_is_written_is_also_claimed() {
+        // A capability claimed and not honoured is worse than one not claimed: the server changes
+        // what it sends, and the difference shows up as something quietly not working. So is the
+        // reverse — a request sent without the capability is one a strict server may refuse.
+        let claimed = capabilities();
+        let text = claimed
+            .text_document
+            .as_ref()
+            .expect("text-document capabilities are claimed");
+
+        assert!(text.declaration.is_some(), "declaration is asked for");
+        assert!(
+            text.type_definition.is_some(),
+            "type_definition is asked for"
+        );
+        assert!(text.implementation.is_some(), "implementation is asked for");
+        assert!(text.signature_help.is_some(), "signature_help is asked for");
+        assert!(text.rename.is_some(), "rename is asked for");
+        assert!(text.code_action.is_some(), "code_action is asked for");
+        assert!(
+            text.document_symbol.is_some(),
+            "document_symbol is asked for"
+        );
+        assert!(
+            text.document_highlight.is_some(),
+            "document_highlight is asked for"
+        );
+        assert!(
+            text.range_formatting.is_some(),
+            "range_formatting is asked for"
+        );
+
+        let workspace = claimed
+            .workspace
+            .as_ref()
+            .expect("workspace capabilities are claimed");
+        assert!(
+            workspace.symbol.is_some(),
+            "workspace symbols are asked for"
+        );
+        assert!(
+            workspace.execute_command.is_some(),
+            "a code action's command is run"
+        );
+    }
+
+    #[test]
+    fn a_rename_says_it_will_ask_first() {
+        // Which is what lets a key pressed on a keyword say "no" before somebody has typed a new
+        // name for it, rather than after.
+        let rename = capabilities()
+            .text_document
+            .and_then(|text| text.rename)
+            .expect("rename is claimed");
+        assert_eq!(rename.prepare_support, Some(true));
+    }
+
+    #[test]
+    fn a_workspace_edit_is_versioned_and_may_move_files() {
+        // Unversioned, an edit that arrives after the buffer has moved on is applied to the wrong
+        // text with no way to tell. Without the resource operations, a rename that moves a file —
+        // which renaming a Rust module does — silently loses the move.
+        let edit = capabilities()
+            .workspace
+            .and_then(|workspace| workspace.workspace_edit)
+            .expect("workspace edits are claimed");
+        assert_eq!(edit.document_changes, Some(true));
+        assert_eq!(
+            edit.resource_operations.map(|ops| ops.len()),
+            Some(3),
+            "create, rename and delete"
+        );
+    }
+
+    #[test]
+    fn both_shapes_of_workspace_symbol_flatten_to_one() {
+        use lsp_types::{
+            Location, OneOf, Position, Range, SymbolInformation, SymbolKind, WorkspaceSymbol,
+            WorkspaceSymbolResponse,
+        };
+
+        let uri = Url::parse("file:///project/src/lib.rs").expect("a url");
+        let range = Range::new(Position::new(3, 0), Position::new(3, 8));
+
+        #[allow(deprecated)]
+        let flat = WorkspaceSymbolResponse::Flat(vec![SymbolInformation {
+            name: "run".to_owned(),
+            kind: SymbolKind::FUNCTION,
+            tags: None,
+            deprecated: None,
+            location: Location {
+                uri: uri.clone(),
+                range,
+            },
+            container_name: Some("app".to_owned()),
+        }]);
+        let found = symbols(Some(flat));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "run");
+        assert_eq!(found[0].range, range);
+        assert_eq!(found[0].container.as_deref(), Some("app"));
+
+        // The same symbol said the other way round comes out identical, which is the whole point:
+        // a picker over these must not be able to tell which shape the server chose.
+        let nested = WorkspaceSymbolResponse::Nested(vec![WorkspaceSymbol {
+            name: "run".to_owned(),
+            kind: SymbolKind::FUNCTION,
+            tags: None,
+            container_name: Some("app".to_owned()),
+            location: OneOf::Left(Location {
+                uri: uri.clone(),
+                range,
+            }),
+            data: None,
+        }]);
+        assert_eq!(symbols(Some(nested)), found);
+    }
+
+    #[test]
+    fn a_symbol_with_no_range_lands_at_the_top_of_its_file() {
+        // Wrong by a screenful and right by a file, and a file is what somebody picking a symbol
+        // out of a project of ten thousand was actually after.
+        use lsp_types::{
+            OneOf, SymbolKind, WorkspaceLocation, WorkspaceSymbol, WorkspaceSymbolResponse,
+        };
+
+        let uri = Url::parse("file:///project/src/lib.rs").expect("a url");
+        let answer = WorkspaceSymbolResponse::Nested(vec![WorkspaceSymbol {
+            name: "run".to_owned(),
+            kind: SymbolKind::FUNCTION,
+            tags: None,
+            container_name: None,
+            location: OneOf::Right(WorkspaceLocation { uri: uri.clone() }),
+            data: None,
+        }]);
+
+        let found = symbols(Some(answer));
+        assert_eq!(found[0].uri, uri);
+        assert_eq!(found[0].range, lsp_types::Range::default());
+    }
+
+    #[test]
+    fn nothing_at_all_is_an_empty_list_rather_than_an_error() {
+        assert!(symbols(None).is_empty());
+        assert!(locations(None).is_empty());
     }
 }

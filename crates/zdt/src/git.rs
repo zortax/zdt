@@ -14,7 +14,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use rustc_hash::FxHashMap;
-use zdt_core::git::{Change, Hunk};
+use zdt_git::{Change, Hunk};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
@@ -94,7 +94,7 @@ impl Git {
         let git = self.clone();
         crate::task::detached(async move {
             let reading = path.clone();
-            let found = zgui::task::blocking(move || zdt_core::git::hunks(&reading)).await;
+            let found = zgui::task::blocking(move || zdt_git::hunks(&reading)).await;
 
             let changed = git
                 .inner

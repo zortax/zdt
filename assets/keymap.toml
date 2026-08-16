@@ -1555,6 +1555,20 @@ desc = "Toggle terminal"
 [[map]]
 mode = ["n"]
 keys = "<Leader>gg"
+action = "git.open"
+desc = "Git"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>gt"
+action = "git.open_tab"
+desc = "Git, as a tab"
+
+# Still here for anybody who wants it: a rebase is a thing to be doing on purpose, and the panel
+# deliberately does not offer one.
+[[map]]
+mode = ["n"]
+keys = "<Leader>gL"
 action = "terminal.toggle"
 args = { placement = "float", command = "lazygit", id = "lazygit" }
 desc = "lazygit"
@@ -1757,6 +1771,24 @@ mode = ["n"]
 keys = "<Leader>uD"
 action = "ui.dismiss"
 desc = "Dismiss notifications"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>,"
+action = "ui.settings"
+desc = "Settings"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uc"
+action = "ui.settings"
+desc = "Settings"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>uC"
+action = "ui.settings_tab"
+desc = "Settings, as a tab"
 
 [[map]]
 mode = ["n"]

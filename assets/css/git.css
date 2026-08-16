@@ -1,0 +1,480 @@
+/* The git panel.
+ *
+ * Three columns and a strip: branches, a list, a diff. The same 22px row and the same tones as
+ * everything else, because it is a part of this editor rather than a terminal program inside it.
+ *
+ * Shown two ways from one set of rules. `.git--modal` adds what floating costs — a position, a
+ * border, a shadow — and everything else here applies to both. */
+
+.git {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+}
+
+.git__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 32;
+    background-color: oklch(0 0 0 / 24%);
+}
+
+.git--modal {
+    position: absolute;
+    top: 6%;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: min(1500px, 92%);
+    height: 82%;
+    z-index: 33;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    box-shadow: var(--zui-shadow-md);
+}
+
+.git__body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    outline: none;
+}
+
+/* Which list has the caret is said by the list, not by a ring around the whole panel. */
+.git__branches[data-focused="true"] .git__branch[data-selected="true"],
+.git__files[data-focused="true"] .git__file[data-selected="true"],
+.git__history[data-focused="true"] .git__commit[data-selected="true"] {
+    background-color: var(--zui-color-accent);
+    box-shadow: inset 2px 0 0 var(--zui-color-ring);
+}
+
+/* ---- The strip across the top ---------------------------------------------------------------- */
+
+.git__bar {
+    flex: none;
+    height: var(--chrome);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    background-color: var(--zui-color-sidebar);
+}
+
+.git__head {
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-base);
+    color: var(--zdt-icon-git);
+}
+
+.git__views {
+    display: flex;
+    flex-direction: row;
+    gap: var(--zui-space-base);
+}
+
+/* A tone rather than an underline, like the buffer line's tabs.
+ *
+ * Centred by the box rather than by a line height: a control's text is laid out inside it, and a
+ * `line-height` equal to the height only looks centred while the font's metrics agree with it —
+ * which the interface font's do not. */
+.git__view-tab {
+    height: 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    padding: 0 calc(var(--zui-space-base) * 3);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    color: var(--zui-color-muted-foreground);
+}
+
+.git__view-tab[data-selected="true"] {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.git__state {
+    display: flex;
+    align-items: center;
+    gap: var(--zui-space-base);
+    max-width: 40%;
+    overflow: hidden;
+}
+
+.git__problem {
+    color: var(--zdt-diagnostic-error);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- The three columns ------------------------------------------------------------------------ */
+
+.git__panes {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    min-width: 0;
+}
+
+.git__side {
+    flex: none;
+    width: 180px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--zui-color-sidebar);
+}
+
+.git__list {
+    flex: none;
+    width: 40%;
+    max-width: 620px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.git__diff {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background-color: var(--editor-bg);
+}
+
+/* A heading is a label, not a bar: a rule under every list in a three-column panel is three rules
+ * doing nothing but subdividing what the columns already divided. */
+.git__heading {
+    flex: none;
+    height: var(--row);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--zui-space-base);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small, 11px);
+}
+
+/* The lists are virtual, so each is a scroll container that has to be given a bounded height.
+ *
+ * `flex: 1 1 0` and not `1 1 auto`: with an `auto` basis the container is first sized to its
+ * content, which for a thousand-row list is a thousand rows tall, and only then shrunk. A zero
+ * basis makes it take the space that is left and clip — which is what gives it something to
+ * scroll. `min-height: 0` is what allows the shrink at all. */
+.git__branches,
+.git__history,
+.git__diff-body {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+/* The two file lists share the column between them, so neither can push the other off. */
+.git__files {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+/* A row fills the height the virtual list gave it rather than declaring one of its own: the list
+ * is the thing that knows how tall a row is, because it decided how many to build. */
+.git__branch,
+.git__file,
+.git__commit,
+.git__diff-row {
+    height: 100%;
+}
+
+/* The list with the keyboard is the one whose selected row is lit; the others keep a dimmer mark
+ * so that where you were is still visible when you come back. */
+.git__branch,
+.git__file,
+.git__commit {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    overflow: hidden;
+}
+
+.git__branch[data-selected="true"],
+.git__file[data-selected="true"],
+.git__commit[data-selected="true"] {
+    background-color: var(--zui-color-muted);
+}
+
+.git__branch-mark {
+    flex: none;
+    width: 8px;
+    color: var(--zdt-git-added);
+}
+
+.git__branch[data-remote="true"] {
+    color: var(--zui-color-muted-foreground);
+}
+
+.git__file-mark {
+    flex: none;
+    width: 10px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.git__file-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.git__file[data-conflicted="true"] .git__file-name {
+    color: var(--zdt-git-conflict);
+}
+
+/* ---- The commit graph -------------------------------------------------------------------------- */
+
+/* Boxes rather than a canvas: every line in a commit graph is vertical, and a row of thin absolute
+ * boxes lines up with the text beside it for free. */
+.git__graph {
+    flex: none;
+    position: relative;
+    height: var(--row);
+    align-self: stretch;
+}
+
+.git__lane {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+}
+
+/* The line through the row: a hairline down the middle of the lane. */
+.git__lane[data-line="true"]::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: var(--zdt-git-lane-0);
+}
+
+/* The commit itself. Filled for an ordinary commit, hollow for a merge — which is the one
+ * distinction worth drawing, because a merge is where two histories met. */
+.git__lane[data-dot="true"]::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background-color: var(--zdt-git-lane-0);
+}
+
+.git__lane[data-merge="true"]::after {
+    background-color: var(--editor-bg);
+    border: 2px solid var(--zdt-git-lane-0);
+    left: 2px;
+    top: 7px;
+    width: 8px;
+    height: 8px;
+}
+
+.git__lane[data-tint="1"]::before, .git__lane[data-tint="1"]::after { background-color: var(--zdt-git-lane-1); }
+.git__lane[data-tint="2"]::before, .git__lane[data-tint="2"]::after { background-color: var(--zdt-git-lane-2); }
+.git__lane[data-tint="3"]::before, .git__lane[data-tint="3"]::after { background-color: var(--zdt-git-lane-3); }
+.git__lane[data-tint="4"]::before, .git__lane[data-tint="4"]::after { background-color: var(--zdt-git-lane-4); }
+.git__lane[data-tint="5"]::before, .git__lane[data-tint="5"]::after { background-color: var(--zdt-git-lane-5); }
+.git__lane[data-tint="6"]::before, .git__lane[data-tint="6"]::after { background-color: var(--zdt-git-lane-6); }
+.git__lane[data-tint="7"]::before, .git__lane[data-tint="7"]::after { background-color: var(--zdt-git-lane-7); }
+
+.git__lane[data-tint="1"][data-merge="true"]::after { border-color: var(--zdt-git-lane-1); background-color: var(--editor-bg); }
+.git__lane[data-tint="2"][data-merge="true"]::after { border-color: var(--zdt-git-lane-2); background-color: var(--editor-bg); }
+.git__lane[data-tint="3"][data-merge="true"]::after { border-color: var(--zdt-git-lane-3); background-color: var(--editor-bg); }
+
+.git__short {
+    flex: none;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+}
+
+.git__summary {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.git__author {
+    flex: none;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.git__when {
+    flex: none;
+    width: 34px;
+    text-align: right;
+}
+
+/* ---- The diff ---------------------------------------------------------------------------------- */
+
+.git__details {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    background-color: var(--zui-color-sidebar);
+}
+
+.git__details-line {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    min-width: 0;
+}
+
+.git__details-body {
+    color: var(--zui-color-muted-foreground);
+    white-space: pre-wrap;
+    max-height: 80px;
+    overflow: hidden;
+}
+
+.git__diff-body {
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+}
+
+/* One wrapper per diff row, because a virtual list gives every row the same height and the three
+ * kinds of row — a file's heading, a hunk's header, a line — have to fill it identically. */
+.git__diff-row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* The hunk the caret is in, which is what `s` would stage. A line down the leading edge rather
+ * than a tint across it: the tints across a diff already mean added and removed. */
+.git__diff-row[data-hunk="true"] {
+    box-shadow: inset 2px 0 0 var(--zui-color-ring);
+}
+
+.git__diff-row[data-caret="true"] {
+    background-color: var(--zui-color-accent);
+}
+
+.git__diff-head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+    background-color: var(--zui-color-muted);
+    height: 100%;
+}
+
+.git__added { color: var(--zdt-git-added); }
+.git__removed { color: var(--zdt-git-removed); }
+
+/* The `@@` line. Kept, because it is what says the change is somewhere else in the file rather
+ * than immediately after the one above it. */
+.git__hunk-head {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 calc(var(--zui-space-base) * 3);
+    color: var(--zui-color-muted-foreground);
+    background-color: var(--zui-color-muted);
+    opacity: 0.7;
+}
+
+.git__line {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    padding-right: calc(var(--zui-space-base) * 2);
+}
+
+.git__line[data-kind="added"] { background-color: var(--zdt-git-added-bg); }
+.git__line[data-kind="removed"] { background-color: var(--zdt-git-removed-bg); }
+
+.git__line-number {
+    flex: none;
+    width: 40px;
+    padding-right: var(--zui-space-base);
+    text-align: right;
+    color: var(--editor-gutter-fg);
+}
+
+.git__line-mark {
+    flex: none;
+    width: 14px;
+    text-align: center;
+}
+
+.git__line[data-kind="added"] .git__line-mark { color: var(--zdt-git-added); }
+.git__line[data-kind="removed"] .git__line-mark { color: var(--zdt-git-removed); }
+
+.git__line-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: pre;
+    overflow: hidden;
+}
+
+.git__empty {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--zui-space-base) * 6);
+}
+
+/* ---- The commit message ------------------------------------------------------------------------ */
+
+.git__commit-box {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    background-color: var(--zui-color-sidebar);
+}
+
+.git__commit-head {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--zui-space-base);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small, 11px);
+}
+
+.git__commit-input {
+    height: 66px;
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+}

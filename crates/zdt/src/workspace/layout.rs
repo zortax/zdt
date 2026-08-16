@@ -88,6 +88,20 @@ pub enum Layout {
     },
 }
 
+/// A [`Layout`] with the shares taken out. See [`Layout::shape`].
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Shape {
+    /// One window.
+    Leaf(WindowId),
+    /// Several, divided along one axis.
+    Split {
+        /// Which way it divides.
+        axis: Axis,
+        /// What is in it.
+        children: Vec<Shape>,
+    },
+}
+
 impl Layout {
     /// Every window in the tree, left to right and top to bottom.
     ///
@@ -292,6 +306,22 @@ impl Layout {
         children
             .iter_mut()
             .any(|(child, _)| child.resize(at, sizes))
+    }
+
+    /// The arrangement, without the shares.
+    ///
+    /// What a view of the layout actually depends on: dragging a divider changes the shares on
+    /// every move and the arrangement on none of them, so a view rebuilt on this is a view that
+    /// survives the drag that is rebuilding it.
+    #[must_use]
+    pub fn shape(&self) -> Shape {
+        match self {
+            Self::Leaf(window) => Shape::Leaf(*window),
+            Self::Split { axis, children } => Shape::Split {
+                axis: *axis,
+                children: children.iter().map(|(child, _)| child.shape()).collect(),
+            },
+        }
     }
 
     /// The window after `at` in the walking order, wrapping.

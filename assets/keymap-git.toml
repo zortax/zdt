@@ -1,0 +1,188 @@
+# The git panel's own keys.
+#
+# Read as an overlay in front of the ordinary keymap while the panel has the keyboard. The keys are
+# the ones anybody who has used a git interface in a terminal already knows — `s` stages, `u`
+# unstages, `c` commits — because a panel that invented its own would be a panel to be learned
+# rather than used.
+#
+# Everything the panel says nothing about still works: `<Leader>ff` from inside it opens the file
+# picker, which is what makes it a region rather than a modal that swallows the keyboard.
+
+# ---- Moving -----------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "gitpanel.down"
+desc = "Down"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "gitpanel.up"
+desc = "Up"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "gitpanel.down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "gitpanel.up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "gitpanel.half_down"
+desc = "Down half a screen"
+
+[[map]]
+mode = ["n"]
+keys = "<C-u>"
+action = "gitpanel.half_up"
+desc = "Up half a screen"
+
+[[map]]
+mode = ["n"]
+keys = "gg"
+action = "gitpanel.top"
+desc = "To the top"
+
+[[map]]
+mode = ["n"]
+keys = "G"
+action = "gitpanel.bottom"
+desc = "To the bottom"
+
+[[map]]
+mode = ["n"]
+keys = "<Tab>"
+action = "gitpanel.next_pane"
+desc = "Next list"
+
+[[map]]
+mode = ["n"]
+keys = "<S-Tab>"
+action = "gitpanel.previous_pane"
+desc = "Previous list"
+
+[[map]]
+mode = ["n"]
+keys = "<C-w>"
+action = "gitpanel.next_pane"
+
+# ---- What is showing --------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<C-t>"
+action = "gitpanel.toggle_view"
+desc = "Status or history"
+
+[[map]]
+mode = ["n"]
+keys = "1"
+action = "gitpanel.status"
+desc = "Show the status"
+
+[[map]]
+mode = ["n"]
+keys = "2"
+action = "gitpanel.history"
+desc = "Show the history"
+
+[[map]]
+mode = ["n"]
+keys = "<C-v>"
+action = "gitpanel.side_by_side"
+desc = "One column or two"
+
+# ---- Staging ----------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "s"
+action = "gitpanel.stage"
+desc = "Stage"
+
+[[map]]
+mode = ["n"]
+keys = "u"
+action = "gitpanel.unstage"
+desc = "Unstage"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "gitpanel.stage"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "gitpanel.stage_all"
+desc = "Stage everything"
+
+[[map]]
+mode = ["n"]
+keys = "U"
+action = "gitpanel.unstage_all"
+desc = "Unstage everything"
+
+[[map]]
+mode = ["n"]
+keys = "X"
+action = "gitpanel.discard"
+desc = "Throw away"
+
+# ---- Committing -------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "c"
+action = "gitpanel.commit"
+desc = "Commit"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "gitpanel.amend"
+desc = "Amend the last commit"
+
+# ---- The rest ---------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "o"
+action = "gitpanel.open"
+desc = "Open the file"
+
+[[map]]
+mode = ["n"]
+keys = "b"
+action = "gitpanel.checkout"
+desc = "Check the branch out"
+
+[[map]]
+mode = ["n"]
+keys = "r"
+action = "gitpanel.refresh"
+desc = "Read it all again"
+
+[[map]]
+mode = ["n"]
+keys = "t"
+action = "gitpanel.to_tab"
+desc = "Open it as a tab"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "gitpanel.close"
+desc = "Close"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "gitpanel.close"

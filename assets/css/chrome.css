@@ -34,12 +34,21 @@
 
 .chrome__branch {
     flex: none;
+    display: flex;
+    flex-direction: row;
     align-items: center;
+    height: 20px;
+    border-radius: var(--zui-radius-sm);
     gap: var(--zui-space-xs);
     padding: 0 var(--zui-space-sm);
     color: var(--zui-color-muted-foreground);
-    font-size: var(--zui-type-size-xs);
+    font-size: var(--zdt-ui-size-small, 11px);
     text-wrap-mode: nowrap;
+}
+
+.chrome__branch:hover {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
 }
 
 /* The buffer line. Tabs shrink before they scroll, and the row never pushes the window buttons
@@ -92,10 +101,14 @@
     justify-content: center;
 }
 
+/* A drawn circle rather than a bullet glyph: a glyph sits wherever the font's metrics put it
+ * inside its line box, which is neither the middle nor the same place in two fonts — so the mark
+ * rode low and moved when the font changed. */
 .tab__mark {
-    font-size: 9px;
-    line-height: 1;
-    color: var(--zdt-warning);
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background-color: var(--zdt-warning);
     opacity: 0;
 }
 
@@ -135,7 +148,7 @@
     gap: var(--zui-space-md);
     padding: 0 var(--zui-space-md) 0 0;
     color: var(--zui-color-muted-foreground);
-    font-size: var(--zui-type-size-xs);
+    font-size: var(--zdt-ui-size-small, 11px);
     min-width: 0;
 }
 
@@ -252,9 +265,15 @@
     color: var(--zdt-diagnostic-hint);
 }
 
-/* What a server is busy with. Dimmer than everything else on the line: it is the one thing there
- * that nobody is waiting on. */
-.statusline__busy {
+/* What state the language servers for this file are in.
+ *
+ * A word, and a mark before it that is either a spinner or a dot. Dimmer than everything else on
+ * the line, because it is the one thing there nobody is waiting on — until it says `failed`, at
+ * which point it is the only thing on the line worth reading, and takes the full colour to say so.
+ *
+ * What the servers have just *done* is not here. That goes to the announcements: this slot holds
+ * one thing, and a slot that holds one thing can only ever show the last of several. */
+.statusline__lsp {
     display: flex;
     align-items: center;
     gap: var(--zui-space-xs);
@@ -264,6 +283,24 @@
     max-width: 40%;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.statusline__lsp[data-state="failed"] {
+    color: var(--zdt-diagnostic-error);
+    opacity: 1;
+}
+
+/* Small enough that it reads as punctuation rather than as a control somebody could press. */
+.statusline__dot {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background-color: currentColor;
+}
+
+.statusline__lsp[data-state="ready"] .statusline__dot {
+    background-color: var(--zdt-git-added);
 }
 
 /* The command line.
@@ -279,7 +316,7 @@
     padding: 0 var(--zui-space-md);
     background-color: var(--zui-color-sidebar);
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
 }
 
 .cmdline__sigil {
@@ -293,7 +330,7 @@
     min-width: 0;
     height: 18px;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
 }
 
 /* Two classes, to out-specify the field's own scoped sheet: the command line *is* the field, and

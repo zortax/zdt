@@ -9,7 +9,7 @@ pub mod diagnostics;
 pub mod pool;
 pub mod registry;
 
-pub use crate::client::{Client, ClientError, Notice};
+pub use crate::client::{Client, ClientError, Notice, Symbol};
 pub use crate::convert::Encoding;
 pub use crate::diagnostics::{Counts, Store};
 pub use crate::pool::{Asked, Pool};

@@ -52,7 +52,21 @@ pub fn Chrome() -> impl IntoView {
             box(class = "fill") {}
 
             {branch.map(|branch| view! {
-                row(class = "chrome__branch") {
+                // A control, because it does something: the branch is the one part of the header
+                // that is *about* the repository, so it is where a person reaches to see it.
+                control(
+                    class = "chrome__branch",
+                    tabindex = Focus::Programmatic,
+                    a11y:label = "Git",
+                    on:pointer_down = move |event: &mut EventCx<'_, events::PointerDown>| {
+                        event.stop_propagation();
+                        if let Some(panel) =
+                            zgui::reactive::use_local_context::<crate::gitui::GitUi>()
+                        {
+                            panel.open();
+                        }
+                    }
+                ) {
                     Icon(icon = icons::GIT_BRANCH, class = "icon--sm")
                     label {{branch}}
                 }
@@ -160,7 +174,10 @@ fn BufferTab(
             // not shift when a buffer is edited.
             box(class = "tab__slot") {
                 label(class = "tab__key") {{move || key().unwrap_or_default()}}
-                label(class = "tab__mark") {"\u{25cf}"}
+                // Drawn rather than typed: a bullet glyph sits wherever the font's metrics put
+                // it inside its line box, which is neither the middle nor the same place in two
+                // fonts. A box with a radius is centred by geometry.
+                box(class = "tab__mark") {}
                 control(
                     class = "tab__close",
                     tabindex = Focus::Programmatic,

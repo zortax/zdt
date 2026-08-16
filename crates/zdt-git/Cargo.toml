@@ -1,0 +1,16 @@
+[package]
+name = "zdt-git"
+description = "Reading and changing a git repository, for zdt's gutter and its git panel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+gix.workspace = true
+rustc-hash.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

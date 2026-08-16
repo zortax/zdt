@@ -271,12 +271,37 @@ impl Vim {
     ///
     /// This is what an editor's key filter is: `true` means the key is used up.
     pub fn key(&self, chord: Chord, handle: &EditorHandle) -> bool {
-        // Documentation stays up until the next key, whatever that key is. It takes no keyboard
-        // of its own, so this is the only thing that has to know it is there.
+        // Documentation has two states, and they take keys differently.
+        //
+        // Focused — which a second `K` does — it takes every key it has a row for, because
+        // somebody who asked twice is somebody reading it rather than somebody who glanced.
+        // Merely showing, it takes none and closes on the next key, whatever that key is: a panel
+        // that swallowed keys would have to be dismissed before work could continue.
         if let Some(hover) = zgui::reactive::use_local_context::<crate::ui::hover::Hover>()
             && hover.is_showing()
         {
+            if hover.is_focused() {
+                return self.key_in_region(chord, "hover");
+            }
+            // The same key again means "I want to read this", so it takes the keyboard rather
+            // than dismissing what it just opened. Asked here and not in the action, because by
+            // then this branch has already closed the panel.
+            if self.chord_runs(chord, "lsp.hover") && hover.focus() {
+                return true;
+            }
             hover.hide();
+        }
+
+        // Suggestions take the keys they are bound to and nothing else, so that typing on past a
+        // popup is typing rather than dismissing. Before the grammar, because `<CR>` in insert
+        // mode means "take this one" while the popup is up.
+        if let Some(completion) =
+            zgui::reactive::use_local_context::<crate::completion::Completion>()
+            && completion.is_open()
+            && self.mode_untracked() == Mode::Insert
+            && self.key_in_region_as(chord, "completion", Mode::Insert)
+        {
+            return true;
         }
 
         // Labelled tabs take the next key, whatever it is: every letter is a label or the end of
@@ -425,6 +450,19 @@ impl Vim {
                 }
                 true
             }
+        }
+    }
+
+    /// Whether `chord` on its own runs `action` in the base map, in whatever mode this is.
+    ///
+    /// For the places that have to know what a key *means* before deciding whether to let it
+    /// through. Against the base map, so it follows a person's own keymap.
+    #[must_use]
+    pub fn chord_runs(&self, chord: Chord, action: &str) -> bool {
+        let keymap = self.inner.keymap.borrow();
+        match Layered::plain(&keymap).resolve(self.mode_untracked(), &[chord]) {
+            Resolution::Run(binding) => binding.actions.iter().any(|one| one.name == action),
+            _ => false,
         }
     }
 

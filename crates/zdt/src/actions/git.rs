@@ -1,8 +1,12 @@
 //! What the git keys do.
 //!
-//! Navigation and staging. What is *not* here is anything that rewrites history or touches a
-//! branch: this editor shows what git says and stages a hunk, and everything past that is what
-//! `<Leader>gg` opens lazygit for.
+//! Two kinds. The ones in this module act on the file being edited — walk to the next change,
+//! stage the hunk under the caret, ask who last touched a line — and want an editor and a caret.
+//! The ones that open the panel do not, and are answered first.
+//!
+//! What is still *not* here is anything that rewrites history: a rebase is a thing to be doing on
+//! purpose with the whole of your attention, and a key in a text editor is not the way to start
+//! one.
 
 use zgui_editor::EditorHandle;
 
@@ -11,6 +15,26 @@ use crate::workspace::Workspace;
 
 /// Carries out one `git.*` action.
 pub fn run(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
+    // The panel first, because none of these needs a file, a caret or a diff — and asking for one
+    // would mean `<Leader>gg` did nothing in a window showing a terminal.
+    if let Some(panel) = zgui::reactive::use_local_context::<crate::gitui::GitUi>() {
+        match leaf {
+            "open" | "status" => {
+                panel.open();
+                return;
+            }
+            "open_tab" => {
+                panel.open_tab();
+                return;
+            }
+            "close" => {
+                panel.close();
+                return;
+            }
+            _ => {}
+        }
+    }
+
     let Some(git) = zgui::reactive::use_local_context::<Git>() else {
         return;
     };
@@ -31,9 +55,9 @@ pub fn run(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
     match leaf {
         "next_hunk" | "previous_hunk" => {
             let found = if leaf == "next_hunk" {
-                zdt_core::git::after(&hunks, line)
+                zdt_git::after(&hunks, line)
             } else {
-                zdt_core::git::before(&hunks, line)
+                zdt_git::before(&hunks, line)
             };
             let Some(found) = found else {
                 workspace.say("no changes");
@@ -62,13 +86,90 @@ pub fn run(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
             )),
             None => workspace.say("nothing changed here"),
         },
+        // Staging the hunk under the caret, without opening anything. The hunks the gutter holds
+        // are the cheap `git diff` kind and say only where a change is, so the one that is wanted
+        // is found again properly — which is the same work the panel does, from the same crate.
         "stage_hunk" | "reset_hunk" => {
-            // Staging one hunk means writing a patch to git's index, which is more than a gutter
-            // needs to know how to do. Saying so beats a key that quietly stages the whole file.
-            workspace.say(format!(
-                "{} is not built yet; <Leader>gg opens lazygit",
-                leaf.replace('_', " ")
-            ));
+            let Some(hunk) = hunks.iter().find(|hunk| hunk.covers(line)) else {
+                workspace.say("nothing changed here");
+                return;
+            };
+            let at = hunk.line;
+            let staging = leaf == "stage_hunk";
+            let root = workspace.project().root().to_path_buf();
+            let path = path.clone();
+            let workspace = workspace.clone();
+            // Taken now: neither a context nor a notify is reachable after the await below.
+            let notify = crate::notify::use_notify();
+            let signs = zgui::reactive::use_local_context::<Git>();
+
+            crate::task::detached(async move {
+                let done = zgui::task::blocking(move || {
+                    let repo = zdt_git::Repo::open(&root)?;
+                    let named = repo
+                        .relative(&path)
+                        .ok_or_else(|| zdt_git::Error::NotARepository(path.clone()))?;
+                    let found = if staging {
+                        zdt_git::diff::worktree(&repo, &named)?
+                    } else {
+                        zdt_git::diff::staged(&repo, &named)?
+                    };
+                    // The one covering the line the caret is on, matched by where it starts in
+                    // whichever file it is a diff of.
+                    let wanted = found.hunks.into_iter().find(|hunk| {
+                        let start = if staging {
+                            hunk.new_start
+                        } else {
+                            hunk.old_start
+                        };
+                        let count = if staging {
+                            hunk.new_count
+                        } else {
+                            hunk.old_count
+                        };
+                        let from = start.saturating_sub(1) as usize;
+                        (from..from + count.max(1) as usize).contains(&at)
+                    });
+                    let Some(wanted) = wanted else {
+                        return Ok(false);
+                    };
+                    if staging {
+                        zdt_git::stage::stage_hunks(&repo, &named, &[wanted])?;
+                    } else {
+                        zdt_git::stage::unstage_hunks(&repo, &named, &[wanted])?;
+                    }
+                    Ok::<bool, zdt_git::Error>(true)
+                })
+                .await;
+
+                match done {
+                    Ok(true) => {
+                        let said = if staging {
+                            "hunk staged"
+                        } else {
+                            "hunk unstaged"
+                        };
+                        match notify.as_ref() {
+                            Some(notify) => notify.say(said),
+                            None => workspace.say(said),
+                        }
+                        // The gutter is worked out from `git diff`, which has just changed.
+                        if let Some(signs) = signs {
+                            signs.refresh_path(
+                                &workspace
+                                    .current_buffer()
+                                    .and_then(|buffer| buffer.path)
+                                    .unwrap_or_default(),
+                            );
+                        }
+                    }
+                    Ok(false) => workspace.say("nothing changed here"),
+                    Err(error) => match notify.as_ref() {
+                        Some(notify) => notify.fail("git", Some(error.to_string())),
+                        None => workspace.complain(error.to_string()),
+                    },
+                }
+            });
         }
         "blame_line" => blame(workspace, &path, line),
         other => workspace.say(format!("git.{other} is not built yet")),
@@ -150,6 +251,201 @@ fn ago(when: i64) -> String {
         _ => (seconds / 31_536_000, "year"),
     };
     format!("{count} {unit}{} ago", if count == 1 { "" } else { "s" })
+}
+
+/// The three git pickers: what has changed, what was committed, and what branches there are.
+///
+/// A picker rather than the panel, because what somebody pressing these wants is to *go*
+/// somewhere — to the file, to the commit, onto the branch — and going places is what a picker is
+/// for. The panel is for looking at a repository; these are for leaving one.
+pub fn picker(workspace: &Workspace, leaf: &str) {
+    use crate::picker::{Deed, Picker, Row, Source, Target};
+
+    let Some(picker) = zgui::reactive::use_local_context::<Picker>() else {
+        return;
+    };
+    let root = workspace.project().root().to_path_buf();
+    let which = leaf.to_owned();
+    let workspace = workspace.clone();
+
+    crate::task::detached(async move {
+        let read = {
+            let root = root.clone();
+            let which = which.clone();
+            zgui::task::blocking(move || {
+                let repo = zdt_git::Repo::open(&root).ok()?;
+                Some(match which.as_str() {
+                    "git_status" => Answer::Status(zdt_git::status::status(&repo).ok()?),
+                    "git_commits" => Answer::Commits(zdt_git::log::log(&repo, None, 500).ok()?),
+                    _ => Answer::Branches(zdt_git::branches(&repo).ok()?),
+                })
+            })
+            .await
+        };
+
+        let Some(read) = read else {
+            workspace.say("this project is not in a git repository");
+            return;
+        };
+
+        let (title, rows): (&'static str, Vec<Row>) = match read {
+            Answer::Status(entries) => (
+                "Git status",
+                entries
+                    .into_iter()
+                    .map(|entry| {
+                        // The worktree mark where there is one, and the index's otherwise: a file
+                        // that is staged and unchanged since still wants a letter.
+                        let state = if entry.worktree.is_change() {
+                            entry.worktree
+                        } else {
+                            entry.index
+                        };
+                        let (mark, tint) = crate::gitui::state_mark(state);
+                        Row::plain(
+                            entry.path.clone(),
+                            Target::File {
+                                path: entry.full,
+                                line: None,
+                                matched: None,
+                            },
+                        )
+                        .with_detail(mark)
+                        .with_glyph(mark_glyph(mark), tint)
+                    })
+                    .collect(),
+            ),
+            Answer::Commits(commits) => (
+                "Git commits",
+                commits
+                    .into_iter()
+                    .map(|commit| {
+                        Row::plain(commit.summary.clone(), Target::Nothing)
+                            .with_detail(format!(
+                                "{}  {}  {}",
+                                commit.short,
+                                commit.author,
+                                crate::gitui::ago_short(commit.when)
+                            ))
+                            .with_glyph("\u{f0718}", "zdt-git-changed")
+                    })
+                    .collect(),
+            ),
+            Answer::Branches(branches) => (
+                "Git branches",
+                branches
+                    .into_iter()
+                    .map(|branch| {
+                        let name = branch.name.clone();
+                        let root = root.clone();
+                        let workspace = workspace.clone();
+                        Row::plain(
+                            branch.name.clone(),
+                            // Through git itself: a checkout writes the working tree, updates the
+                            // index and moves `HEAD`, and doing two of those three correctly is
+                            // worse than doing none of them.
+                            Target::Run(Deed::new(move || {
+                                checkout(&workspace, &root, &name);
+                            })),
+                        )
+                        .with_detail(branch.upstream.unwrap_or_default())
+                        .with_glyph(
+                            if branch.current {
+                                "\u{25cf}"
+                            } else {
+                                "\u{f062c}"
+                            },
+                            if branch.current {
+                                "zdt-git-added"
+                            } else {
+                                "zui-color-muted-foreground"
+                            },
+                        )
+                    })
+                    .collect(),
+            ),
+        };
+
+        if rows.is_empty() {
+            workspace.say("nothing to show");
+            return;
+        }
+        picker.open(Source::Given { title, rows });
+    });
+}
+
+/// What one of the three questions came back with.
+enum Answer {
+    Status(Vec<zdt_git::Entry>),
+    Commits(Vec<zdt_git::Commit>),
+    Branches(Vec<zdt_git::Branch>),
+}
+
+/// Which glyph a status letter gets in the picker.
+///
+/// The letter itself is in the dim text after the name; the glyph is what carries the colour, and
+/// one shape for every state is what keeps the column from looking like a ransom note.
+const fn mark_glyph(mark: &str) -> &'static str {
+    match mark.as_bytes() {
+        b"?" => "\u{f0453}",
+        b"A" => "\u{f0704}",
+        b"D" => "\u{f0708}",
+        b"R" => "\u{f070c}",
+        b"U" => "\u{f071b}",
+        _ => "\u{f0704}",
+    }
+}
+
+/// Checks a branch out, and says what happened.
+fn checkout(workspace: &Workspace, root: &std::path::Path, name: &str) {
+    let (root, name, workspace) = (root.to_path_buf(), name.to_owned(), workspace.clone());
+    let notify = crate::notify::use_notify();
+    let signs = zgui::reactive::use_local_context::<Git>();
+    crate::task::detached(async move {
+        let done = {
+            let name = name.clone();
+            zgui::task::blocking(move || {
+                std::process::Command::new("git")
+                    .arg("-C")
+                    .arg(&root)
+                    .args(["checkout", &name])
+                    .output()
+            })
+            .await
+        };
+
+        match done {
+            Ok(output) if output.status.success() => {
+                match notify.as_ref() {
+                    Some(notify) => notify.ok(format!("on {name}")),
+                    None => workspace.say(format!("on {name}")),
+                }
+                // Every open file may have changed underneath, so the signs are worked out again.
+                if let Some(signs) = signs {
+                    for buffer in workspace.order() {
+                        signs.refresh(buffer);
+                    }
+                }
+            }
+            Ok(output) => {
+                let said = String::from_utf8_lossy(&output.stderr);
+                let first = said
+                    .lines()
+                    .map(str::trim)
+                    .find(|line| !line.is_empty())
+                    .unwrap_or("git refused")
+                    .to_owned();
+                match notify.as_ref() {
+                    Some(notify) => notify.fail("checkout", Some(first)),
+                    None => workspace.complain(first),
+                }
+            }
+            Err(error) => match notify.as_ref() {
+                Some(notify) => notify.fail("checkout", Some(error.to_string())),
+                None => workspace.complain(error.to_string()),
+            },
+        }
+    });
 }
 
 #[cfg(test)]

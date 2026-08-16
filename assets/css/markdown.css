@@ -1,0 +1,120 @@
+/* Documentation, drawn.
+ *
+ * Every language server answers in markdown, and what it answers with is nearly always the same
+ * four things: a signature in a fenced block, a rule, a paragraph, and a list of bounds. So the
+ * proportions here are chosen for that document and not for a general-purpose one — the headings
+ * are barely larger than the body, because a hover's heading is a section marker inside a panel
+ * three hundred pixels wide rather than a title on a page.
+ *
+ * Everything is measured in the same units as the rest of the window: a 3px space unit, a 16px
+ * line, and no borders on anything that is not floating. */
+
+.md {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--zui-space-base) * 2);
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+    color: var(--zui-color-foreground);
+}
+
+.md__paragraph {
+    display: block;
+}
+
+/* Headings are a weight and a tone, not a size. Three sizes of heading inside a panel this small
+ * would be three sizes of heading nobody can tell apart, and the largest would be shouting. */
+.md__heading {
+    display: block;
+    font-weight: 600;
+    color: var(--zdt-doc-heading, var(--zui-color-foreground));
+}
+
+.md__heading[data-depth="1"] {
+    font-size: calc(var(--zdt-ui-size, 12px) + 1px);
+    line-height: 18px;
+}
+
+/* A rule is what a server puts between the signature and the prose. It is the one line-like thing
+ * allowed in this interface, because it is carrying a meaning nothing else here carries: what is
+ * above and what is below are different kinds of thing. */
+.md__rule {
+    flex: none;
+    height: 1px;
+    margin: var(--zui-space-base) 0;
+    background-color: var(--zdt-doc-rule, var(--zui-color-border));
+    opacity: 0.6;
+}
+
+.md__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+}
+
+.md__item {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: calc(var(--zui-space-base) * 2);
+}
+
+/* The mark in a box of its own, so a wrapped item's second line lines up with its first rather
+ * than with the bullet. */
+.md__bullet {
+    flex: none;
+    width: 8px;
+    text-align: center;
+    color: var(--zui-color-muted-foreground);
+}
+
+.md__item-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* A code span is a tone and a background, not a border and a radius: at 12px a rounded box around
+ * two words is a box whose corners are most of what it is. */
+.md__code {
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    color: var(--zdt-doc-code, var(--syntax-string));
+}
+
+.md__emphasis {
+    font-style: italic;
+}
+
+.md__strong {
+    font-weight: 600;
+}
+
+.md__link {
+    color: var(--zdt-doc-link, var(--zui-color-primary));
+}
+
+/* ---- Fenced blocks ------------------------------------------------------------------------ */
+
+/* A mounted editor, so the fence is highlighted as the language it says it is — which for a hover
+ * is the whole value of the hover. Sized by its own line count rather than by its parent: an
+ * editor stretched to fit would clip a six-line signature and leave four blank lines under a
+ * one-line one. What scrolls is the panel around it. */
+.md__block {
+    flex: none;
+    display: flex;
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    background-color: var(--zdt-doc-block, var(--zui-color-muted));
+    padding: var(--zui-space-base) calc(var(--zui-space-base) * 2);
+    overflow: hidden;
+}
+
+.md__editor {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* One line per line of content, plus nothing: the block is its text and no more. */
+    height: calc(var(--md-block-lines, 1) * var(--md-block-line, 17px));
+    --editor-bg: transparent;
+    --editor-gutter-bg: transparent;
+    --editor-current-line: transparent;
+    --editor-cursor: transparent;
+    --zdt-editor-size: 12px;
+}

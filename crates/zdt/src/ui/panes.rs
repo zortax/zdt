@@ -12,15 +12,34 @@ use zgui_ui_primitives::Orientation;
 
 use crate::ui::Erase;
 use crate::ui::pane::PaneProps;
-use crate::workspace::{Axis, Layout, WindowId, use_workspace};
+use crate::workspace::{Axis, Layout, Shape, WindowId, use_workspace};
 
 /// Every window, arranged.
 #[component]
 pub fn Panes() -> impl IntoView {
     let workspace = use_workspace();
+    // The arrangement, held apart from the shares so that this rebuilds on the first and not on
+    // the second. A dragged divider reports new shares on every pointer move, and rebuilding takes
+    // the handle out from under the drag. The shares are read below without subscribing: from the
+    // first frame they belong to the panel group.
+    let shape: zgui::reactive::RwSignal<Shape, zgui::reactive::LocalStorage> =
+        zgui::reactive::RwSignal::new_local(workspace.layout_untracked().shape());
+    let watching = {
+        let workspace = workspace.clone();
+        zgui::reactive::RenderEffect::new(move |_| {
+            let next = workspace.shape();
+            if shape.with_untracked(|held| *held != next) {
+                shape.set(next);
+            }
+        })
+    };
+    on_cleanup_local(move || drop(watching));
     view! {
         box(class = "panes") {
-            {move || tree(&workspace.layout())}
+            {move || {
+                shape.get();
+                tree(&workspace.layout_untracked())
+            }}
         }
     }
 }
@@ -54,7 +73,20 @@ fn tree(layout: &Layout) -> AnyView {
                 .flat_map(|(index, (child, size))| {
                     let mut views = Vec::new();
                     if index > 0 {
-                        views.push(view! { ResizableHandle() }.any());
+                        // The keyboard goes back to the editor when the drag ends: the handle is a
+                        // tab stop of the library's, and a window left with the keyboard on a
+                        // divider is one where the next motion goes unheard.
+                        let workspace = use_workspace();
+                        views.push(
+                            view! {
+                                ResizableHandle(
+                                    on:pointer_up = move |_: &mut EventCx<'_, events::PointerUp>| {
+                                        workspace.focus_editor();
+                                    }
+                                )
+                            }
+                            .any(),
+                        );
                     }
                     let inner = tree(child);
                     views.push(

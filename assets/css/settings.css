@@ -1,0 +1,326 @@
+/* The settings page.
+ *
+ * The component library ships the whole family — two columns, a page list with roving focus,
+ * groups, and rows that name their control for a screen reader. What it does not ship is this
+ * application's density: its rows are comfortable, its type is the library's sans, and its page
+ * list is two hundred pixels of card. All of that is retuned here and none of it is forked.
+ *
+ * The rules are written as `.config .zui-settings__x` rather than `.zui-settings__x`, because the
+ * library installs its own sheet when the component mounts — after this one — and at equal
+ * specificity the later sheet wins. One extra class is what makes these the declarations that
+ * count, rather than an ordering nobody can see. */
+
+/* ---- As a floating panel ---------------------------------------------------------------------- */
+
+/* The same shape as the picker and the git panel: a barely-there scrim so the file behind stays
+ * readable, a box centred on the horizontal, and the one border and shadow that floating earns. */
+.config__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 42;
+    background-color: oklch(0 0 0 / 24%);
+}
+
+.config__modal {
+    position: absolute;
+    top: 8%;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: min(980px, 88%);
+    height: 76%;
+    z-index: 43;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    box-shadow: var(--zui-shadow-md);
+    outline: none;
+}
+
+/* `width: 100%` is load-bearing: without it this box is as wide as its content while the page
+ * inside still paints out to the modal's edge, and everything past that boundary is drawn where
+ * nothing can be pressed. */
+.config__modal-body {
+    flex: 1 1 auto;
+    display: flex;
+    width: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* ---- The library's own measurements, retuned in one place -------------------------------------- */
+
+/* The component library sizes its controls from tokens, so the whole page is brought down to this
+ * application's scale by redefining the tokens here rather than by out-specifying two dozen rules.
+ * A control that reads `var(--zui-type-size-sm)` gets 11px because that is what the token says
+ * inside this panel, and it keeps every state, focus ring and transition the library shipped. */
+.config {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+
+    --zui-type-family-sans: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    --zui-type-size-sm: var(--zdt-ui-size-small, 11px);
+    --zui-type-leading-sm: 16px;
+    --zui-type-size-base: var(--zdt-ui-size, 12px);
+    --zui-type-leading-base: 16px;
+    --zui-radius-md: calc(var(--zui-radius-base) - 2px);
+    /* Nothing in this window that is not floating casts a shadow, and a settings row is not
+       floating — it is the page. */
+    --zui-shadow-xs: none;
+}
+
+/* ---- The page list ---------------------------------------------------------------------------- */
+
+.config .zui-settings__pages {
+    width: 150px;
+    gap: 0;
+    padding: calc(var(--zui-space-base) * 2) var(--zui-space-base);
+    /* No line: the tone difference between the sidebar and the pane says the same thing, and
+       every other panel in this window is told apart that way. */
+    border-right: none;
+}
+
+.config .zui-settings__page {
+    height: var(--row);
+    padding: 0 calc(var(--zui-space-base) * 2);
+    gap: var(--zui-space-base);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size, 12px);
+    font-weight: 400;
+    line-height: var(--row);
+    /* The transition is the library's; at this size a page changing colour over two hundred
+       milliseconds reads as lag rather than as a change. */
+    transition: none;
+}
+
+.config .zui-settings__page[data-state="active"] {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+/* ---- The pane --------------------------------------------------------------------------------- */
+
+.config .zui-settings__pane {
+    gap: calc(var(--zui-space-base) * 6);
+    padding: calc(var(--zui-space-base) * 4) calc(var(--zui-space-base) * 5);
+}
+
+.config .zui-settings__group {
+    gap: 0;
+}
+
+.config .zui-settings__group-label {
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small, 11px);
+    font-weight: 400;
+    line-height: var(--row);
+    color: var(--zui-color-muted-foreground);
+}
+
+.config .zui-settings__group-description {
+    font-size: var(--zdt-ui-size-small, 11px);
+    line-height: 15px;
+    color: var(--zui-color-muted-foreground);
+    max-width: 62ch;
+    padding-bottom: calc(var(--zui-space-base) * 2);
+}
+
+/* ---- One setting ------------------------------------------------------------------------------ */
+
+/* A row, not a card: 22px like every other row in the window, with the words on the left and the
+ * control at the trailing edge. A setting with a description is taller, and only then. */
+/* Room to breathe between settings without turning the page into a form: three units above and
+ * below each row, which at a 3px unit is nine pixels — enough that two switches do not read as one
+ * control, little enough that a page of them still fits on a screen. */
+.config .zui-settings__item {
+    min-height: var(--row);
+    padding: calc(var(--zui-space-base) * 3) 0;
+    gap: calc(var(--zui-space-base) * 4);
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    align-items: center;
+}
+
+.config .zui-settings__group + .zui-settings__group {
+    padding-top: calc(var(--zui-space-base) * 2);
+}
+
+.config .zui-settings__item-description {
+    font-size: var(--zdt-ui-size-small, 11px);
+    line-height: 15px;
+    color: var(--zui-color-muted-foreground);
+    max-width: 62ch;
+}
+
+.config .zui-settings__item-control {
+    flex: none;
+    min-width: 170px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ---- The controls ----------------------------------------------------------------------------- */
+
+/* A settings row is not a form: its controls are the size of a row in this interface rather than
+ * the comfortable size the library ships.
+ *
+ * Three selectors, because a height is the one thing here that is not a token: the library states
+ * it again under `[data-size="sm"]`, which is as specific as two classes, and at a tie its sheet
+ * is the later one. */
+.config .zui-native-select.config__select,
+.config .zui-field.config__input {
+    height: 20px;
+    min-height: 20px;
+    width: 170px;
+    padding: 0 calc(var(--zui-space-base) * 2);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+}
+
+/* The mark inside a chooser, and the room kept clear for it. */
+.config .zui-native-select.config__select {
+    padding-right: 18px;
+}
+
+.config .config__select .zui-native-select__mark {
+    width: 10px;
+    height: 10px;
+    right: calc(var(--zui-space-base) * 2);
+}
+
+/* A switch at the library's size is half again the height of a row, which on a page of them reads
+ * as a column of buttons rather than as a list of settings. */
+.config .zui-switch.config__switch {
+    width: 22px;
+    height: 12px;
+}
+
+.config .config__switch .zui-switch__thumb {
+    width: 10px;
+    height: 10px;
+}
+
+/* A slider and the number it is set to, side by side: the slider to change it without thinking,
+ * the number to know what it is. The library has no number input, and a bare slider is a control
+ * whose value nobody can read. */
+.config__number {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 3);
+    width: 170px;
+}
+
+.config__slider {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.config__value {
+    flex: none;
+    width: 54px;
+    font-size: var(--zdt-ui-size-small, 11px);
+    text-align: right;
+    color: var(--zui-color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- The server list -------------------------------------------------------------------------- */
+
+.config__servers {
+    display: flex;
+    flex-direction: column;
+    padding-top: var(--zui-space-base);
+}
+
+.config__server {
+    height: var(--row);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    color: var(--zui-color-muted-foreground);
+}
+
+/* The ones answering for the file on screen are lit; the rest are configured and idle. Which is
+ * a fact worth showing, because "why is nothing underlined" is nearly always this. */
+.config__server[data-running="true"] {
+    color: var(--zui-color-foreground);
+}
+
+.config__server-dot {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background-color: var(--zui-color-border);
+}
+
+.config__server[data-running="true"] .config__server-dot {
+    background-color: var(--zdt-git-added);
+}
+
+/* ---- As a tab --------------------------------------------------------------------------------- */
+
+/* A panel buffer fills its pane the way an editor does. No border and no shadow: it is not
+ * floating, it *is* the pane. */
+.pane__panel {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    background-color: var(--zui-color-background);
+}
+
+/* ---- The chooser's list, which is not inside the panel ------------------------------------------ */
+
+/* A chooser's list is portalled onto the window's overlay band, so it is not a descendant of
+ * `.config` and none of the tokens set there reach it. They are set again here. */
+.zui-surface.zui-native-select__list {
+    min-width: 170px;
+    padding: var(--zui-space-base);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+
+    --zui-type-family-sans: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    --zui-type-size-sm: var(--zdt-ui-size-small, 11px);
+    --zui-type-leading-sm: var(--row);
+    --zui-radius-sm: calc(var(--zui-radius-base) - 2px);
+}
+
+/* A row of the list is a row of this window like any other, with the tick laid over the trailing
+ * padding rather than given a column, so a ticked row and a plain one start their text together. */
+.zui-native-select__list .zui-native-select__option {
+    height: var(--row);
+    padding: 0 20px 0 calc(var(--zui-space-base) * 2);
+}
+
+.zui-native-select__list .zui-native-select__indicator {
+    right: calc(var(--zui-space-base) * 2);
+    width: 10px;
+    height: 10px;
+}
+
+/* The glyph beside a page's name. Smaller than an icon elsewhere, and dimmer until the page is
+ * the one being looked at, so the list still reads as words with marks rather than as a toolbar. */
+.config .config__page-icon {
+    width: var(--zui-icon-sm);
+    height: var(--zui-icon-sm);
+    color: var(--zui-color-muted-foreground);
+}
+
+.config .zui-settings__page[data-state="active"] .config__page-icon {
+    color: var(--zui-color-foreground);
+}

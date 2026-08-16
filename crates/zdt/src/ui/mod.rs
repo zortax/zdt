@@ -1,15 +1,21 @@
 //! Everything the window is drawn from.
 
+pub mod anchor;
 pub mod chrome;
 pub mod cmdline;
+pub mod completion;
+pub mod config;
 pub mod diagnostics;
 pub mod frame;
+pub mod git;
 pub mod hover;
 pub mod leap;
+pub mod markdown;
 pub mod pane;
 pub mod panes;
 pub mod picker;
 pub mod prompt;
+pub mod rename;
 pub mod spinner;
 pub mod statusline;
 pub mod terminal;

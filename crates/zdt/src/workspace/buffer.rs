@@ -32,6 +32,14 @@ pub enum BufferKind {
         /// What the program running in it calls itself, once it says.
         title: RwSignal<Option<String>, LocalStorage>,
     },
+    /// The settings, as a page.
+    ///
+    /// A buffer rather than a modal so that it is a tab like any other: `]b` walks onto it,
+    /// `<Leader>c` closes it, and it can be put in a split beside the file whose behaviour is
+    /// being changed — which is the whole reason to want it as a tab.
+    Settings,
+    /// The git panel, as a page.
+    Git,
 }
 
 /// One open buffer.
@@ -153,17 +161,50 @@ impl Buffer {
         }
     }
 
+    /// A panel buffer: the settings, or the git page.
+    ///
+    /// No path, no text, nothing to save. What makes it a buffer at all is that the buffer line,
+    /// the window layout and every key that walks between tabs already work on buffers, and a
+    /// panel that was none of those things would need all three written again.
+    pub fn panel(id: BufferId, kind: BufferKind) -> Self {
+        let file_type = match kind {
+            BufferKind::Git => zdt_core::language::GIT,
+            _ => zdt_core::language::SETTINGS,
+        };
+        Self {
+            id,
+            path: None,
+            kind,
+            file_type,
+            encoding: Encoding::default(),
+            line_ending: LineEnding::default(),
+            lossy: false,
+            revision: RwSignal::new_local(0),
+            saved_revision: RwSignal::new_local(0),
+            saved_text: RwSignal::new_local(Fingerprint::default()),
+            dirty: RwSignal::new_local(false),
+        }
+    }
+
     /// The document, when this is text.
     pub fn document(&self) -> Option<&zgui_editor::Document> {
         match &self.kind {
             BufferKind::Text { document } => Some(document),
-            BufferKind::Terminal { .. } => None,
+            _ => None,
         }
     }
 
     /// Whether this is a terminal.
     pub fn is_terminal(&self) -> bool {
         matches!(self.kind, BufferKind::Terminal { .. })
+    }
+
+    /// Whether this is a panel rather than something being edited.
+    ///
+    /// What the things that only make sense over text ask before doing anything: saving, telling a
+    /// language server, working out a diff.
+    pub fn is_panel(&self) -> bool {
+        matches!(self.kind, BufferKind::Settings | BufferKind::Git)
     }
 
     /// Which grammar highlights it.
@@ -184,6 +225,8 @@ impl Buffer {
             (None, BufferKind::Terminal { title }) => title
                 .get_untracked()
                 .unwrap_or_else(|| "terminal".to_owned()),
+            (None, BufferKind::Settings) => "settings".to_owned(),
+            (None, BufferKind::Git) => "git".to_owned(),
             (None, BufferKind::Text { .. }) => "[no name]".to_owned(),
         }
     }

@@ -44,12 +44,23 @@ pub struct Ui {
     pub font: String,
     /// Its size, in pixels.
     pub font_size: f32,
+    /// How heavy it is drawn: 100 to 900, where 400 is regular and 700 is bold.
+    pub font_weight: u16,
     /// How long a part-typed sequence sits before which-key appears, in milliseconds.
     pub whichkey_delay: u64,
     /// Whether the window draws its own frame.
     ///
     /// Off puts the desktop's title bar back, for a desktop whose own decorations are wanted.
     pub client_side_decorations: bool,
+    /// Whether anything the editor was not asked for is announced in the corner.
+    ///
+    /// Off leaves the status line saying what state things are in and nothing saying what has
+    /// just happened, which is what somebody who finds announcements distracting wants.
+    pub notifications: bool,
+    /// How long an announcement stays, in milliseconds.
+    ///
+    /// Zero means until it is dismissed. Failures ignore this and always wait to be read.
+    pub notification_timeout: u64,
 }
 
 impl Default for Ui {
@@ -59,8 +70,11 @@ impl Default for Ui {
             scheme: Scheme::Dark,
             font: "Mononoki Nerd Font".to_owned(),
             font_size: 12.0,
+            font_weight: 400,
             whichkey_delay: 300,
             client_side_decorations: true,
+            notifications: true,
+            notification_timeout: 4000,
         }
     }
 }
@@ -86,6 +100,8 @@ pub struct Editor {
     pub font: String,
     /// Its size, in pixels.
     pub font_size: f32,
+    /// How heavy it is drawn: 100 to 900, where 400 is regular and 700 is bold.
+    pub font_weight: u16,
     /// How the gutter numbers its lines.
     pub line_numbers: LineNumbers,
     /// How many lines to keep between the caret and the edge of the view.
@@ -105,6 +121,26 @@ pub struct Editor {
     pub cursorline: bool,
     /// How many editors one window keeps ready for buffers it is not showing.
     pub mounted_per_window: usize,
+    /// Whether typing offers suggestions.
+    pub completion: bool,
+    /// How many characters of a word are typed before it does.
+    ///
+    /// One asks as soon as a word starts, which is what makes suggestions feel like they were
+    /// already there. Raise it for a server whose answers are slow enough to be distracting.
+    pub completion_min_chars: usize,
+    /// Whether resting on a suggestion opens what the server says about it.
+    pub completion_doc: bool,
+    /// How long the caret rests on a suggestion first, in milliseconds.
+    ///
+    /// Zero opens it at once, which is right for somebody reading the list and wrong for somebody
+    /// holding `<C-n>` through it.
+    pub completion_doc_delay: u64,
+    /// Whether the editor marks the other places the symbol under the caret is used.
+    pub highlight_symbol: bool,
+    /// How long the caret rests before it does, in milliseconds.
+    pub highlight_symbol_delay: u64,
+    /// Whether saving runs the language server's formatter first.
+    pub format_on_save: bool,
 }
 
 impl Default for Editor {
@@ -112,6 +148,7 @@ impl Default for Editor {
         Self {
             font: "Mononoki Nerd Font".to_owned(),
             font_size: 14.0,
+            font_weight: 400,
             line_numbers: LineNumbers::Relative,
             scrolloff: 3,
             tab_size: 4,
@@ -120,6 +157,13 @@ impl Default for Editor {
             smooth_scroll_min_lines: 0.0,
             cursorline: true,
             mounted_per_window: 8,
+            completion: true,
+            completion_min_chars: 1,
+            completion_doc: true,
+            completion_doc_delay: 250,
+            highlight_symbol: true,
+            highlight_symbol_delay: 200,
+            format_on_save: false,
         }
     }
 }

@@ -36,8 +36,25 @@ impl Reach {
 }
 
 /// Which picker is open.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Source {
+    /// A list somebody else worked out, with a name to put at the top.
+    ///
+    /// What every language-server picker is: the references, the symbols in a file, the actions
+    /// offered at the caret. All of them are one request whose answer is a list, and none of them
+    /// is a thing the picker could gather for itself — so the picker's job is only to filter it
+    /// and let somebody choose, which is the job it was already good at.
+    Given {
+        /// What to call it.
+        title: &'static str,
+        /// What to choose from.
+        rows: Vec<Row>,
+    },
+    /// Everything in the project whose name matches what is typed.
+    ///
+    /// Live, like grep: the query *is* the request, because no server will list every symbol in a
+    /// project and none should be asked to.
+    WorkspaceSymbols,
     /// The files in the project.
     Files {
         /// Which files to walk.
@@ -75,6 +92,8 @@ impl Source {
     #[must_use]
     pub fn title(&self) -> &'static str {
         match self {
+            Self::Given { title, .. } => title,
+            Self::WorkspaceSymbols => "Project symbols",
             Self::Files { reach } if reach.ignored => "All files",
             Self::Files { .. } => "Files",
             Self::Grep { reach, .. } if reach.ignored => "Search everything",
@@ -94,21 +113,31 @@ impl Source {
     /// Whether the query is the search itself rather than a filter over a list.
     #[must_use]
     pub fn is_live(&self) -> bool {
-        matches!(self, Self::Grep { .. })
+        matches!(self, Self::Grep { .. } | Self::WorkspaceSymbols)
     }
 
     /// Whether its rows are files worth previewing.
+    ///
+    /// A given list previews when its rows are files, which is a question about the rows rather
+    /// than about the source: references and symbols are places in files and want a preview, and
+    /// a list of code actions is not and does not.
     #[must_use]
     pub fn previews(&self) -> bool {
-        matches!(
-            self,
-            Self::Files { .. }
-                | Self::Grep { .. }
-                | Self::Buffers
-                | Self::Lines
-                | Self::Recent
-                | Self::GitFiles
-        )
+        match self {
+            Self::Given { rows, .. } => rows
+                .iter()
+                .any(|row| matches!(row.target, Target::File { .. })),
+            Self::WorkspaceSymbols => true,
+            _ => matches!(
+                self,
+                Self::Files { .. }
+                    | Self::Grep { .. }
+                    | Self::Buffers
+                    | Self::Lines
+                    | Self::Recent
+                    | Self::GitFiles
+            ),
+        }
     }
 
     /// What the query starts out as.
@@ -167,8 +196,127 @@ pub enum Target {
     Theme(String),
     /// Runs an action, by the name the keymap knows it as.
     Action(zdt_vim::Action),
+    /// Runs whatever the row was built to run.
+    ///
+    /// For rows whose behaviour is not a name: a code action carries a whole protocol value that
+    /// has to be resolved and applied, and there is no way to say that in a keymap. The work is
+    /// held as a shared closure rather than named, because the row is *written* where the answer
+    /// arrived and *read* where the picker draws it.
+    Run(Deed),
     /// Nothing — a row that is there to be read.
     Nothing,
+}
+
+/// Something a row does when it is chosen.
+#[derive(Clone)]
+pub struct Deed(std::rc::Rc<dyn Fn()>);
+
+impl Deed {
+    /// A deed that runs `work`.
+    #[must_use]
+    pub fn new(work: impl Fn() + 'static) -> Self {
+        Self(std::rc::Rc::new(work))
+    }
+
+    /// Does it.
+    pub fn run(&self) {
+        (self.0)();
+    }
+}
+
+/// Two deeds are the same when they are the same closure, which is the only answer a function has.
+///
+/// The rows are compared to decide whether the list changed, so this has to exist; comparing by
+/// pointer is exactly right, because a rebuilt list is a different list.
+impl PartialEq for Deed {
+    fn eq(&self, other: &Self) -> bool {
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl std::fmt::Debug for Deed {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Deed")
+    }
+}
+
+/// Which glyph a kind of symbol gets, and what colour it is drawn in.
+///
+/// The same four groups the completion popup uses, for the same reason: what somebody reads off a
+/// glyph at twelve pixels is "is this a function, a type, a value or a word", and twenty-five
+/// distinct glyphs would be twenty-five glyphs nobody can tell apart.
+#[must_use]
+pub fn symbol_mark(kind: lsp_types::SymbolKind) -> (&'static str, &'static str) {
+    use lsp_types::SymbolKind as Kind;
+
+    match kind {
+        Kind::FUNCTION | Kind::METHOD => ("\u{f0295}", "zdt-completion-function"),
+        Kind::CONSTRUCTOR => ("\u{f0674}", "zdt-completion-function"),
+        Kind::CLASS | Kind::STRUCT => ("\u{f0233}", "zdt-completion-type"),
+        Kind::INTERFACE => ("\u{f0e8}", "zdt-completion-type"),
+        Kind::ENUM => ("\u{f0a5c}", "zdt-completion-type"),
+        Kind::ENUM_MEMBER => ("\u{f0a5c}", "zdt-completion-value"),
+        Kind::MODULE | Kind::NAMESPACE | Kind::PACKAGE => ("\u{f0487}", "zdt-completion-keyword"),
+        Kind::VARIABLE => ("\u{f0b97}", "zdt-completion-value"),
+        Kind::FIELD | Kind::PROPERTY => ("\u{f0ad1}", "zdt-completion-value"),
+        Kind::CONSTANT => ("\u{f0ff2}", "zdt-completion-value"),
+        Kind::FILE => ("\u{f0214}", "zdt-completion-text"),
+        _ => ("\u{f0219}", "zdt-completion-text"),
+    }
+}
+
+/// A list of places, as rows.
+#[must_use]
+pub fn location_rows(locations: &[lsp_types::Location], root: &std::path::Path) -> Vec<Row> {
+    locations
+        .iter()
+        .filter_map(|location| {
+            let path = zdt_lsp::convert::path_of(&location.uri)?;
+            Some(Row::location(
+                &path,
+                u64::from(location.range.start.line) + 1,
+                root,
+            ))
+        })
+        .collect()
+}
+
+/// A project's symbols, as rows.
+#[must_use]
+pub fn symbol_rows(symbols: &[zdt_lsp::Symbol], root: &std::path::Path) -> Vec<Row> {
+    symbols
+        .iter()
+        .filter_map(|symbol| {
+            let path = zdt_lsp::convert::path_of(&symbol.uri)?;
+            let relative = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .into_owned();
+            let (glyph, tint) = symbol_mark(symbol.kind);
+            // The name first, because that is what is being searched for; where it is goes in the
+            // dim text after it, because that is what tells two of the same name apart.
+            let label = match symbol.container.as_deref().filter(|it| !it.is_empty()) {
+                Some(container) => format!("{container}::{}", symbol.name),
+                None => symbol.name.clone(),
+            };
+            Some(
+                Row {
+                    label,
+                    detail: format!("{relative}:{}", symbol.range.start.line + 1),
+                    matched: Vec::new(),
+                    glyph: Some(glyph),
+                    tint: Some(tint),
+                    target: Target::File {
+                        path,
+                        line: Some(u64::from(symbol.range.start.line) + 1),
+                        matched: None,
+                    },
+                }
+                .to_owned(),
+            )
+        })
+        .collect()
 }
 
 /// What the preview shows for one row.
@@ -254,6 +402,41 @@ impl Row {
         {
             *held = Some(matched);
         }
+        self
+    }
+
+    /// A row standing for a place in a file, named the way a person names one.
+    ///
+    /// The path relative to the project and the line after it, which is what an error message and
+    /// a grep hit both look like — so a list of references reads the same way as everything else
+    /// the picker shows.
+    #[must_use]
+    pub fn location(path: &std::path::Path, line: u64, root: &std::path::Path) -> Self {
+        let relative = path
+            .strip_prefix(root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .into_owned();
+        let kind = zdt_core::language::of(path);
+        Self {
+            label: format!("{relative}:{line}"),
+            detail: String::new(),
+            matched: Vec::new(),
+            glyph: Some(kind.glyph),
+            tint: Some(kind.tint),
+            target: Target::File {
+                path: path.to_path_buf(),
+                line: Some(line),
+                matched: None,
+            },
+        }
+    }
+
+    /// The same row, with a glyph and a tint of its own.
+    #[must_use]
+    pub fn with_glyph(mut self, glyph: &'static str, tint: &'static str) -> Self {
+        self.glyph = Some(glyph);
+        self.tint = Some(tint);
         self
     }
 

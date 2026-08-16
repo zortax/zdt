@@ -153,6 +153,20 @@ pub const TERMINAL: FileType = FileType {
     tint: "zui-color-muted-foreground",
 };
 
+/// What a settings tab shows on the buffer line.
+pub const SETTINGS: FileType = FileType {
+    language: None,
+    glyph: "\u{f013}",
+    tint: "zui-color-muted-foreground",
+};
+
+/// What a git tab shows on the buffer line.
+pub const GIT: FileType = FileType {
+    language: None,
+    glyph: "\u{f02a2}",
+    tint: "zdt-icon-git",
+};
+
 /// What `path` is.
 ///
 /// Whole names win over extensions, because `Cargo.lock` is a lock file before it is a `.lock`

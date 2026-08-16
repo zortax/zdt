@@ -1,0 +1,76 @@
+# The completion popup's own keys.
+#
+# Read as an overlay in front of the ordinary keymap while the popup is open, in insert mode. The
+# keys are vim's own — `<C-n>` and `<C-p>` are what completion has been bound to since before any
+# of this — with the arrows beside them for hands that reach for those instead.
+#
+# Everything the popup says nothing about goes where it would have gone anyway, which is what lets
+# somebody keep typing without dismissing anything: a popup that swallowed the next character
+# would be a popup that costs more than it saves.
+
+[[map]]
+mode = ["i"]
+keys = "<C-n>"
+action = "completion.next"
+desc = "Next suggestion"
+
+[[map]]
+mode = ["i"]
+keys = "<C-p>"
+action = "completion.previous"
+desc = "Previous suggestion"
+
+[[map]]
+mode = ["i"]
+keys = "<Down>"
+action = "completion.next"
+
+[[map]]
+mode = ["i"]
+keys = "<Up>"
+action = "completion.previous"
+
+[[map]]
+mode = ["i"]
+keys = "<CR>"
+action = "completion.accept"
+desc = "Accept"
+
+[[map]]
+mode = ["i"]
+keys = "<Tab>"
+action = "completion.accept"
+
+[[map]]
+mode = ["i"]
+keys = "<C-y>"
+action = "completion.accept"
+
+[[map]]
+mode = ["i"]
+keys = "<Esc>"
+action = "completion.cancel"
+desc = "Cancel"
+
+[[map]]
+mode = ["i"]
+keys = "<C-e>"
+action = "completion.cancel"
+
+[[map]]
+mode = ["i"]
+keys = "<C-d>"
+action = "completion.docs_down"
+desc = "Scroll the documentation down"
+
+[[map]]
+mode = ["i"]
+keys = "<C-u>"
+action = "completion.docs_up"
+desc = "Scroll the documentation up"
+
+[[map]]
+mode = ["i"]
+keys = "<C-Space>"
+action = "completion.open"
+desc = "Ask for suggestions"

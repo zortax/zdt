@@ -24,7 +24,7 @@ use zgui_ui_primitives::prelude::*;
 
 use crate::settings::Settings;
 use crate::terminals::use_terminals;
-use crate::workspace::{BufferId, use_workspace};
+use crate::workspace::{BufferId, WindowId, use_workspace};
 
 /// The floating terminal, over everything.
 #[component]
@@ -93,6 +93,9 @@ pub fn Emulator(
     buffer: BufferId,
     /// Whether it is the floating one rather than a window's contents.
     floating: bool,
+    /// Which window it is in, when it is in one rather than floating.
+    #[prop(optional)]
+    window: Option<WindowId>,
 ) -> impl IntoView {
     use crate::ui::Erase;
 
@@ -133,6 +136,26 @@ pub fn Emulator(
     };
     on_cleanup_local(move || drop(claiming));
 
+    // A window with a terminal in it has no editor to give the keyboard to, so nothing would hand
+    // it over: moving here with `<C-l>` would move the focus and leave the keys behind. Typing
+    // starts on arrival, which is what opening one already does; `<C-\><C-n>` and `<C-h/j/k/l>`
+    // are the ways back out.
+    let following = {
+        let workspace = workspace.clone();
+        let terminals = terminals.clone();
+        zgui::reactive::RenderEffect::new(move |_| {
+            let Some(window) = window else { return };
+            if workspace.focused() == window
+                && workspace
+                    .window(window)
+                    .is_some_and(|state| state.current == Some(buffer))
+            {
+                terminals.start_typing(buffer);
+            }
+        })
+    };
+    on_cleanup_local(move || drop(following));
+
     let on_ready = {
         let terminals = terminals.clone();
         Box::new(move |handle: TerminalHandle| terminals.register(buffer, handle))
@@ -153,8 +176,7 @@ pub fn Emulator(
             // The program ended, so the buffer has nothing left to show. Vim keeps the last screen
             // until a key is pressed; this closes, because a buffer nobody can type into is one
             // more thing on the buffer line to close by hand.
-            terminals.close(buffer);
-            workspace.close_buffer(buffer);
+            terminals.end(&workspace, buffer);
         }) as Box<dyn Fn(_)>
     };
 
@@ -184,13 +206,15 @@ pub fn Emulator(
         ) as zgui_terminal::KeyFilter
     };
 
+    // Whether *this* window is showing this terminal — not whether the focused one is. Asking
+    // about the focused window blanks every terminal in a split that does not have the keyboard.
     let current = {
         let workspace = workspace.clone();
-        move || {
-            floating
-                || workspace
-                    .window(workspace.focused())
-                    .is_some_and(|state| state.current == Some(buffer))
+        move || match window {
+            None => true,
+            Some(window) => workspace
+                .window(window)
+                .is_some_and(|state| state.current == Some(buffer)),
         }
     };
 

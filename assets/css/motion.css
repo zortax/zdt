@@ -24,15 +24,10 @@
  * pixels across the same four pixels are invisible, and the amount that reads the same way is a
  * *proportion* of the thing rather than a distance. Ninety milliseconds either way.
  *
- * There is one keyframe set per resting transform, and that is not incidental. A keyframe naming
- * `transform` replaces the property *whole* — an element centred by `translateX(-50%)` and grown
- * by a keyframe naming only `scale` is an element that is not centred for the length of the
- * animation, which for a picker is a jump of half its width and back again. So each surface's
- * arrival carries its own resting transform along with the movement.
- *
- * The scale is written after the centring translation in every one of them, which is what makes
- * it a scale about the box's own middle rather than about the point the translation moved it
- * from. Reversed, a picker would grow out of its left edge and slide as it went. */
+ * Nothing here rests on a transform. A transformed box's descendants are tested against a clip
+ * measured before the box moved, so everything inside one past a boundary partway across it is
+ * unreachable by the pointer — panels are centred with `margin: auto` instead, and an arrival is
+ * a plain scale about the box's own middle. */
 
 @keyframes zdt-rise {
     from {
@@ -45,34 +40,9 @@
     }
 }
 
-/* For the surfaces centred on the horizontal. */
-@keyframes zdt-zoom-centred-x {
-    from {
-        opacity: 0;
-        transform: translateX(-50%) scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
-    }
-}
-
-/* And for the one centred on both. */
-@keyframes zdt-zoom-centred {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-}
-
-/* For the ones anchored where they were opened rather than centred: a hover under a caret, a menu
- * at a pointer. They grow from their own top left, because that is the point that was aimed at
- * and a surface that grew from its middle would slide away from it. */
-@keyframes zdt-zoom-anchored {
+/* One arrival for everything that zooms; where it grows *from* is `transform-origin` on the rule
+ * rather than a second keyframe. */
+@keyframes zdt-zoom {
     from {
         opacity: 0;
         transform: scale(0.96);
@@ -91,23 +61,27 @@
     animation-timing-function: var(--zdt-ease);
 }
 
+/* Centred in the window: they grow about their own middle, which is where they already are. */
 .picker,
-.prompt {
-    animation-name: zdt-zoom-centred-x;
-    animation-duration: var(--zdt-quick);
-    animation-timing-function: var(--zdt-ease);
-}
-
+.git--modal,
+.config__modal,
+.prompt,
 .termfloat {
-    animation-name: zdt-zoom-centred;
+    animation-name: zdt-zoom;
     animation-duration: var(--zdt-quick);
     animation-timing-function: var(--zdt-ease);
 }
 
+/* Opened where they were aimed at rather than centred: a hover under a caret, a menu at a
+ * pointer. They grow from their own top left, because that is the point that was aimed at and a
+ * surface that grew from its middle would slide away from it. */
 .hover,
 .treemenu,
-.cmdline {
-    animation-name: zdt-zoom-anchored;
+.cmdline,
+.completion,
+.completion__docs,
+.rename {
+    animation-name: zdt-zoom;
     animation-duration: var(--zdt-quick);
     animation-timing-function: var(--zdt-ease);
     transform-origin: top left;
@@ -127,29 +101,7 @@
  * Faster than the arrival. A surface appearing is worth a moment; a surface leaving is in the way,
  * and the thing behind it is what is being looked at. */
 
-@keyframes zdt-shrink-centred-x {
-    from {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
-    }
-    to {
-        opacity: 0;
-        transform: translateX(-50%) scale(0.96);
-    }
-}
-
-@keyframes zdt-shrink-centred {
-    from {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-    to {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0.96);
-    }
-}
-
-@keyframes zdt-shrink-anchored {
+@keyframes zdt-shrink {
     from {
         opacity: 1;
         transform: scale(1);
@@ -161,27 +113,24 @@
 }
 
 .picker[data-state="closed"],
-.prompt[data-state="closed"] {
-    animation-name: zdt-shrink-centred-x;
-    animation-duration: var(--zdt-instant);
-    animation-fill-mode: forwards;
-}
-
-.termfloat[data-state="closed"] {
-    animation-name: zdt-shrink-centred;
-    animation-duration: var(--zdt-instant);
-    animation-fill-mode: forwards;
-}
-
+.git--modal[data-state="closed"],
+.config__modal[data-state="closed"],
+.prompt[data-state="closed"],
+.termfloat[data-state="closed"],
 .hover[data-state="closed"],
 .treemenu[data-state="closed"],
-.cmdline[data-state="closed"] {
-    animation-name: zdt-shrink-anchored;
+.cmdline[data-state="closed"],
+.completion[data-state="closed"],
+.completion__docs[data-state="closed"],
+.rename[data-state="closed"] {
+    animation-name: zdt-shrink;
     animation-duration: var(--zdt-instant);
     animation-fill-mode: forwards;
 }
 
 .picker__scrim[data-state="closed"],
+.git__scrim[data-state="closed"],
+.config__scrim[data-state="closed"],
 .treemenu__scrim[data-state="closed"] {
     animation-name: zdt-vanish;
     animation-duration: var(--zdt-instant);
@@ -210,6 +159,8 @@
 
 /* What is behind a modal only fades — a scrim that slid would be a scrim that was noticed. */
 .picker__scrim,
+.git__scrim,
+.config__scrim,
 .treemenu__scrim {
     animation-name: zdt-fade;
     animation-duration: var(--zdt-quick);

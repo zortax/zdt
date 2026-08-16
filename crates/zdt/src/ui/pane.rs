@@ -22,6 +22,8 @@ use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 use crate::icons::IconProps;
 use crate::settings::use_settings;
 use crate::ui::Erase;
+use crate::ui::config::ConfigPanelProps;
+use crate::ui::git::GitPanelProps;
 use crate::ui::leap::LeapLabelsProps;
 use crate::ui::terminal::EmulatorProps;
 use crate::vim::use_vim;
@@ -179,16 +181,46 @@ fn BufferView(
             let on_event = {
                 let entry = entry.clone();
                 let language = zgui::reactive::use_local_context::<crate::language::Language>();
+                let completion =
+                    zgui::reactive::use_local_context::<crate::completion::Completion>();
+                let workspace = workspace.clone();
+                let mine = Rc::clone(&mine);
                 Box::new(move |event: zgui_editor::EditorEvent| {
-                    if let zgui_editor::EditorEvent::Edited { .. } = event {
-                        // Whether it is dirty is a question about the *text*, not the revision:
-                        // undoing back to what is on disk gives a new revision, not the old one.
-                        entry.refresh_dirty();
-                        // The servers hear about it after a pause, so that typing a word is one
-                        // notification rather than five.
-                        if let Some(language) = language.as_ref() {
-                            language.changed(buffer);
+                    match event {
+                        zgui_editor::EditorEvent::Edited { ref kind, .. } => {
+                            // Whether it is dirty is a question about the *text*, not the
+                            // revision: undoing back to what is on disk gives a new revision, not
+                            // the old one.
+                            entry.refresh_dirty();
+                            // The servers hear about it after a pause, so that typing a word is
+                            // one notification rather than five.
+                            if let Some(language) = language.as_ref() {
+                                language.changed(buffer);
+                            }
+                            // Typing offers suggestions; anything else that changes the text —
+                            // a paste, an undo, a formatter — puts them away, because none of
+                            // those is somebody in the middle of a word.
+                            if let Some(completion) = completion.as_ref() {
+                                match kind {
+                                    zgui_editor::EditKind::Typing
+                                    | zgui_editor::EditKind::Deletion => {
+                                        let handle = mine.borrow().clone();
+                                        completion.typed(&workspace, handle.as_ref());
+                                    }
+                                    _ => completion.close(),
+                                }
+                            }
                         }
+                        // The caret moving, the view moving, the keyboard leaving: all three mean
+                        // the popup is about somewhere the caret no longer is.
+                        zgui_editor::EditorEvent::SelectionMoved
+                        | zgui_editor::EditorEvent::Scrolled
+                        | zgui_editor::EditorEvent::Blurred => {
+                            if let Some(completion) = completion.as_ref() {
+                                completion.close();
+                            }
+                        }
+                        _ => {}
                     }
                 }) as Box<dyn Fn(zgui_editor::EditorEvent)>
             };
@@ -328,8 +360,19 @@ fn BufferView(
         // reason an editor does: a terminal taken out of the tree is a program shut down.
         BufferKind::Terminal { .. } => view! {
             box(class = "pane__buffer") {
-                Emulator(buffer = buffer, floating = false)
+                Emulator(buffer = buffer, floating = false, window = Some(window))
             }
+        }
+        .any(),
+        // A panel is a page rather than a document: no editor, no decorations, nothing to save.
+        // It is a buffer only so that the buffer line, the splits and every key that walks between
+        // tabs work on it without being told about it.
+        BufferKind::Settings => view! {
+            box(class = "pane__buffer pane__panel") { ConfigPanel() }
+        }
+        .any(),
+        BufferKind::Git => view! {
+            box(class = "pane__buffer pane__panel") { GitPanel() }
         }
         .any(),
     }

@@ -14,7 +14,7 @@
     overflow: hidden;
     background-color: var(--zui-color-sidebar);
     color: var(--zui-color-sidebar-foreground);
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
     user-select: none;
 }
 
@@ -185,7 +185,7 @@
     border-radius: var(--zui-radius-base);
     background-color: var(--zui-color-popover);
     box-shadow: var(--zui-shadow-md);
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
 }
 
 .treemenu__item {
@@ -198,4 +198,25 @@
 
 .treemenu__item:hover {
     background-color: var(--zui-color-accent);
+}
+
+/* The edge between the tree and the work area, widened for the pointer.
+ *
+ * Nothing to see: six pixels of grab area straddling the boundary, with a negative margin on each
+ * side so the strip takes none of the row's width and the two panels still meet exactly where they
+ * look like they meet. Raised, because the editor beside it is painted later and would otherwise
+ * have the trailing three pixels to the pointer. */
+.tree__resize {
+    position: relative;
+    z-index: 21;
+    flex: 0 0 auto;
+    width: 6px;
+    margin-left: -3px;
+    margin-right: -3px;
+    align-self: stretch;
+    cursor: col-resize;
+}
+
+.tree__resize:not([data-open="true"]) {
+    display: none;
 }

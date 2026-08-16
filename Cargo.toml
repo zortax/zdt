@@ -25,6 +25,7 @@ portable-pty = "0.9"
 zdt-core = { path = "crates/zdt-core" }
 zdt-vim = { path = "crates/zdt-vim" }
 zdt-lsp = { path = "crates/zdt-lsp" }
+zdt-git = { path = "crates/zdt-git" }
 
 # --- text --------------------------------------------------------------------------------
 ropey = "1.6"
@@ -46,6 +47,24 @@ tree-sitter = "0.26"
 async-lsp = { version = "0.2", features = ["tokio"] }
 lsp-types = "0.95"
 tower = "0.5"
+
+# --- git ---------------------------------------------------------------------------------
+# Reads are gix: a commit graph walked in-process beats one commit per `git show`, and staging a
+# single hunk means rewriting an index entry's blob, which is an object-store operation rather
+# than something to express in command-line flags.
+# Only what the panel asks: no network transports, no credential helpers, no progress units. The
+# hash backend is a feature of its own and is not optional — without `sha1` the crate does not
+# compile, which is a clearer error than most.
+gix = { version = "0.85", default-features = false, features = [
+    "sha1",
+    "max-performance-safe",
+    "blob-diff",
+    "status",
+    "index",
+    "revision",
+    "dirwalk",
+    "parallel",
+] }
 
 # --- platform ----------------------------------------------------------------------------
 tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync"] }

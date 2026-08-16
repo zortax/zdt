@@ -11,6 +11,7 @@ use zdt_core::{Project, ThemeSource};
 use zgui::prelude::*;
 use zgui::reactive::{LocalStorage, RenderEffect, RwSignal};
 use zgui::{component, view};
+use zgui_ui::prelude::{ToastCorner, ToasterProps};
 use zgui_ui_tokens::ColorScheme;
 
 use crate::cmdline::CommandLine;
@@ -24,23 +25,46 @@ use crate::tabpick::TabPick;
 use crate::terminals::Terminals;
 use crate::ui::chrome::ChromeProps;
 use crate::ui::cmdline::CommandLineProps;
+use crate::ui::completion::CompletionPopupProps;
+use crate::ui::config::ConfigModalProps;
 use crate::ui::frame::FrameProps;
+use crate::ui::git::GitModalProps;
 use crate::ui::hover::{Hover, HoverPanelProps};
 use crate::ui::panes::PanesProps;
 use crate::ui::picker::PickerProps;
 use crate::ui::prompt::PromptProps;
+use crate::ui::rename::RenameBoxProps;
 use crate::ui::statusline::StatusLineProps;
 use crate::ui::terminal::FloatingTerminalProps;
 use crate::ui::theme::{ZdtThemeProps, fallback};
-use crate::ui::tree::ExplorerProps;
+use crate::ui::tree::{ExplorerProps, TreeResizeProps};
 use crate::ui::treemenu::TreeMenuProps;
 use crate::ui::whichkey::WhichKeyProps;
 use crate::vim::Vim;
 use crate::workspace::{self, BufferId, Workspace};
 
 /// The application.
+///
+/// Nothing but the toaster, because the queue announcements reach is published *downwards* through
+/// the scope tree: a workbench written beside the toaster rather than inside it could not find it.
+/// Everything the editor is made of is therefore one component further in.
 #[component]
 pub fn Root(
+    /// The directory the editor was opened on.
+    project: Project,
+    /// The files named on the command line.
+    files: Vec<PathBuf>,
+) -> impl IntoView {
+    view! {
+        Toaster(corner = ToastCorner::BottomRight, limit = 4, label = "Notifications") {
+            Workbench(project = project, files = files)
+        }
+    }
+}
+
+/// Everything the window contains.
+#[component]
+fn Workbench(
     /// The directory the editor was opened on.
     project: Project,
     /// The files named on the command line.
@@ -50,10 +74,16 @@ pub fn Root(
     let (settings, problem) = Settings::load(paths.clone());
     crate::settings::provide(settings.clone());
 
+    // Before anything that might announce something, and inside the toaster, which is the only
+    // place a queue can be found.
+    let notify = crate::notify::Notify::new(settings.clone());
+    crate::notify::provide(notify.clone());
+    settings.announce_through(notify.clone());
+
     let space = Workspace::new(project.clone());
     workspace::provide(space.clone());
     if let Some(problem) = problem {
-        space.complain(problem);
+        notify.fail("config.toml did not read", Some(problem));
     }
 
     let vim = Vim::new(space.clone(), settings.clone());
@@ -61,7 +91,9 @@ pub fn Root(
 
     // The tree's own keys, in front of the base map while the keyboard is in the panel. Shipped
     // rather than optional: without them `j` in the tree would be the editor's `j`.
-    apply_tree_keymap(&vim, &space, paths.as_ref());
+    apply_tree_keymap(&vim, &notify, paths.as_ref());
+    // And the same for every other region that answers keys of its own.
+    apply_all_overlays(&vim, &notify, paths.as_ref());
 
     let explorer = Explorer::new(
         project.root().to_path_buf(),
@@ -79,6 +111,7 @@ pub fn Root(
     crate::ui::treemenu::provide();
     crate::cmdline::provide(CommandLine::new(space.clone()));
     crate::ui::hover::provide(Hover::new());
+    crate::ui::rename::provide(crate::ui::rename::Rename::new());
     crate::tabpick::provide(TabPick::new(space.clone()));
     crate::picker::provide(Picker::new(space.clone(), settings.clone()));
     crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
@@ -90,9 +123,18 @@ pub fn Root(
     let servers = follow_buffers(&language, &space);
     on_cleanup_local(move || drop(servers));
 
-    // What git says about the open files.
+    // After the servers, because the suggestions hold one: a context looked up in a debounce
+    // timer is a context that is not there — see `tests/context.rs`.
+    crate::completion::provide(crate::completion::Completion::new(
+        settings.clone(),
+        Some(language.clone()),
+    ));
+
+    // What git says about the open files, and the panel that shows the rest of it.
     let git = Git::new(space.clone());
     crate::git::provide(git.clone());
+    crate::gitui::provide(crate::gitui::GitUi::new(space.clone()));
+    crate::ui::config::provide(crate::ui::config::ConfigModalState::new(space.clone()));
 
     // The keys leap labels are drawn from, and again whenever the settings change.
     let alphabet = {
@@ -113,7 +155,7 @@ pub fn Root(
     // A person's own keymap, read after the shipped one so a row in it replaces the shipped row
     // for the same keys.
     if let Some(paths) = paths.as_ref() {
-        apply_keymap(&vim, &space, paths, &settings);
+        apply_keymap(&vim, &notify, paths, &settings);
     }
 
     // The theme follows the settings, and both follow the files on disk.
@@ -158,10 +200,10 @@ pub fn Root(
 
     // What a change on disk does. Held for the window's life; dropping it stops the watching.
     let watcher = paths.as_ref().and_then(|paths| {
-        let (settings, space, vim, held) =
-            (settings.clone(), space.clone(), vim.clone(), paths.clone());
+        let (settings, notify, vim, held) =
+            (settings.clone(), notify.clone(), vim.clone(), paths.clone());
         crate::reload::watch(paths, move || {
-            reload(&settings, &space, &vim, &held, theme);
+            reload(&settings, &notify, &vim, &held, theme);
         })
     });
     on_cleanup_local(move || drop(watcher));
@@ -178,12 +220,17 @@ pub fn Root(
                 // tree, and they do not.
                 row(class = "frame__body") {
                     Explorer()
+                    TreeResize()
                     column(class = "workarea") {
                         Chrome()
                         Panes()
                     }
                 }
                 HoverPanel()
+                CompletionPopup()
+                RenameBox()
+                GitModal()
+                ConfigModal()
                 TreeMenu()
                 FloatingTerminal()
                 Picker()
@@ -275,21 +322,39 @@ fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
 }
 
 /// The file tree's keys: the shipped ones, then a person's own on top.
-fn apply_tree_keymap(vim: &Vim, space: &Workspace, paths: Option<&Paths>) {
+fn apply_tree_keymap(vim: &Vim, notify: &crate::notify::Notify, paths: Option<&Paths>) {
     let theirs = paths.and_then(|paths| zdt_core::config::read_optional(&paths.tree_keymap()));
     if let Err(problems) = vim.load_overlay("tree", crate::assets::TREE_KEYMAP, theirs.as_deref()) {
-        space.complain(format!("keymap-tree.toml: {}", problems.join("; ")));
+        notify.fail("keymap-tree.toml", Some(problems.join("; ")));
+    }
+}
+
+/// A region's own keys: the shipped ones, then a person's own on top.
+///
+/// The overlays are all the same shape — a shipped file, an optional one beside it in the
+/// configuration directory — so they are loaded by one function rather than one each.
+fn apply_overlay(
+    vim: &Vim,
+    notify: &crate::notify::Notify,
+    paths: Option<&Paths>,
+    region: &str,
+    shipped: &str,
+    file: &str,
+) {
+    let theirs = paths.and_then(|paths| zdt_core::config::read_optional(&paths.root.join(file)));
+    if let Err(problems) = vim.load_overlay(region, shipped, theirs.as_deref()) {
+        notify.fail(file.to_owned(), Some(problems.join("; ")));
     }
 }
 
 /// Reads a person's keymap on top of the shipped one, saying what did not read.
-fn apply_keymap(vim: &Vim, space: &Workspace, paths: &Paths, settings: &Settings) {
+fn apply_keymap(vim: &Vim, notify: &crate::notify::Notify, paths: &Paths, settings: &Settings) {
     let Some(text) = zdt_core::config::read_optional(&paths.keymap()) else {
         return;
     };
     let leaders = leaders_from(settings);
     if let Err(problems) = vim.merge_keymap(&text, leaders) {
-        space.complain(format!("keymap.toml: {}", problems.join("; ")));
+        notify.fail("keymap.toml", Some(problems.join("; ")));
     }
 }
 
@@ -317,20 +382,27 @@ fn leaders_from(settings: &Settings) -> zdt_vim::Leaders {
 /// than none.
 fn reload(
     settings: &Settings,
-    space: &Workspace,
+    notify: &crate::notify::Notify,
     vim: &Vim,
     paths: &Paths,
     theme: RwSignal<ThemeSource, LocalStorage>,
 ) {
-    let (settings, space, vim, paths) =
-        (settings.clone(), space.clone(), vim.clone(), paths.clone());
+    let (settings, notify, vim, paths) =
+        (settings.clone(), notify.clone(), vim.clone(), paths.clone());
 
     let task = zgui::task::spawn_local(async move {
         let reading = paths.clone();
         let reloaded = zgui::task::blocking(move || crate::reload::read(&reading)).await;
 
+        // What this editor wrote itself, coming back around through the watcher. Applying it
+        // would be applying what is already applied, and saying so would be announcing somebody's
+        // own keystroke back at them.
+        if settings.wrote(reloaded.config_text.as_deref()) {
+            return;
+        }
+
         for problem in &reloaded.problems {
-            space.complain(problem.clone());
+            notify.fail("configuration", Some(problem.clone()));
         }
         if let Some(config) = reloaded.config {
             settings.replace(config);
@@ -342,17 +414,28 @@ fn reload(
         if let Some(text) = reloaded.keymap
             && let Err(problems) = vim.merge_keymap(&text, leaders_from(&settings))
         {
-            space.complain(format!("keymap.toml: {}", problems.join("; ")));
+            notify.fail("keymap.toml", Some(problems.join("; ")));
         }
 
-        apply_tree_keymap(&vim, &space, Some(&paths));
+        apply_tree_keymap(&vim, &notify, Some(&paths));
+        apply_all_overlays(&vim, &notify, Some(&paths));
         theme.set(read_theme(&settings));
         crate::ui::theme::install_user_css(reloaded.user_css.as_deref());
 
         if reloaded.problems.is_empty() {
-            space.say("configuration reloaded");
+            notify.say("configuration reloaded");
         }
     });
     // The task belongs to the root's owner and is cancelled with the window.
     std::mem::forget(task);
+}
+
+/// Every region's keymap overlay, loaded.
+///
+/// One call site for all of them, so a region added later is one row here rather than one row in
+/// three places that have to agree.
+fn apply_all_overlays(vim: &Vim, notify: &crate::notify::Notify, paths: Option<&Paths>) {
+    for (region, shipped, file) in crate::assets::OVERLAYS {
+        apply_overlay(vim, notify, paths, region, shipped, file);
+    }
 }

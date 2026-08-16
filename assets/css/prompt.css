@@ -6,8 +6,10 @@
 .prompt {
     position: absolute;
     top: 22%;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
     width: min(520px, 70%);
     z-index: 40;
     display: flex;
@@ -21,14 +23,14 @@
 }
 
 .prompt__title {
-    font-size: 11px;
+    font-size: var(--zdt-ui-size-small, 11px);
     color: var(--zui-color-muted-foreground);
     padding: 0 var(--zui-space-base);
 }
 
 .prompt__input {
     height: 24px;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
 }
 

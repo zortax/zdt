@@ -32,7 +32,7 @@
     background-color: transparent;
     color: var(--zui-color-foreground);
     font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
     line-height: 16px;
     display: block;
     overflow: hidden;
@@ -60,7 +60,7 @@
     flex: none;
     width: 14px;
     text-align: center;
-    font-size: 13px;
+    font-size: calc(var(--zdt-ui-size, 12px) + 1px);
 }
 
 .muted { color: var(--zui-color-muted-foreground); }

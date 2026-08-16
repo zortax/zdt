@@ -15,8 +15,10 @@
 .picker {
     position: absolute;
     top: 8%;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
     width: min(1400px, 90%);
     height: 72%;
     z-index: 31;
@@ -49,7 +51,7 @@
 
 .picker__title {
     flex: 0 0 auto;
-    font-size: 11px;
+    font-size: var(--zdt-ui-size-small, 11px);
     color: var(--zui-color-muted-foreground);
     text-transform: lowercase;
     letter-spacing: 0.04em;
@@ -60,7 +62,7 @@
     min-width: 0;
     height: 24px;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 13px;
+    font-size: calc(var(--zdt-ui-size, 12px) + 1px);
 }
 
 /* Two classes, to out-specify the component's own scoped sheet: a field is a box everywhere else
@@ -78,7 +80,7 @@
 
 .picker__counts {
     flex: 0 0 auto;
-    font-size: 11px;
+    font-size: var(--zdt-ui-size-small, 11px);
     color: var(--zui-color-muted-foreground);
     font-variant-numeric: tabular-nums;
 }
@@ -128,7 +130,7 @@
     min-width: 0;
     min-height: 0;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
     line-height: 1.45;
     background-color: var(--editor-bg);
     color: var(--editor-fg);
@@ -148,7 +150,7 @@
     padding: 0 calc(var(--zui-space-base) * 3);
     color: var(--zui-color-muted-foreground);
     white-space: nowrap;
-    font-size: 12px;
+    font-size: var(--zdt-ui-size, 12px);
 }
 
 .picker__row:hover {

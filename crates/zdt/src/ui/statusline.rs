@@ -7,7 +7,6 @@ use zgui::prelude::*;
 use zgui::{component, view};
 
 use crate::icons::{self, IconProps};
-use crate::ui::spinner::SpinnerProps;
 use zgui_editor::CursorPos;
 
 use crate::vim::use_vim;
@@ -131,9 +130,20 @@ pub fn StatusLine() -> impl IntoView {
             (!parts.is_empty()).then_some(parts)
         }
     };
-    let busy = {
-        let language = language.clone();
-        move || language.as_ref().and_then(crate::language::Language::busy)
+    // What state the servers for this file are in — which is a fact that stays true until it
+    // changes, and so belongs here. What they have just *done* goes to the announcements: a status
+    // line with one slot can only ever show the last of several things that happened, and showing
+    // the last one is showing the wrong one as often as not.
+    let state = {
+        let (language, workspace) = (language.clone(), workspace.clone());
+        move || {
+            let language = language.as_ref()?;
+            let path = workspace.current_buffer().and_then(|buffer| buffer.path);
+            let state = language.state(path.as_deref());
+            // Nothing claims this file: the status line says nothing rather than reserving a
+            // space for a word about a thing that is not happening.
+            (state != crate::language::ServerState::Inactive).then_some(state)
+        }
     };
 
     view! {
@@ -183,19 +193,6 @@ pub fn StatusLine() -> impl IntoView {
 
             box(class = "fill") {}
 
-            row(class = "statusline__busy") {
-                {move || {
-                    use crate::ui::Erase;
-                    match busy() {
-                        Some(doing) => view! {
-                            Spinner()
-                            label(class = "nowrap") {{doing}}
-                        }
-                        .any(),
-                        None => ().any(),
-                    }
-                }}
-            }
 
             label(
                 class = "statusline__message",
@@ -208,6 +205,29 @@ pub fn StatusLine() -> impl IntoView {
             }
 
             box(class = "fill") {}
+
+            // A dot and a word, on the right with the rest of what is *true about this buffer*.
+            // No spinner: while a server is working there is a loading announcement in the corner
+            // already turning one, and two spinners for one job is one too many.
+            row(
+                class = "statusline__lsp",
+                attr:data-state = {
+                    let state = state.clone();
+                    move || state().map(|state| state.tone().to_owned())
+                }
+            ) {
+                {move || {
+                    use crate::ui::Erase;
+                    match state() {
+                        Some(state) => view! {
+                            box(class = "statusline__dot") {}
+                            label(class = "nowrap") {{state.label().to_owned()}}
+                        }
+                        .any(),
+                        None => ().any(),
+                    }
+                }}
+            }
 
             label(class = "statusline__pending") {{pending}}
             label(class = "statusline__spelling") {{spelling}}

@@ -203,6 +203,186 @@ pub fn write_default(path: &Path) -> Result<bool, ConfigError> {
     Ok(true)
 }
 
+/// The settings as a file: every field that disagrees with the default, and nothing else.
+///
+/// What the settings panel writes. Serialising the whole `Config` would turn a three-line file
+/// somebody wrote by hand into two hundred lines they did not, and would freeze today's defaults
+/// into their file so that changing one later would not reach them.
+///
+/// # How far down it looks
+///
+/// One level. A section is compared key by key, and anything under a key — a table, an array — is
+/// compared whole. That is not a simplification but a correctness rule: `lsp.servers` is a map with
+/// `#[serde(default)]` on it, so a file naming *some* servers is a file naming *only* those
+/// servers. Written key by key, adding one server would silently delete the four that ship.
+#[must_use]
+pub fn write_diff(config: &Config) -> String {
+    let Ok(toml::Value::Table(current)) = toml::Value::try_from(config) else {
+        return String::new();
+    };
+    let Ok(toml::Value::Table(default)) = toml::Value::try_from(Config::default()) else {
+        return String::new();
+    };
+
+    let mut out = toml::Table::new();
+    for (section, value) in current {
+        let base = default.get(&section);
+        match (&value, base) {
+            (toml::Value::Table(mine), Some(toml::Value::Table(theirs))) => {
+                let differs: toml::Table = mine
+                    .iter()
+                    .filter(|(key, value)| theirs.get(*key) != Some(*value))
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect();
+                if !differs.is_empty() {
+                    out.insert(section, toml::Value::Table(differs));
+                }
+            }
+            // Not a section at all, or one the defaults have never heard of: kept whole.
+            _ if base != Some(&value) => {
+                out.insert(section, value);
+            }
+            _ => {}
+        }
+    }
+
+    toml::to_string_pretty(&out).unwrap_or_default()
+}
+
+/// Writes `text` to `path` without ever leaving a half-written file there.
+///
+/// A temporary beside it, then a rename, which is atomic on every filesystem the editor runs on.
+/// The watcher was written for this: it watches the directory rather than the file, because an
+/// atomic save replaces a file rather than writing it.
+///
+/// # Errors
+///
+/// When the directory cannot be made, or either step fails.
+pub fn write_atomically(path: &Path, text: &str) -> Result<(), ConfigError> {
+    let io = |path: &Path| {
+        let path = path.to_path_buf();
+        move |source| ConfigError::Io {
+            path: path.clone(),
+            source,
+        }
+    };
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(io(parent))?;
+    }
+    // Beside it rather than in the temporary directory, because a rename across filesystems is
+    // not a rename.
+    let temporary = path.with_extension("toml.writing");
+    std::fs::write(&temporary, text).map_err(io(&temporary))?;
+    std::fs::rename(&temporary, path).map_err(io(path))
+}
+
+#[cfg(test)]
+mod diff_tests {
+    use super::{Config, write_atomically, write_diff};
+
+    #[test]
+    fn the_defaults_write_as_nothing_at_all() {
+        // Which is the whole point: a person who has changed nothing has an empty file, and picks
+        // up every default the editor changes later.
+        assert_eq!(write_diff(&Config::default()).trim(), "");
+    }
+
+    #[test]
+    fn one_change_writes_one_key() {
+        let mut config = Config::default();
+        config.editor.scrolloff = 8;
+
+        let text = write_diff(&config);
+        assert!(text.contains("scrolloff = 8"), "{text}");
+        assert!(
+            !text.contains("tab_size"),
+            "everything else is left to the defaults:\n{text}"
+        );
+        assert!(!text.contains("[ui]"), "and so is every other section");
+    }
+
+    #[test]
+    fn what_is_written_reads_back_as_what_was_meant() {
+        let mut config = Config::default();
+        config.ui.theme = "gruvbox".to_owned();
+        config.editor.tab_size = 2;
+        config.tree.width = 320;
+
+        let read: Config = toml::from_str(&write_diff(&config)).expect("it reads");
+        assert_eq!(read, config);
+    }
+
+    #[test]
+    fn the_servers_are_written_whole_or_not_at_all() {
+        // The defect this prevents is the worst kind: `lsp.servers` has `#[serde(default)]` on it,
+        // so a file naming *some* servers is a file naming *only* those. Written key by key,
+        // adding one server would silently delete the four that ship — and the symptom would be
+        // rust-analyzer quietly not starting a week later.
+        let mut config = Config::default();
+        config.lsp.servers.insert(
+            "zls".to_owned(),
+            crate::config::schema::Server {
+                command: "zls".to_owned(),
+                filetypes: vec!["zig".to_owned()],
+                ..Default::default()
+            },
+        );
+
+        let text = write_diff(&config);
+        assert!(text.contains("zls"), "the new one is there:\n{text}");
+        assert!(
+            text.contains("rust-analyzer"),
+            "and so are the ones that ship:\n{text}"
+        );
+
+        let read: Config = toml::from_str(&text).expect("it reads");
+        assert_eq!(read.lsp.servers.len(), config.lsp.servers.len());
+        assert_eq!(read, config);
+    }
+
+    #[test]
+    fn a_section_with_nothing_changed_in_it_is_not_written() {
+        let mut config = Config::default();
+        config.ui.font_size = 13.0;
+
+        let text = write_diff(&config);
+        assert!(text.contains("[ui]"));
+        for absent in ["[editor]", "[terminal]", "[picker]", "[tree]", "[lsp]"] {
+            assert!(!text.contains(absent), "{absent} is in:\n{text}");
+        }
+    }
+
+    #[test]
+    fn writing_never_leaves_half_a_file_behind() {
+        // Not a race this can provoke, but the arrangement that makes one impossible: the write
+        // goes to a temporary and the rename is what publishes it.
+        let directory = std::env::temp_dir().join(format!(
+            "zdt-write-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        let path = directory.join("nested").join("config.toml");
+
+        write_atomically(&path, "[editor]\nscrolloff = 4\n").expect("it writes");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("it is there"),
+            "[editor]\nscrolloff = 4\n"
+        );
+
+        // And writing again replaces it rather than appending, with no leftovers beside it.
+        write_atomically(&path, "[editor]\nscrolloff = 9\n").expect("it writes again");
+        assert!(std::fs::read_to_string(&path).unwrap().contains("9"));
+        assert!(
+            !path.with_extension("toml.writing").exists(),
+            "the temporary is renamed away rather than left"
+        );
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Paths, load, write_default};

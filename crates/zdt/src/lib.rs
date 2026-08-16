@@ -8,9 +8,11 @@ pub mod actions;
 pub mod app;
 pub mod assets;
 pub mod cmdline;
+pub mod completion;
 pub mod explorer;
 pub mod files;
 pub mod git;
+pub mod gitui;
 // The icon set is chosen as a set: an outline drawn only by a region built later is still part of
 // it, and the props of `Icon` are its contract whether or not a caller has needed one yet.
 #[allow(dead_code)]
@@ -18,6 +20,7 @@ pub mod icons;
 pub mod keys;
 pub mod language;
 pub mod leap;
+pub mod notify;
 pub mod picker;
 pub mod prompt;
 pub mod reload;

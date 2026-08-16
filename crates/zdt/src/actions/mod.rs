@@ -9,8 +9,9 @@
 
 use std::path::PathBuf;
 
+mod edit;
 mod git;
-mod lsp;
+pub mod lsp;
 
 use zdt_vim::Action;
 use zgui_editor::EditorHandle;
@@ -40,10 +41,112 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "session" => session(workspace, leaf, handle),
         "cmdline" => cmdline(workspace, leaf, args),
         "diagnostic" => lsp::diagnostic(workspace, leaf, handle),
+        "hover" => hover(leaf),
+        "completion" => completion(workspace, leaf, handle),
+        "gitpanel" => gitpanel(leaf),
         "ui" => ui(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.
         _ => workspace.say(format!("{} is not built yet", action.name)),
+    }
+}
+
+/// Reading the documentation panel.
+///
+/// Only reachable while the panel has the keyboard, which is what a second `K` gives it — see
+/// [`crate::ui::hover`]. Every one of these is a scroll, because reading is the only thing there
+/// is to do with a panel of documentation.
+fn hover(leaf: &str) {
+    let Some(panel) = zgui::reactive::use_local_context::<crate::ui::hover::Hover>() else {
+        return;
+    };
+    let page = panel.page();
+
+    match leaf {
+        "down" => panel.scroll_lines(1.0),
+        "up" => panel.scroll_lines(-1.0),
+        "half_down" => panel.scroll_by(page / 2.0),
+        "half_up" => panel.scroll_by(-page / 2.0),
+        "page_down" => panel.scroll_by(page),
+        "page_up" => panel.scroll_by(-page),
+        "top" => panel.to_top(),
+        "bottom" => panel.to_bottom(),
+        "close" => panel.hide(),
+        // Silently, because the overlay is only in front while the panel is up and an unbound key
+        // there should fall through to the editor rather than complain about a panel.
+        _ => {}
+    }
+}
+
+/// The suggestion popup.
+fn completion(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
+    let Some(completion) = zgui::reactive::use_local_context::<crate::completion::Completion>()
+    else {
+        return;
+    };
+
+    match leaf {
+        "next" => completion.step(1),
+        "previous" => completion.step(-1),
+        "accept" => completion.accept(handle),
+        "cancel" => completion.close(),
+        "docs_down" => completion.scroll_docs(1.0),
+        "docs_up" => completion.scroll_docs(-1.0),
+        "open" => completion.ask(workspace, handle),
+        _ => {}
+    }
+}
+
+/// The git panel's own keys.
+///
+/// Only reachable while the panel has the keyboard. Everything here acts on what the caret is on,
+/// which the panel itself knows — so none of these takes an argument.
+fn gitpanel(leaf: &str) {
+    use crate::gitui::{GitUi, List, View};
+
+    let Some(panel) = zgui::reactive::use_local_context::<GitUi>() else {
+        return;
+    };
+
+    match leaf {
+        "down" => panel.step(1),
+        "up" => panel.step(-1),
+        // Half a screenful, in rows. Not measured: the lists are all the same 22px row and what
+        // the key means is "a good way down" rather than an exact distance.
+        "half_down" => panel.step(10),
+        "half_up" => panel.step(-10),
+        "top" => panel.to_top(),
+        "bottom" => panel.to_bottom(),
+        "next_pane" => panel.cycle_list(true),
+        "previous_pane" => panel.cycle_list(false),
+
+        "toggle_view" => panel.toggle_view(),
+        // Naming a half rather than turning it over, so that `1` and `2` are where you go rather
+        // than what you toggle. Already there is already right.
+        "status" => panel.show(View::Status),
+        "history" => panel.show(View::History),
+        "side_by_side" => panel.toggle_side_by_side(),
+
+        "stage" => panel.stage(),
+        "unstage" => panel.unstage(),
+        "stage_all" => panel.stage_all(),
+        "unstage_all" => panel.unstage_all(),
+        "discard" => panel.discard(),
+
+        "commit" => panel.start_commit(false),
+        "amend" => panel.start_commit(true),
+
+        "open" => panel.open_selected(),
+        "checkout" => {
+            panel.set_list(List::Branches);
+            panel.checkout();
+        }
+        "refresh" => panel.refresh(),
+        "to_tab" => panel.open_tab(),
+        "close" => panel.close(),
+        // Silently: the overlay is only in front while the panel is up, and an unbound key there
+        // should fall through rather than complain.
+        _ => {}
     }
 }
 
@@ -62,6 +165,15 @@ fn buffer(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
             if let Some(buffer) = workspace.current_buffer() {
                 if buffer.is_dirty() && !args.flag("force") {
                     workspace.complain("unsaved changes; <Leader>C closes anyway");
+                } else if buffer.is_terminal() {
+                    // A terminal's program has to be shut down as well, and the split it was
+                    // opened in goes with it.
+                    match zgui::reactive::use_local_context::<crate::terminals::Terminals>() {
+                        Some(terminals) => terminals.end(workspace, buffer.id),
+                        None => {
+                            workspace.close_buffer(buffer.id);
+                        }
+                    }
                 } else {
                     workspace.close_buffer(buffer.id);
                 }
@@ -344,8 +456,24 @@ fn ui(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
 
     if leaf == "dismiss" {
         workspace.hush();
+        if let Some(notify) = crate::notify::use_notify() {
+            notify.dismiss_all();
+        }
         return;
     }
+    // The settings, floating: something opened, changed and closed again, which is a modal.
+    if leaf == "settings" {
+        if let Some(state) = crate::ui::config::use_config_modal() {
+            state.open();
+        }
+        return;
+    }
+    // And as a tab, for anybody who wants them beside the file whose behaviour they are changing.
+    if leaf == "settings_tab" {
+        workspace.open_panel(crate::workspace::BufferKind::Settings);
+        return;
+    }
+
     if leaf != "toggle" {
         workspace.say(format!("ui.{leaf} is not built yet"));
         return;
@@ -415,6 +543,8 @@ fn terminal(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::Args) 
                     workspace.split(axis);
                     vim.reset();
                     if let Some(id) = terminals.open(&program) {
+                        // The split was made for this terminal, so it goes when the terminal does.
+                        terminals.owns_window(id, workspace.focused_untracked());
                         terminals.start_typing(id);
                     }
                 }
@@ -453,6 +583,32 @@ fn picker(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args, handle: Optio
     let Some(picker) = zgui::reactive::use_local_context::<Picker>() else {
         return;
     };
+
+    // Four of these are questions for a language server rather than lists the picker could gather
+    // for itself. They keep their `picker.*` names because that is what the shipped keymap binds
+    // and what anybody's fingers have learned; what they *are* is an LSP request whose answer
+    // happens to be shown in a picker.
+    match leaf {
+        "references" | "symbols" | "workspace_symbols" | "diagnostics" => {
+            let asked = match leaf {
+                "references" => "references",
+                "symbols" => "outline",
+                "workspace_symbols" => "workspace_symbols",
+                _ => "diagnostics",
+            };
+            lsp::run(workspace, asked, handle);
+            return;
+        }
+        // And three are questions for the repository, answered on a worker and shown the same
+        // way. Not the panel: what somebody pressing `<Leader>gc` wants is to *go* somewhere, and
+        // a picker is what goes places.
+        "git_status" | "git_commits" | "git_branches" => {
+            git::picker(workspace, leaf);
+            return;
+        }
+        _ => {}
+    }
+
     let Some(mut source) = Source::named(leaf, args) else {
         workspace.say(format!("picker.{leaf} is not built yet"));
         return;

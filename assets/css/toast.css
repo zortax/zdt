@@ -1,0 +1,91 @@
+/* The announcements.
+ *
+ * The component library draws these as cards: 356px wide, sixteen pixels of padding, a body-size
+ * title, a rounded corner two steps up from everything else and a four-hundred-millisecond
+ * arrival. That is right for an application whose window is mostly whitespace, and wrong here,
+ * where a toast sits over code and has to say its piece without hiding four lines of it.
+ *
+ * So this file is measurements and nothing else. The library keeps the stacking, the deadlines,
+ * the swipe, the fan-out under the pointer and every tone — the themes already declare
+ * `--zui-color-success` and its neighbours, so a mark is the right colour without being told.
+ *
+ * Two things about how it is written. The tokens are set on the region, because that is what the
+ * library reads them from. The rules are written as `.zui-toast__region .zui-toast` rather than
+ * `.zui-toast`, because the library installs its sheet when the toaster mounts — after this one —
+ * and at equal specificity the later sheet wins. One extra class is what makes these declarations
+ * the ones that count, rather than an ordering nobody can see. */
+
+.zui-toast__region {
+    --zui-toast-width: 300px;
+    --zui-toast-gap: 6px;
+    /* The one duration in the window that is allowed past a tenth of a second: a stack sliding in
+     * from off the screen covers more distance than a menu opening, and at 90ms it reads as a
+     * flicker rather than as an arrival. Still half what the library asks for. */
+    --zui-toast-move: 180ms;
+    /* Clear of the status line, which must never be covered: it is where the answer to the key
+     * just pressed appears. */
+    margin: calc(var(--zui-space-base) * 2);
+    margin-bottom: calc(var(--status) + var(--zui-space-base) * 2);
+}
+
+.zui-toast__region .zui-toast {
+    gap: calc(var(--zui-space-base) * 2);
+    padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
+    border-radius: var(--zui-radius-base);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+    box-shadow: var(--zui-shadow-md);
+}
+
+/* The title carries the message; the description carries the detail nobody reads unless the title
+ * made them want to. So the title is not emphasised — it is the only thing there most of the
+ * time, and emphasis that is always on is emphasis that says nothing. */
+.zui-toast__region .zui-toast__title {
+    font-size: var(--zdt-ui-size, 12px);
+    line-height: 16px;
+    font-weight: 400;
+}
+
+.zui-toast__region .zui-toast__description {
+    font-size: var(--zdt-ui-size-small, 11px);
+    line-height: 15px;
+    color: var(--zui-color-muted-foreground);
+    /* A language server's failure is a paragraph. Three lines is enough to know which failure it
+     * is; the rest is in the log, which is where a paragraph belongs. */
+    max-height: 45px;
+    overflow: hidden;
+}
+
+.zui-toast__region .zui-toast__icon {
+    width: 12px;
+    height: 12px;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.zui-toast__region .zui-toast__icon .icon {
+    width: 12px;
+    height: 12px;
+}
+
+/* An error is the one kind that waits to be read, so it is also the one that has to be findable at
+ * a glance in a stack of four. A line down its leading edge rather than a tinted box, because the
+ * text has to stay exactly as readable as everything else. */
+.zui-toast__region .zui-toast[data-kind="error"] {
+    border-left: 2px solid var(--zui-color-destructive);
+}
+
+.zui-toast__region .zui-toast__action,
+.zui-toast__region .zui-toast__cancel {
+    height: 18px;
+    padding: 0 calc(var(--zui-space-base) * 2);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    font-size: var(--zdt-ui-size-small, 11px);
+}
+
+.zui-toast__region .zui-toast__close {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+}

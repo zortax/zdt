@@ -104,6 +104,9 @@ pub struct Watcher {
 pub struct Reloaded {
     /// The settings, when they read.
     pub config: Option<zdt_core::Config>,
+    /// Exactly what was in the settings file, for telling this editor's own write apart from
+    /// somebody else's.
+    pub config_text: Option<String>,
     /// The keymap, when there is one.
     pub keymap: Option<String>,
     /// The user's own style sheet, when there is one.
@@ -124,6 +127,7 @@ pub fn read(paths: &Paths) -> Reloaded {
         Ok(config) => reloaded.config = Some(config),
         Err(error) => reloaded.problems.push(error.to_string()),
     }
+    reloaded.config_text = zdt_core::config::read_optional(&paths.config());
     reloaded.keymap = zdt_core::config::read_optional(&paths.keymap());
     reloaded.user_css = zdt_core::config::read_optional(&paths.user_css());
 

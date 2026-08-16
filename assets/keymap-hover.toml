@@ -1,0 +1,82 @@
+# The documentation panel's own keys.
+#
+# Read as an overlay in front of the ordinary keymap, and only while the panel has been given the
+# keyboard — which is what a second `K` does. Until then the panel takes no keys at all and `j`
+# still moves the caret, because a documentation panel that swallows keys is one that has to be
+# dismissed before work can continue.
+#
+# The keys are the ones for reading something: vim's scrolling, and `q` to be done with it.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "hover.down"
+desc = "Down a line"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "hover.up"
+desc = "Up a line"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "hover.down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "hover.up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "hover.half_down"
+desc = "Down half a panel"
+
+[[map]]
+mode = ["n"]
+keys = "<C-u>"
+action = "hover.half_up"
+desc = "Up half a panel"
+
+[[map]]
+mode = ["n"]
+keys = "<C-f>"
+action = "hover.page_down"
+desc = "Down a panel"
+
+[[map]]
+mode = ["n"]
+keys = "<C-b>"
+action = "hover.page_up"
+desc = "Up a panel"
+
+[[map]]
+mode = ["n"]
+keys = "gg"
+action = "hover.top"
+desc = "To the top"
+
+[[map]]
+mode = ["n"]
+keys = "G"
+action = "hover.bottom"
+desc = "To the bottom"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "hover.close"
+desc = "Close"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "hover.close"
+
+[[map]]
+mode = ["n"]
+keys = "K"
+action = "hover.close"

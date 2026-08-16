@@ -150,6 +150,27 @@
 --zdt-git-added: #99ffe4;
 --zdt-git-changed: #a0a0a0;
 --zdt-git-removed: #ff8080;
+--zdt-git-untracked: #a0a0a0;
+--zdt-git-conflict: #ffc799;
+
+/* The grounds a diff's rows sit on. Barely there: what carries the meaning is the mark and the
+   colour of it, and a band strong enough to notice is a band that makes the code harder to read
+   than the plain file it came from. */
+
+--zdt-git-added-bg: color-mix(in oklch, #99ffe4 12%, transparent);
+--zdt-git-removed-bg: color-mix(in oklch, #ff8080 12%, transparent);
+
+/* The graph's lanes. Eight, cycling: enough that two lines crossing are different colours, few
+   enough that each stays distinct at two pixels wide. */
+
+--zdt-git-lane-0: #a0a0a0;
+--zdt-git-lane-1: #99ffe4;
+--zdt-git-lane-2: #ffcfa8;
+--zdt-git-lane-3: #ffc799;
+--zdt-git-lane-4: #99ffe4;
+--zdt-git-lane-5: #ffc799;
+--zdt-git-lane-6: #ff8080;
+--zdt-git-lane-7: #a0a0a0;
 
 /* --- what the language servers say ------------------------------------------------------- */
 
@@ -157,6 +178,31 @@
 --zdt-diagnostic-warning: #ffc799;
 --zdt-diagnostic-information: #a0a0a0;
 --zdt-diagnostic-hint: #99ffe4;
+
+/* What the servers say at length: a hover, a completion's documentation. The block ground is the
+   same plane a selection sits on, so a signature reads as inset rather than as a card. */
+
+--zdt-doc-heading: #ffffff;
+--zdt-doc-rule: #505050;
+--zdt-doc-code: #99ffe4;
+--zdt-doc-link: #a0a0a0;
+--zdt-doc-block: #1c1c1c;
+
+/* The kinds of thing a completion can offer. Four groups rather than twenty-five: what somebody
+   reads off the glyph is "is this a function, a type, a value or a word", and a palette with a
+   colour per protocol constant is a palette that says nothing. */
+
+--zdt-completion-function: #a0a0a0;
+--zdt-completion-type: #ffc799;
+--zdt-completion-value: #ffc799;
+--zdt-completion-keyword: #ffcfa8;
+--zdt-completion-text: #a0a0a0;
+
+/* Where a symbol is used, under the caret. Dimmer than a search hit, because it appears without
+   being asked for and must not compete with the text it is marking. */
+
+--zdt-highlight: #232323;
+--zdt-highlight-write: #333333;
 
 /* --- the terminal element ---------------------------------------------------------------- */
 
