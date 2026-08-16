@@ -1,15 +1,15 @@
 //! One client per server and root.
 //!
-//! Servers start when the first file that wants one is opened, not at startup: a project with a
-//! Rust crate and a Python script in it should not start `basedpyright` until somebody opens the
-//! script, and starting every configured server on every project would make opening an editor cost
-//! whatever the slowest of them costs.
+//! A server starts when the first file that wants it is opened. A project with a Rust crate and a
+//! Python script in it leaves `basedpyright` alone until somebody opens the script. Starting every
+//! configured server on every project would make opening an editor cost whatever the slowest of
+//! them costs.
 //!
 //! # What "starting" means here
 //!
 //! Asking for a client answers immediately with what is running. A server that is not yet up is
-//! *begun* — the caller is told so and gets nothing this time — and the file it was wanted for is
-//! remembered, so that when it comes up it is told about everything that was opened while it was
+//! *begun*. The caller is told so and gets nothing this time, and the file it was wanted for is
+//! remembered. When the server comes up it is told about everything that was opened while it was
 //! starting. Without that, a server that takes two seconds would answer nothing about the file
 //! that started it.
 
@@ -30,7 +30,7 @@ pub enum Asked {
     Running,
     /// It is being started. Ask again later.
     Starting,
-    /// It could not be started, and this is why. Not tried again.
+    /// It could not be started, and this is why. Nothing tries again.
     Failed(String),
 }
 
@@ -85,8 +85,8 @@ impl Pool {
 
     /// Says that `wanted` is being started for `path`.
     ///
-    /// Answers `false` when it is already running, starting or known to have failed — in which
-    /// case the caller should not start it again.
+    /// Answers `false` when it is already running, starting, or known to have failed. The caller
+    /// then leaves it alone.
     pub fn begin(&mut self, wanted: &Wanted, path: &Path) -> bool {
         let key = Self::key_of(wanted);
         if self.running.contains_key(&key) || self.failed.contains_key(&key) {
@@ -118,9 +118,8 @@ impl Pool {
 
     /// Records that a client could not be started, so nothing tries again.
     ///
-    /// Not retrying is deliberate: a server that is not installed is not going to become installed
-    /// while the editor is open, and retrying on every keystroke would be a process spawn per
-    /// keystroke.
+    /// Never retrying is deliberate. A server that is absent stays absent while the editor is
+    /// open, and a retry on every keystroke is a process spawn on every keystroke.
     pub fn failed(&mut self, wanted: &Wanted, error: &ClientError) {
         let key = Self::key_of(wanted);
         self.starting.remove(&key);

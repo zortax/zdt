@@ -20,7 +20,7 @@ pub fn open(workspace: &Workspace, path: impl Into<PathBuf>) {
     open_at(workspace, path, None);
 }
 
-/// The same, and puts the caret on `line` — counting from one — when there is one.
+/// The same, and puts the caret on `line` when there is one. `line` counts from one.
 ///
 /// What a grep hit and a jump to a definition both come to.
 pub fn open_at(workspace: &Workspace, path: impl Into<PathBuf>, line: Option<u64>) {
@@ -34,7 +34,7 @@ pub fn open_at(workspace: &Workspace, path: impl Into<PathBuf>, line: Option<u64
     let workspace = workspace.clone();
     // Detached: opening a file is often what closes the picker that asked for it, and a read
     // belonging to the picker would be cancelled before the buffer ever appeared.
-    crate::task::detached(async move {
+    zdt_view::detached(async move {
         let reading = path.clone();
         let loaded = blocking(move || zdt_core::fs::load(&reading)).await;
 
@@ -102,8 +102,8 @@ fn go_to_line(workspace: &Workspace, buffer: BufferId, line: Option<u64>) {
             selections: vec![zgui_editor::Selection::caret(at)],
             primary: 0,
         });
-        // Centred rather than merely visible: a hit at the bottom of the screen with nothing
-        // under it reads as the end of the file even when it is not.
+        // Centred, and not merely visible. A hit at the bottom of the screen with nothing under
+        // it reads as the end of the file.
         editor.command(zgui_editor::Command::Scroll(
             zgui_editor::ScrollCmd::CursorCenter,
         ));
@@ -114,8 +114,8 @@ fn go_to_line(workspace: &Workspace, buffer: BufferId, line: Option<u64>) {
 
 /// Opens `path` when it is a file, or says why it cannot.
 ///
-/// What the command line hands over: a directory is the project rather than a buffer, and a path
-/// that is not there yet is a new file rather than a mistake.
+/// What the command line hands over. A directory is the project, and a path that is not there yet
+/// is a new file.
 pub fn open_argument(workspace: &Workspace, path: &Path) {
     if path.is_dir() {
         return;
@@ -166,7 +166,7 @@ pub fn save_as(
 
     let workspace = workspace.clone();
     // Detached: `:wq` closes the window that asked, and a write cancelled half way is a file lost.
-    crate::task::detached(async move {
+    zdt_view::detached(async move {
         let writing = path.clone();
         let written =
             background(async move { zdt_core::fs::save(&writing, &text, encoding, line_ending) })

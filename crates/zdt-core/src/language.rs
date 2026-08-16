@@ -1,9 +1,9 @@
 //! What a file is, from its name.
 //!
 //! Two answers come from one table: which grammar highlights it, and which glyph stands for it in
-//! the tree and on its buffer tab. They are together because they are decided by the same thing
-//! and would otherwise drift — a file type that highlights but has no icon looks like a bug, and
-//! one with an icon that does not highlight looks like a worse one.
+//! the tree and on its buffer tab. They sit together because the same thing decides both, and two
+//! tables would drift. A file type that highlights and has no icon looks like a bug. One with an
+//! icon and no highlighting looks like a worse one.
 //!
 //! Glyphs are from a Nerd Font, written as escapes so that this file is readable in an editor that
 //! has not got one. The colour is a token name the style sheet answers for, so a devicon follows

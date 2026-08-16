@@ -1,0 +1,22 @@
+[package]
+name = "zdt-view"
+description = "The small pieces a zgui view is built from: type erasure, exit states, detached work, a directory watch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+notify.workspace = true
+tokio.workspace = true
+zgui.workspace = true
+zgui-ui-primitives.workspace = true
+zgui-ui.workspace = true
+zgui-editor.workspace = true
+
+[dev-dependencies]
+zgui-platform-headless = { git = "https://github.com/zortax/zgui" }
+zgui-testkit-view = { git = "https://github.com/zortax/zgui" }

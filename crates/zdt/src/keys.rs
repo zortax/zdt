@@ -5,19 +5,19 @@
 //!
 //! # Which of the two keys an event carries
 //!
-//! A key event says both what the key means with the modifiers applied and what it would mean
-//! without them. A shortcut wants the second — `<C-w>` has to be control-and-w whatever the layout
-//! does with control — and text wants the first, because that is the character the person meant.
-//! The rule here is: anything with control, alt or the platform key on it is a shortcut, and
-//! everything else is what it looks like.
+//! A key event says both what the key means with the modifiers applied, and what it would mean
+//! without them. A shortcut wants the second, because `<C-w>` has to be control-and-w whatever the
+//! layout does with control. Text wants the first, because that is the character the person meant.
+//! The rule here: anything carrying control, alt or the platform key is a shortcut, and everything
+//! else is what it looks like.
 
 use zdt_vim::chord::{Chord, Key as VimKey, Mods, Named};
 use zgui::vocab::{Key, KeyEvent, Modifiers, NamedKey};
 
 /// The chord `event` is, when it is one.
 ///
-/// Nothing for a modifier pressed on its own, for a dead key, and for a key the platform could not
-/// identify — none of which is something a keymap can be written against.
+/// Nothing for a modifier pressed on its own, for a dead key, or for a key the platform could not
+/// identify. A keymap can be written against none of them.
 #[must_use]
 pub fn chord_of(event: &KeyEvent, modifiers: Modifiers) -> Option<Chord> {
     let mut mods = Mods::NONE;
@@ -109,8 +109,8 @@ fn named_of(named: NamedKey) -> Option<Named> {
         NamedKey::F10 => Named::Function(10),
         NamedKey::F11 => Named::Function(11),
         NamedKey::F12 => Named::Function(12),
-        // A modifier on its own is not a chord, and neither is anything the keymap has no word
-        // for. Both reach here, and both are nothing rather than a key that would match wrongly.
+        // A modifier on its own is no chord, and neither is anything the keymap has no word for.
+        // Both reach here, and both answer nothing. A key that matched wrongly would be worse.
         _ => return None,
     })
 }

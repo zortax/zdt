@@ -1,13 +1,13 @@
 //! The named clipboards.
 //!
-//! Vim's registers, which are the reason `dd` then `p` puts the line back and `"ayy` then `"ap`
+//! Vim's registers. They are the reason `dd` then `p` puts the line back, and `"ayy` then `"ap`
 //! puts a different one somewhere else. What matters and is easy to get wrong:
 //!
 //! * a yank goes to `0` as well as to the unnamed register, so `y` then `d` then `p` still pastes
-//!   what was yanked when `"0p` asks for it;
+//!   what was yanked when `"0p` asks for it.
 //! * a delete pushes the numbered registers along, so `"1p` is the last delete and `"2p` the one
-//!   before it;
-//! * an uppercase name appends rather than replaces, which is how a run of `"Ayy` collects lines;
+//!   before it.
+//! * an uppercase name appends, which is how a run of `"Ayy` collects lines.
 //! * whether the text was taken by lines decides whether pasting opens a line or inserts inline.
 
 use rustc_hash::FxHashMap;
@@ -92,7 +92,7 @@ impl Name {
         self.0 == Some('_')
     }
 
-    /// Whether writing to this appends rather than replaces.
+    /// Whether writing to this appends. It replaces otherwise.
     #[must_use]
     pub fn appends(self) -> bool {
         self.0.is_some_and(|name| name.is_ascii_uppercase())
@@ -133,8 +133,8 @@ impl Registers {
 
     /// Puts `contents` in `name`, appending when the name is uppercase.
     ///
-    /// A named register is also the unnamed one afterwards, which is what makes `"ayy` then `p`
-    /// paste what was just yanked rather than whatever was there before.
+    /// A named register is also the unnamed one afterwards. So `"ayy` then `p` pastes what was
+    /// just yanked.
     pub fn set(&mut self, name: Name, contents: Contents) {
         if name.is_black_hole() {
             return;
@@ -166,7 +166,7 @@ impl Registers {
     /// Records a yank: into `name`, and into `0` when the yank did not name one.
     ///
     /// The reason `"0p` pastes the last *yank* even after a delete has overwritten the unnamed
-    /// register — which is the single most useful thing about vim's registers.
+    /// register. It is the single most useful thing about vim's registers.
     pub fn yank(&mut self, name: Name, contents: Contents) {
         if name == Name::UNNAMED {
             self.held.insert('0', contents.clone());
@@ -176,8 +176,8 @@ impl Registers {
 
     /// Records a delete: into `name`, and into the numbered ring when it did not name one.
     ///
-    /// Small deletes — less than a line, taken charwise — go to `-` instead of pushing the ring,
-    /// which is what stops a run of `x` from throwing away nine lines of history.
+    /// A small delete, meaning less than a line and taken charwise, goes to `-` and leaves the
+    /// ring alone. That stops a run of `x` from throwing away nine lines of history.
     pub fn delete(&mut self, name: Name, contents: Contents) {
         if name == Name::UNNAMED {
             if contents.linewise || contents.text.contains('\n') {

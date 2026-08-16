@@ -38,6 +38,9 @@ zdt-core.workspace = true
 zdt-git.workspace = true
 zdt-lsp.workspace = true
 zdt-vim.workspace = true
+zdt-view.workspace = true
+zdt-icons.workspace = true
+zdt-gitui.workspace = true
 
 zgui.workspace = true
 zgui-editor.workspace = true

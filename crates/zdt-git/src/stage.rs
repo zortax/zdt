@@ -2,23 +2,23 @@
 //!
 //! # What staging one hunk actually is
 //!
-//! Not a patch. What the index holds for a file is a blob, and staging part of a change means the
-//! index should hold a *third* text — neither what was committed nor what is on disk, but the one
-//! you get by applying the chosen hunks to the committed one. So:
+//! It is not a patch. What the index holds for a file is a blob. Staging part of a change means
+//! the index must hold a *third* text: the one you get by applying the chosen hunks to the
+//! committed text. It differs from what was committed and from what is on disk. So:
 //!
 //! 1. read the text the index currently holds;
 //! 2. apply the chosen hunks to *that* text, in memory;
 //! 3. write the result as a new blob;
 //! 4. point the index entry at it, and write the index.
 //!
-//! Every step either happens or does not. Expressed as `git apply --cached` it is a patch that has
-//! to be generated, escaped, and applied to a file that may have moved underneath it — and when it
-//! fails halfway the index is left in a state nobody asked for.
+//! Every step either happens or does not. Expressed as `git apply --cached` it is a patch that
+//! has to be generated, escaped, and applied to a file that may have moved underneath it. When
+//! that fails halfway, the index is left in a state nobody asked for.
 //!
 //! # Writing the index
 //!
-//! The whole index is rewritten each time, which is what git does too: it is one file, it is
-//! usually small, and rewriting it whole is what makes a half-written index impossible.
+//! The whole index is rewritten each time, which is what git does too. It is one file, it is
+//! usually small, and rewriting it whole makes a half-written index impossible.
 
 use crate::diff::{DiffHunk, LineKind};
 use crate::repo::{Error, Repo};
@@ -40,8 +40,8 @@ pub fn stage_file(repo: &Repo, path: &str) -> Result<(), Error> {
 
 /// Takes everything about `path` back out of the index.
 ///
-/// Back to what the last commit holds — or out of the index altogether when the last commit has
-/// never heard of it, which is what unstaging a newly added file means.
+/// Back to what the last commit holds. When the last commit has never heard of the file, it goes
+/// out of the index altogether, which is what unstaging a newly added file means.
 ///
 /// # Errors
 ///
@@ -53,8 +53,8 @@ pub fn unstage_file(repo: &Repo, path: &str) -> Result<(), Error> {
 
 /// Puts just these hunks of `path` into the index.
 ///
-/// The hunks come from the *unstaged* diff — the working tree against the index — so applying them
-/// to what the index holds is what produces the text that should be staged.
+/// The hunks come from the *unstaged* diff, which is the working tree against the index. Applying
+/// them to what the index holds produces the text that should be staged.
 ///
 /// # Errors
 ///
@@ -132,8 +132,8 @@ pub fn discard_hunks(repo: &Repo, path: &str, hunks: &[DiffHunk]) -> Result<(), 
 /// Applies `hunks` to `base`, or undoes them when `backwards`.
 ///
 /// Works in lines, matching each hunk against the text by its context. A hunk whose context does
-/// not match is refused rather than applied at a guess: a hunk applied in the wrong place is a
-/// file quietly corrupted, and the file on disk is the only copy of somebody's work.
+/// not match is refused. A hunk applied at a guess corrupts the file quietly, and the file on disk
+/// is the only copy of somebody's work.
 fn apply(base: &[u8], hunks: &[DiffHunk], backwards: bool) -> Result<Vec<u8>, Error> {
     let ends_with_newline = base.is_empty() || base.ends_with(b"\n");
     let text = String::from_utf8_lossy(base).into_owned();
@@ -178,7 +178,7 @@ fn apply(base: &[u8], hunks: &[DiffHunk], backwards: bool) -> Result<Vec<u8>, Er
     Ok(out.into_bytes())
 }
 
-/// The lines of a hunk that are of one kind, plus the context — which is what has to be found.
+/// The lines of a hunk that are of one kind, plus the context. This is what has to be found.
 fn kept(hunk: &DiffHunk, changed: LineKind) -> Vec<String> {
     hunk.lines
         .iter()
@@ -199,9 +199,9 @@ fn start_of(hunk: &DiffHunk, backwards: bool) -> usize {
 
 /// Where `wanted` is in `lines`, looking near `hint` first.
 ///
-/// The hint is where the hunk says it is; the search widens from there because a file may have
-/// been edited above the hunk since the diff was taken. It never matches at a different place when
-/// the hinted one fits — a hunk that fits where it says it does belongs there.
+/// The hint is where the hunk says it is. The search widens from there, because a file may have
+/// been edited above the hunk since the diff was taken. When the hinted place fits, that is the
+/// match. A hunk that fits where it says it does belongs there.
 fn locate(lines: &[String], wanted: &[String], hint: usize) -> Option<usize> {
     if wanted.is_empty() {
         return (hint <= lines.len()).then_some(hint);
@@ -238,7 +238,7 @@ fn write_entry(repo: &Repo, path: &str, content: Option<&[u8]>) -> Result<(), Er
     use gix::index::entry::{Flags, Mode, Stat};
 
     let git = repo.git();
-    // The file itself rather than the shared snapshot, because this is about to write it.
+    // The file itself, and not the shared snapshot, because this is about to write it.
     let mut index = git.open_index().map_err(Error::git)?;
     let name: &gix::bstr::BStr = path.into();
 
@@ -263,8 +263,8 @@ fn write_entry(repo: &Repo, path: &str, content: Option<&[u8]>) -> Result<(), Er
                     entry.id = id;
                     entry.mode = mode;
                     // The stat is what makes git believe the working tree matches the index
-                    // without reading every file. Zeroed rather than faked: a wrong stat is worse
-                    // than none, because git trusts it.
+                    // without reading every file. Zeroed, because git trusts it and a wrong stat
+                    // is worse than none.
                     entry.stat = Stat::default();
                 }
                 Err(_) => {
@@ -312,8 +312,7 @@ mod tests {
 
         stage_file(&temp.repo(), "a.txt").expect("it stages");
 
-        // Asserted against git itself rather than against this crate's own reader, because what
-        // is being tested is whether git agrees.
+        // Asserted against git itself, because what is being tested is whether git agrees.
         assert!(
             temp.run(&["diff", "--cached", "--name-only"])
                 .contains("a.txt"),
@@ -364,8 +363,8 @@ mod tests {
 
     #[test]
     fn staging_one_hunk_stages_exactly_that_hunk() {
-        // The whole reason this crate uses gix rather than shelling out. Two changes far enough
-        // apart to be two hunks; only the first is staged.
+        // The whole reason this crate uses gix. Two changes far enough apart to be two hunks,
+        // and only the first is staged.
         let temp = Temp::new("stage-hunk");
         let original: String = (0..40).map(|n| format!("line {n}\n")).collect();
         temp.commit("a.txt", &original, "first");

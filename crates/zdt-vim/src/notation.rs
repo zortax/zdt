@@ -123,7 +123,7 @@ fn bracketed(name: &str, leaders: Leaders) -> Result<Chord, NotationError> {
             "m" | "a" | "alt" | "meta" => Mods::ALT,
             "d" | "cmd" | "super" => Mods::SUPER,
             "s" | "shift" => Mods::SHIFT,
-            // Not a modifier, so the rest is the key — which is how `g-` binds a hyphen.
+            // The part before it is no modifier, so the rest is the key. `g-` binds a hyphen.
             _ => break,
         };
         mods = mods.with(modifier);
@@ -159,8 +159,8 @@ fn bracketed(name: &str, leaders: Leaders) -> Result<Chord, NotationError> {
 
 /// Writes a key sequence back out, the way a keymap would have written it.
 ///
-/// Not through the leader: which-key shows what was typed, and a person who has just pressed
-/// space is looking for what space did rather than for the word "leader".
+/// The leader is written out as the key it is. Which-key shows what was typed, and somebody who
+/// has just pressed space is looking for what space did.
 #[must_use]
 pub fn format(chords: &[Chord]) -> String {
     let mut out = String::new();
@@ -258,8 +258,7 @@ mod tests {
 
     #[test]
     fn shift_on_a_letter_is_the_capital() {
-        // Written either way, it is the same press — which is what makes `A` and `<S-a>` one
-        // binding rather than two that shadow each other.
+        // Written either way, it is the same press. So `A` and `<S-a>` are one binding.
         assert_eq!(read("<S-a>"), read("A"));
     }
 

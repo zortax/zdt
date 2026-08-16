@@ -2,13 +2,13 @@
 //!
 //! Two kinds, and the difference matters more than the list of names suggests.
 //!
-//! A **standing** source is a list that exists before anybody types: the files in the project, the
-//! open buffers, the themes. It is gathered once when the picker opens and then only ranked, which
-//! is why typing in it costs nothing.
+//! A **standing** source is a list that exists before anybody types: the files in the project,
+//! the open buffers, the themes. It is gathered once when the picker opens and then only ranked,
+//! which is why typing in it costs nothing.
 //!
-//! A **live** source is one where the query *is* the search: grep. Every keystroke starts a new
-//! search and cancels the one before it, and there is no ranking at all — the order is the order
-//! the files came back in.
+//! A **live** source is one where the query *is* the search, which is grep. Every keystroke starts
+//! a new search and cancels the one before it. Nothing is ranked, and the order is the order the
+//! files came back in.
 
 use std::path::PathBuf;
 
@@ -41,9 +41,9 @@ pub enum Source {
     /// A list somebody else worked out, with a name to put at the top.
     ///
     /// What every language-server picker is: the references, the symbols in a file, the actions
-    /// offered at the caret. All of them are one request whose answer is a list, and none of them
-    /// is a thing the picker could gather for itself — so the picker's job is only to filter it
-    /// and let somebody choose, which is the job it was already good at.
+    /// offered at the caret. Each is one request whose answer is a list, and the picker could
+    /// gather none of them itself. So the picker filters the list and lets somebody choose, which
+    /// is the job it was already good at.
     Given {
         /// What to call it.
         title: &'static str,
@@ -64,7 +64,7 @@ pub enum Source {
     Grep {
         /// Which files to look in.
         reach: Reach,
-        /// What to start the query as — the word under the caret, for `<Leader>fc`.
+        /// What to start the query as. The word under the caret, for `<Leader>fc`.
         start: String,
     },
     /// The open buffers.
@@ -110,7 +110,7 @@ impl Source {
         }
     }
 
-    /// Whether the query is the search itself rather than a filter over a list.
+    /// Whether the query is the search itself. A filter over a list otherwise.
     #[must_use]
     pub fn is_live(&self) -> bool {
         matches!(self, Self::Grep { .. } | Self::WorkspaceSymbols)
@@ -198,12 +198,12 @@ pub enum Target {
     Action(zdt_vim::Action),
     /// Runs whatever the row was built to run.
     ///
-    /// For rows whose behaviour is not a name: a code action carries a whole protocol value that
-    /// has to be resolved and applied, and there is no way to say that in a keymap. The work is
-    /// held as a shared closure rather than named, because the row is *written* where the answer
-    /// arrived and *read* where the picker draws it.
+    /// For rows whose behaviour has no name. A code action carries a whole protocol value that
+    /// has to be resolved and applied, and a keymap has no way to say that. The work is held as a
+    /// shared closure, because the row is *written* where the answer arrived and *read* where the
+    /// picker draws it.
     Run(Deed),
-    /// Nothing — a row that is there to be read.
+    /// Nothing. A row that is there to be read.
     Nothing,
 }
 
@@ -407,9 +407,9 @@ impl Row {
 
     /// A row standing for a place in a file, named the way a person names one.
     ///
-    /// The path relative to the project and the line after it, which is what an error message and
-    /// a grep hit both look like — so a list of references reads the same way as everything else
-    /// the picker shows.
+    /// The path relative to the project, and the line after it. An error message and a grep hit
+    /// both look like that, so a list of references reads the same way as everything else the
+    /// picker shows.
     #[must_use]
     pub fn location(path: &std::path::Path, line: u64, root: &std::path::Path) -> Self {
         let relative = path

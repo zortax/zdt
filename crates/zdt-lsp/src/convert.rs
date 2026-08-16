@@ -1,14 +1,13 @@
 //! Between the editor's offsets and the protocol's positions.
 //!
-//! The editor counts bytes. The protocol counts lines and characters — and by default a character
-//! is a UTF-16 code unit, which is neither a byte nor a `char`. A server that says the error is at
-//! character 12 of line 3 means twelve UTF-16 units, so on a line with an emoji in it, twelve
-//! *anythings else* is the wrong place.
+//! The editor counts bytes. The protocol counts lines and characters, and by default a character
+//! is a UTF-16 code unit. That is neither a byte nor a `char`. A server that says the error is at
+//! character 12 of line 3 means twelve UTF-16 units, so on a line with an emoji in it, twelve of
+//! anything else lands in the wrong place.
 //!
-//! Every conversion in this file is against the rope, so it is exact rather than approximately
-//! right for ASCII. That matters more than it sounds: a diagnostic underline one character wide in
-//! the wrong place is worse than none, and a completion that replaces the wrong range corrupts the
-//! text.
+//! Every conversion in this file works against the rope, so every one is exact. That matters more
+//! than it sounds. A diagnostic underline one character wide in the wrong place is worse than
+//! none, and a completion that replaces the wrong range corrupts the text.
 
 use lsp_types::{Position, Range};
 use ropey::Rope;
@@ -39,8 +38,8 @@ impl Encoding {
 
 /// Where `byte` is, as the protocol would say it.
 ///
-/// A byte past the end answers the last position rather than failing: an offset that has moved
-/// under a request is a race, not a bug worth propagating.
+/// A byte past the end answers the last position. An offset that has moved under a request is a
+/// race, and propagating it as an error helps nobody.
 #[must_use]
 pub fn position_of(rope: &Rope, byte: usize, encoding: Encoding) -> Position {
     let byte = byte.min(rope.len_bytes());
@@ -106,10 +105,10 @@ fn advance(text: &str, units: usize, encoding: Encoding) -> usize {
             }
             at
         }
-        // A position inside a surrogate pair rounds *back* to where the character begins rather
-        // than forward past it. Both are wrong — the server and the editor disagree about the
-        // text — but rounding back can only ever include less, and rounding forward can step over
-        // a character that was meant to be edited.
+        // A position inside a surrogate pair rounds *back* to where the character begins. Both
+        // directions are wrong, because the server and the editor disagree about the text.
+        // Rounding back can only ever include less. Rounding forward can step over a character
+        // that was meant to be edited.
         Encoding::Utf16 => {
             let mut counted = 0;
             for (offset, character) in text.char_indices() {
@@ -239,7 +238,7 @@ mod tests {
         assert_eq!(
             Encoding::of(Some(&PositionEncodingKind::new("utf-64"))),
             Encoding::Utf16,
-            "and something nobody has heard of is the default rather than a failure"
+            "and something nobody has heard of falls back to the default"
         );
     }
 

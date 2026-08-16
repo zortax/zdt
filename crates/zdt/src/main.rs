@@ -46,8 +46,8 @@ fn main() -> anyhow::Result<()> {
 /// What was asked for on the command line: a project to work in, and files to open in it.
 ///
 /// A directory argument is the project outright. With only files, the project is discovered from
-/// the first of them — opening one file in a repository should put the whole repository in the
-/// tree, which is what a person means by opening a file in a project.
+/// the first of them. Opening one file in a repository puts the whole repository in the tree,
+/// which is what somebody means by opening a file in a project.
 fn arguments() -> (Project, Vec<PathBuf>) {
     let mut directory: Option<PathBuf> = None;
     let mut files: Vec<PathBuf> = Vec::new();

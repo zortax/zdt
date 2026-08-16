@@ -1,9 +1,9 @@
 //! Laying a history out as lines and dots.
 //!
-//! A commit graph drawn as a picture is a scheduling problem: each commit gets a *lane*, and the
+//! A commit graph drawn as a picture is a scheduling problem. Each commit gets a *lane*, and the
 //! lines between rows say which commit came from which. This works it out from nothing but the
-//! commits and their parents, so it is pure — no repository, no I/O — and can be asserted against
-//! a history written out by hand.
+//! commits and their parents. It opens no repository and reads no files, so a test can assert it
+//! against a history written out by hand.
 //!
 //! # The algorithm
 //!
@@ -13,7 +13,7 @@
 //!
 //! 1. Find the lanes waiting for it. The leftmost is where its dot goes; every other one merges
 //!    into that lane and is freed.
-//! 2. If no lane was waiting — which happens for a branch tip — take the leftmost free lane.
+//! 2. If no lane was waiting, which happens for a branch tip, take the leftmost free lane.
 //! 3. Put the commit's first parent in its own lane, and every other parent in a fresh lane
 //!    beside it. That is what makes a merge fan out to the right and rejoin later.
 //!
@@ -48,8 +48,8 @@ pub struct Row {
 
 /// Lays `commits` out, newest first.
 ///
-/// The commits must be in the order they are drawn in — which is the order [`crate::log::log`]
-/// returns them.
+/// The commits must arrive in the order they are drawn in, which is the order
+/// [`crate::log::log`] returns them.
 #[must_use]
 pub fn lay_out(commits: &[Commit]) -> Vec<Row> {
     // What each lane is waiting for. `None` is a free lane.
@@ -68,9 +68,9 @@ pub fn lay_out(commits: &[Commit]) -> Vec<Row> {
 
         let lane = match waiting.first() {
             Some(first) => *first,
-            // Nothing is waiting for it: a branch tip, or the newest commit. It takes the leftmost
-            // free lane rather than a new one, so a history with one branch stays one column wide
-            // however many branches have come and gone above it.
+            // Nothing is waiting for it: a branch tip, or the newest commit. It takes the
+            // leftmost free lane, so a history with one branch stays one column wide however many
+            // branches have come and gone above it.
             None => free_lane(&mut lanes),
         };
         // The ones rejoining are freed; their lines are drawn below.
@@ -91,8 +91,8 @@ pub fn lay_out(commits: &[Commit]) -> Vec<Row> {
                     .iter()
                     .position(|held| held.as_deref() == Some(parent.as_str()))
                 {
-                    // That parent is already expected somewhere: the merge rejoins an existing
-                    // line rather than opening another one beside it.
+                    // That parent is already expected somewhere. The merge rejoins the existing
+                    // line.
                     Some(existing) => existing,
                     None => {
                         let fresh = free_lane(&mut lanes);

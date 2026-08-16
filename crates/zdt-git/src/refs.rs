@@ -13,7 +13,7 @@ pub struct Branch {
     pub current: bool,
     /// Which remote branch it follows, when it follows one.
     pub upstream: Option<String>,
-    /// Whether it is a remote branch rather than a local one.
+    /// Whether it is a remote branch. A local one otherwise.
     pub remote: bool,
 }
 
@@ -22,7 +22,7 @@ pub struct Branch {
 pub enum Head {
     /// On a branch, by name.
     Branch(String),
-    /// Not on one, at a commit.
+    /// Off every branch, at a commit.
     Detached(String),
     /// A repository with no commits in it, so `HEAD` points at a branch that does not exist yet.
     Unborn(String),
@@ -54,7 +54,7 @@ impl Head {
 ///
 /// # Errors
 ///
-/// When `HEAD` cannot be read at all, which means the repository is broken rather than empty.
+/// When `HEAD` cannot be read at all, which means the repository is broken. An empty one reads.
 pub fn head(repo: &Repo) -> Result<Head, Error> {
     let found = repo.git().head().map_err(Error::git)?;
 
@@ -101,8 +101,8 @@ pub fn branches(repo: &Repo) -> Result<Vec<Branch>, Error> {
         if !is_remote && !full.starts_with("refs/heads/") {
             continue;
         }
-        // `origin/HEAD` is a pointer to another branch rather than a branch, and listing it puts
-        // the same commit in the list twice under two names.
+        // `origin/HEAD` points at another branch. Listing it puts one commit in the list twice,
+        // under two names.
         if full.ends_with("/HEAD") {
             continue;
         }

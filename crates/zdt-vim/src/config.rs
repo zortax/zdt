@@ -17,9 +17,8 @@
 //! args = { big = false }
 //! ```
 //!
-//! A row can carry several actions with `actions = [...]`, and can take a binding away with
-//! `action = false` — which is how a person removes one of the defaults rather than having to
-//! shadow it with something that does nothing.
+//! A row can carry several actions with `actions = [...]`. `action = false` takes a binding away,
+//! which is how a person removes one of the defaults.
 //!
 //! Files are merged in the order they are given, so the shipped defaults are read first and a
 //! person's own file is an override of them.
@@ -195,8 +194,8 @@ fn apply(map: &mut Keymap, row: &Row, leaders: Leaders) -> Result<(), KeymapErro
     }
 
     let description = row.desc.clone().unwrap_or_else(|| {
-        // Something rather than nothing: a binding with no description still has to be findable
-        // in which-key and in the keymap picker.
+        // Every binding gets a description. One with none must still be findable in which-key
+        // and in the keymap picker.
         actions[0].leaf().replace('_', " ")
     });
 

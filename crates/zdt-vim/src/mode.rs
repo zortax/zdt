@@ -8,7 +8,7 @@ pub enum Mode {
     Normal,
     /// Keys are text.
     Insert,
-    /// Keys are text, replacing what is under the caret rather than pushing it along.
+    /// Keys are text. Each one replaces what is under the caret.
     Replace,
     /// A selection that grows character by character.
     Visual,
@@ -72,8 +72,8 @@ impl Mode {
 
 /// Which modes one binding applies in.
 ///
-/// A set rather than one mode, because almost every binding applies in several and writing it out
-/// once per mode is how a keymap gets out of step with itself.
+/// A set, because almost every binding applies in several modes. Writing it out once per mode is
+/// how a keymap gets out of step with itself.
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct ModeSet(u16);
 
@@ -107,10 +107,10 @@ impl ModeSet {
 
     /// The modes a keymap's mode letter stands for.
     ///
-    /// Vim's letters, and vim's meanings for them: `n` normal, `i` insert, `r` replace, `x` every
-    /// visual mode — the block one included — `v` those and select, `s` select alone, `b` the
-    /// block one alone, `o` operator-pending, `c` the command line, `t` a terminal. `a` is all of
-    /// them, for a binding like `<F7>` that has to work wherever the person is.
+    /// Vim's letters, with vim's meanings: `n` normal, `i` insert, `r` replace, `x` every visual
+    /// mode including the block one, `v` those and select, `s` select alone, `b` the block one
+    /// alone, `o` operator-pending, `c` the command line, `t` a terminal. `a` is all of them, for
+    /// a binding like `<F7>` that must work wherever the person is.
     #[must_use]
     pub fn from_letter(letter: &str) -> Option<Self> {
         let visual = Self::of(Mode::Visual)
@@ -211,8 +211,8 @@ mod tests {
 
     #[test]
     fn the_status_line_has_a_word_and_a_colour_for_every_mode() {
-        // A modal editor that could not say which mode it was in would be unusable, so this is
-        // the one place a missing arm has to be impossible rather than merely unlikely.
+        // A modal editor that cannot say which mode it is in is unusable. This is the one place
+        // where a missing arm must be impossible.
         for mode in [
             Mode::Normal,
             Mode::Insert,

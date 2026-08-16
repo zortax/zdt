@@ -458,7 +458,7 @@ fn o_opens_a_line_and_keeps_the_indent() {
 
 #[test]
 fn escape_leaves_the_caret_where_vim_leaves_it() {
-    // On the last character typed, rather than after it.
+    // On the last character typed, and not after it.
     let mut editor = Editor::new("|hello");
     editor.keys("iXY<Esc>");
     assert_eq!(editor.rendered(), "X|Yhello");
@@ -594,8 +594,8 @@ fn the_dot_puts_the_last_change_back() {
 
 #[test]
 fn the_dot_repeats_the_change_rather_than_the_motion_after_it() {
-    // After `dw` and an `l`, `.` deletes a word again — at the caret, where vim repeats it.
-    // A `.` that had repeated the `l` would have left the text alone.
+    // After `dw` and an `l`, `.` deletes a word again, at the caret, where vim repeats it. A `.`
+    // that repeated the `l` would leave the text alone.
     let mut editor = Editor::new("|one two three");
     editor.keys("dw");
     assert_eq!(editor.text(), "two three");

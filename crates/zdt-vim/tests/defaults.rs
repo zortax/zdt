@@ -1,8 +1,8 @@
 //! The keymap the editor ships with.
 //!
-//! It is a file rather than code, so what protects it is a test that reads it: a typo in a key
-//! sequence, a mode letter that stands for nothing, or a row that says nothing about what it does
-//! would otherwise reach a person's hands as a binding that quietly is not there.
+//! The keymap is a file, so a test that reads it is what protects it. A typo in a key sequence, a
+//! mode letter that stands for nothing, or a row that says nothing about what it does would
+//! otherwise reach a person's hands as a binding that quietly is not there.
 
 use zdt_vim::config::merge;
 use zdt_vim::keymap::{Keymap, Resolution};
@@ -163,9 +163,9 @@ fn escape_goes_back_to_normal_from_everywhere() {
 #[test]
 fn no_binding_shadows_a_prefix_it_shares() {
     // A key bound to something *and* the start of a longer sequence in the same mode would make
-    // the longer one unreachable, because a whole binding wins over a prefix. The doubled forms —
-    // `dd`, `yy`, `gcc` — are grammar rather than bindings for exactly this reason: an operator
-    // that sees its own last key again acts on the current line.
+    // the longer one unreachable, because a whole binding wins over a prefix. The doubled forms
+    // `dd`, `yy` and `gcc` belong to the grammar for exactly this reason. An operator that sees
+    // its own last key again acts on the current line.
     let map = defaults();
     for mode in [
         Mode::Normal,
@@ -238,8 +238,8 @@ fn a_users_file_replaces_a_shipped_binding() {
 #[test]
 fn a_different_leader_moves_the_whole_leader_map() {
     let mut map = Keymap::new();
-    // A key the defaults do not otherwise use, so that what is asserted is the substitution
-    // rather than which of two bindings won.
+    // A key the defaults do not otherwise use, so this asserts the substitution itself. Two
+    // bindings would make it assert which one won.
     let leaders = Leaders {
         leader: zdt_vim::Chord::char('Q'),
         local: zdt_vim::Chord::char(','),

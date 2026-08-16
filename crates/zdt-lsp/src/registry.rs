@@ -1,12 +1,12 @@
 //! Which server runs where.
 //!
-//! Two questions, and neither involves talking to anything: which servers claim a file's language,
-//! and which directory each of them should be rooted at.
+//! Two questions, and neither talks to anything: which servers claim a file's language, and which
+//! directory each of them is rooted at.
 //!
 //! The root matters more than it looks. `rust-analyzer` rooted at a crate inside a workspace
-//! indexes that crate alone and answers "no definition" for anything outside it; rooted at the
-//! workspace it answers properly. So the rule is the outermost marker under the project, not the
-//! nearest one — the same rule the project itself is found by.
+//! indexes that crate alone, and answers "no definition" for anything outside it. Rooted at the
+//! workspace it answers properly. So the rule takes the outermost marker under the project. The
+//! project itself is found by the same rule.
 
 use std::path::{Path, PathBuf};
 
@@ -67,8 +67,8 @@ pub fn wanted_for(
 
 /// The configuration's TOML, as the JSON a server is handed.
 ///
-/// The settings are written in TOML because the rest of the configuration is; the protocol speaks
-/// JSON. A value that will not convert is left out rather than sent wrong.
+/// The settings are written in TOML, because the rest of the configuration is. The protocol
+/// speaks JSON. A value that will not convert is left out.
 fn as_json(value: Option<&toml::Value>) -> Option<serde_json::Value> {
     let value = value?;
     match serde_json::to_value(value) {
@@ -102,8 +102,8 @@ pub fn root_for(path: &Path, project_root: &Path, markers: &[String]) -> Option<
         return Some(project_root.to_path_buf());
     }
 
-    // Climbing from the file to the project root and keeping the *last* match is what makes this
-    // the outermost rather than the nearest.
+    // Climbing from the file to the project root and keeping the *last* match is what makes the
+    // answer the outermost marker.
     let mut outermost = None;
     let mut at = Some(directory.as_path());
     while let Some(here) = at {

@@ -1,8 +1,8 @@
 //! The repository, opened.
 //!
 //! One handle, opened from any path inside the working tree and shared by everything else in this
-//! crate. Opening is not free — it reads the configuration, resolves the object store, works out
-//! where the worktree is — so it happens once and the handle is passed around.
+//! crate. Opening costs: it reads the configuration, resolves the object store, and works out
+//! where the worktree is. So it happens once, and the handle is passed around.
 
 use std::path::{Path, PathBuf};
 
@@ -39,9 +39,8 @@ pub struct Repo {
 impl Repo {
     /// Opens the repository `path` is inside.
     ///
-    /// Walks upwards, so any file in the tree finds it. A bare repository is refused rather than
-    /// half-supported: everything the panel shows is a comparison against a working tree, and
-    /// there is not one.
+    /// Walks upwards, so any file in the tree finds it. A bare repository is refused. Everything
+    /// the panel shows is a comparison against a working tree, and a bare repository has none.
     ///
     /// # Errors
     ///
@@ -212,8 +211,8 @@ mod tests {
         let directory = std::env::temp_dir().join(format!("zdt-git-none-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).expect("a directory");
-        // A temporary directory can itself be inside somebody's repository, so this only asserts
-        // that opening either works or says why — never that it panics.
+        // A temporary directory can itself be inside somebody's repository. This asserts only
+        // that opening works or says why.
         if let Ok(repo) = Repo::open(&directory) {
             assert!(repo.root().exists());
         }

@@ -6,9 +6,9 @@
 //!
 //! # Overlays
 //!
-//! A region with its own keys — the file tree, a picker, a terminal — puts an overlay in front of
-//! the base map. The overlay is asked first and the base answers whatever it declines, so the tree
-//! can bind `d` to *delete this file* without having to re-state what `<Leader>ff` does.
+//! A region with its own keys, such as the file tree, a picker or a terminal, puts an overlay in
+//! front of the base map. The overlay is asked first, and the base answers whatever it declines.
+//! So the tree can bind `d` to *delete this file* and still get `<Leader>ff` for free.
 
 use rustc_hash::FxHashMap;
 
@@ -43,7 +43,7 @@ pub struct Continuation<'a> {
     pub chord: Chord,
     /// What that key leads to.
     pub label: &'a str,
-    /// Whether it is a whole binding rather than another prefix.
+    /// Whether it is a whole binding. Another prefix otherwise.
     pub runs: bool,
 }
 
@@ -77,9 +77,9 @@ impl Node {
 
     /// Whether anything is bound here or anywhere under here.
     ///
-    /// Not the same as having children. A group label — `<Leader>f` is "Find" — is written into
-    /// every mode's trie, because a label is not a mode's business; so a mode with nothing bound
-    /// under `<Leader>` still has the whole group tree in it. Without this, `<Space>` in a
+    /// This differs from having children. A group label, such as `<Leader>f` for "Find", goes
+    /// into every mode's trie, because a label is not a mode's business. So a mode with nothing
+    /// bound under `<Leader>` still holds the whole group tree. Without this, `<Space>` in a
     /// terminal would be a prefix waiting for a key that can never come, and the space bar would
     /// stop working.
     fn binds_anything(&self) -> bool {
@@ -117,8 +117,8 @@ impl Keymap {
 
     /// Binds `keys` to `binding` in every mode in `modes`.
     ///
-    /// A later binding replaces an earlier one for the same keys in the same mode, which is what
-    /// makes a user's file an override of the defaults rather than a conflict with them.
+    /// A later binding replaces an earlier one for the same keys in the same mode. That is what
+    /// makes a user's file an override of the defaults.
     pub fn bind(&mut self, modes: ModeSet, keys: &[Chord], binding: Binding) {
         if keys.is_empty() {
             return;
@@ -162,9 +162,9 @@ impl Keymap {
             return Resolution::None;
         };
 
-        // A binding wins over a prefix: `d` deletes even though `dd` exists, and the engine
-        // decides whether to wait by whether an operator is pending — which is a matter for the
-        // grammar rather than for the map.
+        // A binding wins over a prefix. `d` deletes even though `dd` exists. Whether to wait is
+        // decided by the engine, from whether an operator is pending. That belongs to the grammar
+        // and not to the map.
         if let Some(binding) = node.binding.as_ref() {
             return Resolution::Run(binding);
         }
@@ -207,8 +207,7 @@ impl Keymap {
 
     /// Every binding in `mode`, as key sequences and what they do.
     ///
-    /// For the picker that searches the keymap, and for a test that wants to assert on the whole
-    /// map rather than one row of it.
+    /// For the picker that searches the keymap, and for a test that asserts on the whole map.
     #[must_use]
     pub fn bindings(&self, mode: Mode) -> Vec<(Vec<Chord>, &Binding)> {
         let mut found = Vec::new();
@@ -306,14 +305,13 @@ fn collect<'a>(node: &'a Node, keys: &mut Vec<Chord>, into: &mut Vec<(Vec<Chord>
 
 /// How the continuations of a prefix are ordered for a reader.
 ///
-/// Characters first and in their own order, then everything with a modifier, then named keys —
-/// so a which-key panel reads like an alphabet rather than like a hash map.
+/// Characters first and in their own order, then everything with a modifier, then named keys. A
+/// which-key panel then reads like an alphabet.
 fn sort_key(chord: Chord) -> (u8, String, u8) {
     let modifiers = chord.mods.bits();
     match chord.key {
         crate::chord::Key::Char(character) => (0, character.to_string(), modifiers),
-        // By name, so the named keys read alphabetically rather than in whatever order the enum
-        // happens to be written in.
+        // By name, so the named keys read alphabetically. The order of the enum is arbitrary.
         crate::chord::Key::Named(named) => (1, named.as_str(), modifiers),
     }
 }
@@ -370,7 +368,7 @@ mod tests {
                     .find(|one| one.chord == Chord::char('f'))
                     .expect("f is there");
                 assert_eq!(find.label, "Find", "a named prefix shows its name");
-                assert!(!find.runs, "it is a group rather than a binding");
+                assert!(!find.runs, "it is a group, and runs nothing itself");
             }
             other => panic!("{other:?}"),
         }
@@ -415,7 +413,7 @@ mod tests {
 
     #[test]
     fn a_later_binding_replaces_an_earlier_one() {
-        // Which is what makes a user's file an override rather than a conflict.
+        // That is what makes a user's file an override of the defaults.
         let mut map = map();
         map.bind(
             ModeSet::of(Mode::Normal),
@@ -546,9 +544,9 @@ mod tests {
 
     #[test]
     fn a_group_label_is_not_a_prefix_in_a_mode_with_nothing_under_it() {
-        // A group is a name, and a name has no mode: `<Leader>f` is "Find" wherever it appears.
-        // But labelling it must not make `<Leader>` a prefix in a mode where nothing is bound
-        // under it — in a terminal that would swallow the space bar, which was exactly the bug.
+        // A group is a name, and a name has no mode. `<Leader>f` is "Find" wherever it appears.
+        // Labelling it must still leave `<Leader>` unbound in a mode with nothing under it. In a
+        // terminal a prefix there swallows the space bar, which was exactly the bug.
         let mut map = Keymap::new();
         let everywhere = ModeSet::ALL;
         let normal = ModeSet::of(Mode::Normal);

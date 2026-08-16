@@ -1,11 +1,11 @@
 //! The suggestion popup.
 //!
-//! No language server is started: what is asserted is the layer between one and the popup — how a
+//! No language server is started. What is asserted is the layer between one and the popup: how a
 //! list is ranked as somebody types, what accepting one puts into the buffer, and that an answer
-//! for a prefix nobody is typing any more is dropped rather than drawn.
+//! for a prefix nobody is typing any more is dropped.
 //!
-//! The parts that need a server — the request itself, resolving documentation — are the client's,
-//! and are asserted in `zdt-lsp`.
+//! The parts that need a server belong to the client and are asserted in `zdt-lsp`: the request
+//! itself, and resolving documentation.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,8 +28,8 @@ fn in_scope<R>(body: impl FnOnce() -> R) -> R {
 
 /// An editor holding `text`, with the caret at the end of it.
 ///
-/// A real one rather than a stub: what `prefix_at` and `replacement` do is read a rope through a
-/// handle, and a stub that answered differently would be testing itself.
+/// A real one, and never a stub. `prefix_at` and `replacement` read a rope through a handle, and
+/// a stub that answered differently would be testing itself.
 fn editor(text: &str) -> (Window, EditorHandle) {
     let window = Window::open();
     window.place(window.root, 0.0, 0.0, 800.0, 600.0);
@@ -141,7 +141,7 @@ fn the_word_behind_the_caret_is_what_is_being_completed() {
 
 #[test]
 fn a_caret_that_is_not_in_a_word_is_completing_nothing() {
-    // A dot is a trigger character rather than a prefix: what follows it is a fresh question.
+    // A dot is a trigger character. What follows it is a fresh question.
     let (_window, handle) = editor("let value = thing.");
     assert!(prefix_at(&handle).is_none());
 

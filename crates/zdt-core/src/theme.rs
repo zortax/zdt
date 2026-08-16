@@ -1,10 +1,9 @@
 //! Where a theme's text comes from.
 //!
 //! A theme is two blocks of custom-property declarations: one for a light surface and one for a
-//! dark one. Two vocabularies share the block — `--zui-*`, which the component library's token
-//! schema reads, and everything else, which this application reads straight from the cascade.
-//! Both are carried together so that a person writing a theme writes one file per surface rather
-//! than two.
+//! dark one. Two vocabularies share the block. `--zui-*` is what the component library's token
+//! schema reads, and this application reads everything else straight from the cascade.
+//! Both travel together, so somebody writing a theme writes one file per surface.
 //!
 //! Built-in themes are compiled in. A theme in the configuration directory is read from disk and
 //! reaches the interface through exactly the same type, so nothing downstream knows the
@@ -41,10 +40,10 @@ impl ThemeSource {
 
 /// Declares the built-in themes and reads their files.
 ///
-/// A theme with a light and a dark file is written `"name" => "Label"`. One that only exists on
-/// one surface — Vesper publishes no light variant, and inventing one would be putting words in
-/// its author's mouth — is written `"name" => "Label", dark only`, and asking for it on a light
-/// surface gets the dark one rather than nothing.
+/// A theme with a light and a dark file is written `"name" => "Label"`. One that exists on a
+/// single surface is written `"name" => "Label", dark only`, and asking for it on a light surface
+/// answers the dark one. Vesper publishes no light variant, and inventing one would put words in
+/// its author's mouth.
 macro_rules! builtins {
     ($($file:literal => $label:literal $(, $only:ident only)? ;)*) => {
         /// Every built-in theme, as it is written in the configuration file.
@@ -105,8 +104,8 @@ pub fn builtin_theme_names() -> &'static [(&'static str, &'static str)] {
 
 /// Every theme that can be switched to: the built-in ones, and whatever is in `dir`.
 ///
-/// A name in the directory replaces a built-in one, the same way a keymap row does — that is how
-/// somebody who dislikes one shipped colour changes it rather than forking the whole theme.
+/// A name in the directory replaces a built-in one, the same way a keymap row does. That is how
+/// somebody who dislikes one shipped colour changes it without forking the whole theme.
 #[must_use]
 pub fn theme_names(dir: Option<&Path>) -> Vec<String> {
     let mut names: Vec<String> = builtin_theme_names()
@@ -139,9 +138,9 @@ pub fn theme_names(dir: Option<&Path>) -> Vec<String> {
 
 /// Reads a theme out of a directory, as `<name>-light.css` and `<name>-dark.css`.
 ///
-/// A surface whose file is missing or unreadable falls back to the other one, so a person who
-/// only cares about dark writes one file. A theme with neither file is not a theme, and this
-/// answers `None` rather than an empty one that would silently render the interface unstyled.
+/// A surface whose file is missing or unreadable falls back to the other one, so somebody who
+/// only cares about dark writes one file. A theme with neither file is no theme, and this answers
+/// `None`. An empty theme would silently render the interface unstyled.
 #[must_use]
 pub fn theme_from_dir(dir: &Path, name: &str) -> Option<ThemeSource> {
     let read =
@@ -186,8 +185,7 @@ mod tests {
     #[test]
     fn every_syntax_capture_the_editor_knows_is_coloured() {
         // The editor falls back along the dots and then to the foreground, so a missing capture
-        // renders as plain text rather than as an error. This is the only place that would say
-        // so.
+        // renders as plain text. This is the only place that would report it.
         let theme = builtin_theme("oldworld").expect("oldworld is compiled in");
         for capture in ["keyword", "string", "comment", "function", "type", "number"] {
             let property = format!("--syntax-{capture}:");

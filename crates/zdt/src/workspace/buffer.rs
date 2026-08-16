@@ -26,7 +26,7 @@ pub enum BufferKind {
     },
     /// A terminal, in its own emulator.
     ///
-    /// Held here so that a terminal is a buffer like any other — it appears on the buffer line,
+    /// Held here so that a terminal is a buffer like any other. It appears on the buffer line,
     /// `]b` walks onto it, and `<Leader>c` closes it.
     Terminal {
         /// What the program running in it calls itself, once it says.
@@ -34,9 +34,9 @@ pub enum BufferKind {
     },
     /// The settings, as a page.
     ///
-    /// A buffer rather than a modal so that it is a tab like any other: `]b` walks onto it,
-    /// `<Leader>c` closes it, and it can be put in a split beside the file whose behaviour is
-    /// being changed — which is the whole reason to want it as a tab.
+    /// A buffer, so it is a tab like any other. `]b` walks onto it, `<Leader>c` closes it, and it
+    /// can go in a split beside the file whose behaviour is being changed. That last one is the
+    /// whole reason to want it as a tab.
     Settings,
     /// The git panel, as a page.
     Git,
@@ -75,8 +75,8 @@ pub struct Buffer {
     pub saved_text: RwSignal<Fingerprint, LocalStorage>,
     /// Whether the text differs from what was written, worked out when the text moves.
     ///
-    /// Held rather than computed on read, because the buffer line reads it every frame and the
-    /// answer costs a hash of the file.
+    /// Held, and never computed on read. The buffer line reads it every frame, and the answer
+    /// costs a hash of the file.
     pub dirty: RwSignal<bool, LocalStorage>,
 }
 
@@ -125,7 +125,7 @@ impl Buffer {
             .map(zdt_core::language::of)
             .unwrap_or(zdt_core::language::UNKNOWN);
         // A buffer opens holding exactly what was read, so what it opens with *is* what is on
-        // disk — and a file that is not there yet is an empty buffer whose empty text matches.
+        // disk. A file that is not there yet is an empty buffer whose empty text matches.
         let saved = Fingerprint::of(&document.rope());
         Self {
             id,
@@ -199,7 +199,7 @@ impl Buffer {
         matches!(self.kind, BufferKind::Terminal { .. })
     }
 
-    /// Whether this is a panel rather than something being edited.
+    /// Whether this is a panel. Something being edited otherwise.
     ///
     /// What the things that only make sense over text ask before doing anything: saving, telling a
     /// language server, working out a diff.
@@ -248,8 +248,8 @@ impl Buffer {
 
     /// Works out whether it still differs, and remembers the answer.
     ///
-    /// Called when the text moves. The revision is checked first — equal revisions cannot differ
-    /// — and then the fingerprint, whose length check settles nearly every case for nothing.
+    /// Called when the text moves. The revision is checked first, because equal revisions cannot
+    /// differ. Then the fingerprint, whose length check settles nearly every case for nothing.
     pub fn refresh_dirty(&self) {
         let Some(document) = self.document() else {
             return;
@@ -296,8 +296,8 @@ mod tests {
 
     #[test]
     fn text_that_changed_and_changed_back_matches_again() {
-        // The whole reason a fingerprint is used rather than the revision: undoing produces a new
-        // revision, never the old one, so only the text can answer whether anything differs.
+        // The whole reason a fingerprint is used. Undoing produces a new revision and never the
+        // old one, so only the text can answer whether anything differs.
         let saved = Fingerprint::of(&ropey::Rope::from_str("hello\n"));
 
         assert!(!saved.matches(&ropey::Rope::from_str("goodbye\n")));
@@ -306,8 +306,8 @@ mod tests {
 
     #[test]
     fn a_different_length_is_answered_without_hashing() {
-        // Not observable from outside, which is the point: the length check is what makes this
-        // cheap enough to run on every keystroke. What is observable is that it still answers.
+        // Invisible from outside, which is the point. The length check makes this cheap enough
+        // to run on every keystroke, and what is observable is that it still answers.
         let saved = Fingerprint::of(&ropey::Rope::from_str("hello"));
         assert!(!saved.matches(&ropey::Rope::from_str("hello world")));
     }

@@ -1,11 +1,11 @@
 //! The terminals, driven without a window.
 //!
-//! The emulator itself is `zgui-terminal`'s and is tested there. What is asserted here is the layer
-//! above it: that a program is started once and handed over once, that a float is a float rather
-//! than a buffer, that toggling one is the same one each time, and that terminal mode is a thing
-//! the interface can be in and get out of.
+//! The emulator itself is `zgui-terminal`'s and is tested there. What is asserted here is the
+//! layer above it: a program is started once and handed over once, a float stays off the buffer
+//! line, toggling one reaches the same one each time, and terminal mode is a thing the interface
+//! can be in and get out of.
 //!
-//! These start real processes. `true` and `cat` are used rather than a shell, because both exist
+//! These start real processes. `true` and `cat` stand in for a shell, because both exist
 //! everywhere and neither reads a configuration file.
 
 use zdt::settings::Settings;
@@ -65,7 +65,7 @@ fn the_program_is_handed_over_once() {
     );
     assert!(
         terminals.take_pending(id).is_none(),
-        "and a second view gets nothing, rather than starting a second one"
+        "and a second view gets nothing, so no second program starts"
     );
 
     terminals.close(id);

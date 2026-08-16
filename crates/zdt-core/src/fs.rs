@@ -1,9 +1,9 @@
 //! Reading a file in and writing it back out.
 //!
-//! Two things about a file are not in its text and have to survive a round trip anyway: how it is
+//! Two things about a file live outside its text and must survive a round trip: how it is
 //! encoded, and what it ends its lines with. Both are read on the way in, held beside the buffer,
-//! and put back on the way out — so opening a CRLF file on Linux, editing one line and saving does
-//! not rewrite every line in the file, and neither does opening a UTF-16 file from Windows.
+//! and put back on the way out. So opening a CRLF file on Linux, editing one line and saving
+//! leaves every other line alone. The same holds for a UTF-16 file from Windows.
 //!
 //! The buffer itself always holds UTF-8 with `\n` breaks. Everything above this module works in
 //! those terms and never asks what the file on disk looks like.
@@ -69,9 +69,9 @@ impl LineEnding {
 
     /// Which one `text` uses, decided by the first break in it.
     ///
-    /// The first rather than the most common: a file is one thing or the other, and a file that
-    /// is genuinely mixed has already lost that argument. Saving normalises it, which is the only
-    /// way an editor can leave a mixed file in a state anybody can reason about.
+    /// The first break decides, and not the most common one. A file is one thing or the other,
+    /// and a genuinely mixed file has already lost that argument. Saving normalises it, which is
+    /// the only way an editor can leave a mixed file in a state anybody can reason about.
     #[must_use]
     pub fn detect(text: &str) -> Self {
         match text.find('\n') {
@@ -175,8 +175,8 @@ pub fn decode(bytes: &[u8], path: &Path) -> Result<LoadedFile, FileError> {
         }
     };
 
-    // A file with a zero byte in it is not text, whatever it decoded to. Checked after decoding
-    // rather than before, because UTF-16 is full of them by construction.
+    // A file with a zero byte in it is not text, whatever it decoded to. Checked after decoding,
+    // because UTF-16 is full of zero bytes by construction.
     if text.contains('\0') {
         return Err(FileError::NotText {
             path: path.to_path_buf(),
@@ -200,7 +200,7 @@ pub fn decode(bytes: &[u8], path: &Path) -> Result<LoadedFile, FileError> {
 /// Writes `text` to `path` in `encoding` with `line_ending`, atomically.
 ///
 /// Through a temporary beside the target and a rename, so an interrupted save leaves the old file
-/// rather than half of the new one. Beside rather than in the system's temporary directory,
+/// whole. The temporary sits beside the target and not in the system's temporary directory,
 /// because a rename across filesystems is a copy and stops being atomic.
 ///
 /// Blocking. Called from a worker.

@@ -48,9 +48,9 @@ impl State {
 
 /// One path, and what has happened to it on each side.
 ///
-/// Two states rather than one, because that is the shape of the thing: a file can be staged *and*
-/// changed again since, and a panel that showed one letter could not say so — which is exactly the
-/// case where somebody is about to commit half of what they think they are committing.
+/// Two states, because that is the shape of the thing. A file can be staged *and* changed again
+/// since. A panel that showed one letter could not say so, and that is exactly the case where
+/// somebody is about to commit half of what they think they are committing.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Entry {
     /// Which file, as git names it.
@@ -87,9 +87,8 @@ impl Entry {
 
 /// Everything git would list, in the order it lists it.
 ///
-/// Untracked files are included but directories are not walked into recursively past the first
-/// untracked one — the same rule `git status` uses, and for the same reason: a fresh `target/` is
-/// one row rather than nine thousand.
+/// Untracked files are included. Directories stop at the first untracked one, which is the rule
+/// `git status` uses. A fresh `target/` is then one row instead of nine thousand.
 ///
 /// # Errors
 ///
@@ -102,8 +101,8 @@ pub fn status(repo: &Repo) -> Result<Vec<Entry>, Error> {
         .status(gix::progress::Discard)
         .map_err(Error::git)?
         .index_worktree_options_mut(|options| {
-            // A fresh `target/` is one row rather than nine thousand, which is the same rule
-            // `git status` itself follows and for the same reason.
+            // A fresh `target/` is one row instead of nine thousand. `git status` follows the
+            // same rule, for the same reason.
             if let Some(dirwalk) = options.dirwalk_options.as_mut() {
                 dirwalk.set_emit_untracked(gix::dir::walk::EmissionMode::CollapseDirectory);
             }
@@ -113,7 +112,7 @@ pub fn status(repo: &Repo) -> Result<Vec<Entry>, Error> {
 
     for item in iter {
         let item = item.map_err(Error::git)?;
-        // `None` is an item that is not a change at all — an index entry whose timestamp wants
+        // `None` is an item that is no change at all: an index entry whose timestamp wants
         // refreshing, or a walked file that turned out to be tracked and unmodified.
         let Some(summary) = item.summary() else {
             continue;
@@ -128,9 +127,9 @@ pub fn status(repo: &Repo) -> Result<Vec<Entry>, Error> {
         });
     }
 
-    // What the index holds that the last commit does not. A second pass because the two questions
-    // are asked of two different things — the tree against the index, and the index against the
-    // working copy — and gix answers them separately.
+    // What the index holds that the last commit does not. A second pass, because the questions
+    // are asked of two different things: the tree against the index, and the index against the
+    // working copy. Gix answers them separately.
     for (path, state) in staged(repo)? {
         match found.iter_mut().find(|entry| entry.path == path) {
             Some(entry) => entry.index = state,

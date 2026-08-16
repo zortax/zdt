@@ -127,7 +127,7 @@ impl Modal {
 
 #[test]
 fn a_letter_is_a_command_rather_than_text() {
-    // The whole point of the modal layer: `l` moves rather than inserting an `l`.
+    // The whole point of the modal layer: `l` moves the caret and types nothing.
     let modal = mount("hello");
     modal.keys("l");
     assert_eq!(modal.text(), "hello");
@@ -144,8 +144,8 @@ fn a_motion_and_an_operator_reach_the_editor() {
 
 #[test]
 fn insert_mode_gives_the_keys_back_to_the_editor() {
-    // Typing is the editor's own business — its auto-indent and its undo grouping are better than
-    // anything the engine could do with the keys.
+    // Typing is the editor's own business. Its auto-indent and its undo grouping beat anything
+    // the engine could do with the keys.
     let modal = mount("world");
     modal.keys("i");
     assert_eq!(modal.vim.mode(), zdt_vim::Mode::Insert);
@@ -184,7 +184,7 @@ fn a_control_chord_reaches_the_keymap() {
 
 #[test]
 fn the_leader_is_the_space_bar() {
-    // A leader that arrived as a bare character rather than the named key would never match.
+    // A leader that arrived as a bare character would never match the named key.
     let modal = mount("hello");
     modal.press(Key::Named(NamedKey::Space));
     assert_eq!(modal.vim.pending(), "<Space>", "it is waiting for the rest");
@@ -267,7 +267,7 @@ fn which_key_offers_what_could_come_next() {
         .find(|one| one.keys == "f")
         .expect("`f` is in the leader map");
     assert_eq!(find.label, "Find");
-    assert!(!find.runs, "it is a group rather than a binding");
+    assert!(!find.runs, "it is a group, and runs nothing itself");
 
     let save = next
         .iter()
@@ -279,9 +279,8 @@ fn which_key_offers_what_could_come_next() {
 
 #[test]
 fn which_key_follows_the_sequence_into_a_group() {
-    // The rows are keyed by what they say as well as by their key, because a row reused from the
-    // group above would keep the label it was built with — and the two groups share plenty of
-    // keys.
+    // The rows are keyed by what they say as well as by their key. A row reused from the group
+    // above would keep the label it was built with, and the two groups share plenty of keys.
     let modal = mount("hello");
     modal.press(Key::Named(NamedKey::Space));
     modal.keys("f");
@@ -321,7 +320,7 @@ fn a_leap_takes_two_characters_and_a_label() {
     assert_eq!(modal.cursor(), 0);
 
     modal.keys("sat");
-    // Three places have `at`, none under the caret, so labels are offered rather than a jump.
+    // Three places have `at` and none is under the caret, so this offers labels.
     assert_eq!(modal.cursor(), 0, "nothing has moved yet");
 
     modal.keys("s");
@@ -375,8 +374,8 @@ fn leaping_backwards_looks_the_other_way() {
     let end = modal.cursor();
     assert!(end > 10);
 
-    // `$` sits on the final `t`, so all three `at`s are behind the caret. The nearest — the one
-    // the caret is inside — gets the first label, and the second label reaches past it.
+    // `$` sits on the final `t`, so all three `at`s are behind the caret. The nearest is the one
+    // the caret is inside. It gets the first label, and the second label reaches past it.
     modal.keys("Sat");
     modal.keys("f");
     assert_eq!(modal.cursor(), 6);

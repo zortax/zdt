@@ -1,11 +1,11 @@
 //! What the servers think is wrong.
 //!
-//! One store for every file and every server. Keyed by both, because two servers can have opinions
-//! about one file and a new set from one of them must not throw away the other's — which is what a
-//! store keyed by file alone would do the moment somebody ran a linter beside a type checker.
+//! One store for every file and every server. Keyed by both, because two servers can have
+//! opinions about one file, and a new set from one of them must leave the other's alone. A store
+//! keyed by file alone loses one of them the moment somebody runs a linter beside a type checker.
 //!
 //! Everything here is plain data. What to underline, what to put in the gutter and what to say in
-//! the status line are the interface's business; this only says what is wrong and where.
+//! the status line belong to the interface. This says only what is wrong, and where.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -85,8 +85,8 @@ impl Store {
 
     /// Replaces what `server` says about `path`.
     ///
-    /// Replacing rather than adding is the protocol's rule: a publish is the whole truth about
-    /// that file from that server, and an empty one means it is happy now.
+    /// Replacing is the protocol's rule. A publish is the whole truth about that file from that
+    /// server, and an empty one means it is happy now.
     pub fn set(&mut self, path: &Path, server: &str, diagnostics: Vec<Diagnostic>) {
         let per_server = self.by_file.entry(path.to_path_buf()).or_default();
         if diagnostics.is_empty() {
@@ -158,8 +158,8 @@ impl Store {
 
     /// The next diagnostic after `line` in `path`, wrapping to the first.
     ///
-    /// What `]d` is. Wrapping rather than stopping, because a file with one error in it at the top
-    /// is a file where `]d` should still reach it from the bottom.
+    /// What `]d` is. It wraps, so a file with one error at the top is still reachable by `]d`
+    /// from the bottom.
     #[must_use]
     pub fn after(&self, path: &Path, line: u32) -> Option<Diagnostic> {
         let found = self.for_file(path);

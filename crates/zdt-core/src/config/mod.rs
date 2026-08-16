@@ -28,8 +28,8 @@ pub use crate::config::schema::{
 
 /// Where the configuration directory is.
 ///
-/// `$ZDT_CONFIG_DIR` when it is set, which is what a test and a second installation both need;
-/// otherwise the platform's own, under `zdt`.
+/// `$ZDT_CONFIG_DIR` when it is set. A test and a second installation both need that. Otherwise
+/// the platform's own directory, under `zdt`.
 #[must_use]
 pub fn directory() -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("ZDT_CONFIG_DIR") {
@@ -206,15 +206,15 @@ pub fn write_default(path: &Path) -> Result<bool, ConfigError> {
 /// The settings as a file: every field that disagrees with the default, and nothing else.
 ///
 /// What the settings panel writes. Serialising the whole `Config` would turn a three-line file
-/// somebody wrote by hand into two hundred lines they did not, and would freeze today's defaults
-/// into their file so that changing one later would not reach them.
+/// somebody wrote by hand into two hundred lines they did not. It would also freeze today's
+/// defaults into their file, so a later change to one would never reach them.
 ///
 /// # How far down it looks
 ///
-/// One level. A section is compared key by key, and anything under a key — a table, an array — is
-/// compared whole. That is not a simplification but a correctness rule: `lsp.servers` is a map with
-/// `#[serde(default)]` on it, so a file naming *some* servers is a file naming *only* those
-/// servers. Written key by key, adding one server would silently delete the four that ship.
+/// One level. A section is compared key by key. Anything under a key, such as a table or an array,
+/// is compared whole. This is a correctness rule. `lsp.servers` is a map with `#[serde(default)]`
+/// on it, so a file that names *some* servers is a file that names *only* those. Written key by
+/// key, adding one server would silently delete the four that ship.
 #[must_use]
 pub fn write_diff(config: &Config) -> String {
     let Ok(toml::Value::Table(current)) = toml::Value::try_from(config) else {
@@ -238,7 +238,8 @@ pub fn write_diff(config: &Config) -> String {
                     out.insert(section, toml::Value::Table(differs));
                 }
             }
-            // Not a section at all, or one the defaults have never heard of: kept whole.
+            // A key that is not a section, or a section the defaults have never heard of. Kept
+            // whole.
             _ if base != Some(&value) => {
                 out.insert(section, value);
             }
@@ -251,9 +252,9 @@ pub fn write_diff(config: &Config) -> String {
 
 /// Writes `text` to `path` without ever leaving a half-written file there.
 ///
-/// A temporary beside it, then a rename, which is atomic on every filesystem the editor runs on.
-/// The watcher was written for this: it watches the directory rather than the file, because an
-/// atomic save replaces a file rather than writing it.
+/// A temporary beside it, then a rename. The rename is atomic on every filesystem the editor runs
+/// on. The watcher was written for this. It watches the directory, because an atomic save replaces
+/// a file instead of writing into it.
 ///
 /// # Errors
 ///
@@ -270,8 +271,8 @@ pub fn write_atomically(path: &Path, text: &str) -> Result<(), ConfigError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(io(parent))?;
     }
-    // Beside it rather than in the temporary directory, because a rename across filesystems is
-    // not a rename.
+    // Beside the target, and not in the temporary directory. A rename across filesystems is a
+    // copy.
     let temporary = path.with_extension("toml.writing");
     std::fs::write(&temporary, text).map_err(io(&temporary))?;
     std::fs::rename(&temporary, path).map_err(io(path))
@@ -315,10 +316,10 @@ mod diff_tests {
 
     #[test]
     fn the_servers_are_written_whole_or_not_at_all() {
-        // The defect this prevents is the worst kind: `lsp.servers` has `#[serde(default)]` on it,
-        // so a file naming *some* servers is a file naming *only* those. Written key by key,
-        // adding one server would silently delete the four that ship — and the symptom would be
-        // rust-analyzer quietly not starting a week later.
+        // The defect this prevents is the worst kind. `lsp.servers` has `#[serde(default)]` on
+        // it, so a file that names *some* servers names *only* those. Written key by key, adding
+        // one server would silently delete the four that ship. The symptom appears a week later
+        // as rust-analyzer quietly not starting.
         let mut config = Config::default();
         config.lsp.servers.insert(
             "zls".to_owned(),
@@ -355,8 +356,8 @@ mod diff_tests {
 
     #[test]
     fn writing_never_leaves_half_a_file_behind() {
-        // Not a race this can provoke, but the arrangement that makes one impossible: the write
-        // goes to a temporary and the rename is what publishes it.
+        // This asserts the arrangement that makes a race impossible. The write goes to a
+        // temporary, and the rename publishes it.
         let directory = std::env::temp_dir().join(format!(
             "zdt-write-{}-{:?}",
             std::process::id(),
@@ -371,12 +372,12 @@ mod diff_tests {
             "[editor]\nscrolloff = 4\n"
         );
 
-        // And writing again replaces it rather than appending, with no leftovers beside it.
+        // Writing again replaces the file, with no leftovers beside it.
         write_atomically(&path, "[editor]\nscrolloff = 9\n").expect("it writes again");
         assert!(std::fs::read_to_string(&path).unwrap().contains("9"));
         assert!(
             !path.with_extension("toml.writing").exists(),
-            "the temporary is renamed away rather than left"
+            "the temporary is renamed away, and none is left behind"
         );
 
         let _ = std::fs::remove_dir_all(&directory);
@@ -408,7 +409,7 @@ mod tests {
 
     #[test]
     fn a_file_that_is_wrong_says_so() {
-        // Somebody wrote it and meant something; carrying on with the defaults would hide that.
+        // Somebody wrote it and meant something. Carrying on with the defaults would hide that.
         let directory = temporary();
         let path = directory.join("config.toml");
         std::fs::write(&path, "[ui]\nthemee = \"nope\"\n").expect("it writes");

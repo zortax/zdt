@@ -102,8 +102,8 @@ impl Tree {
 
     /// Whether `path` is a directory, as the rows that have been read say.
     ///
-    /// Answered from what has been walked rather than from the filesystem: this is asked while a
-    /// pointer moves, and a `stat` per frame is a `stat` too many.
+    /// Answered from what has been walked, and never from the filesystem. This is asked while a
+    /// pointer moves, and one `stat` per frame is one too many.
     #[must_use]
     pub fn is_directory(&self, path: &Path) -> bool {
         if path == self.root {
@@ -222,8 +222,8 @@ impl Tree {
 
 /// What is directly inside `path`, in the order a tree shows it.
 ///
-/// Directories first, then files, each sorted by name and ignoring case — which is the order every
-/// file tree uses and the only one that can be scanned.
+/// Directories first, then files, each sorted by name and ignoring case. Every file tree uses
+/// that order, and it is the only one that can be scanned.
 ///
 /// Blocking.
 #[must_use]

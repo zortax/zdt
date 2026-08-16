@@ -1,9 +1,8 @@
 //! How the windows are arranged.
 //!
 //! A tree of splits with a window at each leaf, which is what `:split` and `:vsplit` build and
-//! what `<C-w>` walks. Sizes are percentages of the split they are in, so resizing the window
-//! keeps the proportions the user set — and so that the tree can be handed to a resizable panel
-//! group unchanged.
+//! what `<C-w>` walks. Sizes are percentages of the split they are in. Resizing the window then
+//! keeps the proportions the user set, and the tree goes to a resizable panel group unchanged.
 
 use slotmap::new_key_type;
 
@@ -55,7 +54,7 @@ impl Direction {
         }
     }
 
-    /// Whether it looks toward the later children of a split rather than the earlier ones.
+    /// Whether it looks toward the later children of a split. The earlier ones otherwise.
     #[must_use]
     pub const fn forward(self) -> bool {
         matches!(self, Self::Right | Self::Down)
@@ -114,10 +113,10 @@ impl Layout {
 
     /// The window `direction` of `from`, when there is one.
     ///
-    /// Worked out from the tree rather than from where things ended up on screen: the nearest
+    /// Worked out from the tree, and never from where things ended up on screen. The nearest
     /// ancestor split that divides the right way is crossed, and the sibling on the other side is
     /// entered at its nearest edge. That is what vim does with a tree of splits, and it needs no
-    /// geometry — which matters, because the geometry is not known until after a frame is drawn.
+    /// geometry. Geometry matters here: it is unknown until after a frame is drawn.
     #[must_use]
     pub fn neighbour(&self, from: WindowId, direction: Direction) -> Option<WindowId> {
         let mut path = Vec::new();
@@ -219,9 +218,9 @@ impl Layout {
 
     /// Divides the split holding `at` along `axis`, putting `new` beside it.
     ///
-    /// A split along the axis its parent already divides on joins that parent rather than nesting
-    /// inside it — three vertical splits are one row of three, not a row of two with a row of two
-    /// in it, which is what makes their sizes add up to what the user sees.
+    /// A split along the axis its parent already divides on joins that parent. Three vertical
+    /// splits are one row of three, and never a row of two holding a row of two. That is what
+    /// makes their sizes add up to what the user sees.
     pub fn split(&mut self, at: WindowId, axis: Axis, new: WindowId) -> bool {
         match self {
             Self::Leaf(id) if *id == at => {
@@ -256,9 +255,9 @@ impl Layout {
 
     /// Removes `at`, giving its space to whatever was beside it.
     ///
-    /// A split left with one child stops being a split: closing one of two windows leaves the
-    /// other filling what both had, rather than a split of one that every later operation would
-    /// have to know about.
+    /// A split left with one child stops being a split. Closing one of two windows leaves the
+    /// other filling what both had. A split of one would be something every later operation had to
+    /// know about.
     pub fn close(&mut self, at: WindowId) -> bool {
         let Self::Split { children, .. } = self else {
             // The last window is not closeable; something has to be on screen.
@@ -505,7 +504,7 @@ mod tests {
     #[test]
     fn crossing_out_of_a_nested_split_climbs_to_find_one() {
         // Left | (top over bottom). From either of the two on the right, `h` is the one on the
-        // left — the split that divides that way is two levels up.
+        // left. The split that divides that way is two levels up.
         let id = ids(3);
         let mut layout = Layout::Leaf(id[0]);
         layout.split(id[0], Axis::Horizontal, id[1]);
@@ -519,8 +518,8 @@ mod tests {
 
     #[test]
     fn crossing_into_a_split_enters_at_its_near_edge() {
-        // (top over bottom) | right. Going left from the right-hand one enters the left column at
-        // its first window rather than at whichever happens to be last.
+        // (top over bottom) | right. Going left from the right-hand one enters the left column
+        // at its first window, and never at whichever happens to be last.
         let id = ids(3);
         let mut layout = Layout::Leaf(id[0]);
         layout.split(id[0], Axis::Horizontal, id[1]);

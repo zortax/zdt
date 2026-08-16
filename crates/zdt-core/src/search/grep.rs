@@ -1,12 +1,11 @@
 //! Looking inside the files.
 //!
-//! `grep-searcher` over the same walk the file picker uses, in this process — no `rg` to find on
-//! the path, and no process to spawn per keystroke.
+//! `grep-searcher` over the same walk the file picker uses, in this process. There is no `rg` to
+//! find on the path, and no process to spawn per keystroke.
 //!
-//! A search is cancellable and reports as it goes, because the interesting property of a grep over
-//! a large repository is not how long it takes to finish but how long until the first hit is on
-//! the screen. Batches go back through a callback the caller gives; on a worker that callback
-//! posts to the interface thread.
+//! A search is cancellable and reports as it goes. What matters about a grep over a large
+//! repository is how long until the first hit is on the screen. Batches go back through a callback
+//! the caller gives. On a worker, that callback posts to the interface thread.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -37,7 +36,7 @@ pub struct Hit {
 pub struct Query {
     /// What to look for.
     pub pattern: String,
-    /// Whether `pattern` is a regular expression rather than text to find literally.
+    /// Whether `pattern` is a regular expression. Literal text otherwise.
     pub regex: bool,
     /// Whether a pattern with no capitals matches without regard to case.
     pub smart_case: bool,
@@ -97,8 +96,8 @@ pub enum GrepError {
 
 /// Searches every file under `root` for `query`, handing batches of hits to `report`.
 ///
-/// `report` is called on the walk's own threads, so it must be cheap and it must be sound to call
-/// from several at once — sending down a channel is the intended shape.
+/// `report` is called on the walk's own threads, so it must be cheap and sound to call from
+/// several at once. Sending down a channel is the intended shape.
 ///
 /// Blocking. Call it from a worker.
 ///

@@ -5,13 +5,13 @@
 //!
 //! # Where the diff comes from
 //!
-//! [`hunks`] runs `git diff` and reads the `@@` headers, and is what the gutter used before there
-//! was a git panel. It is kept because it is the cheapest possible answer to "has this file
-//! changed" — a process, forty bytes of output, no object store opened — and because a repository
-//! `gix` cannot open is one this still works in.
+//! [`hunks`] runs `git diff` and reads the `@@` headers. The gutter used it before there was a
+//! git panel. It stays because it is the cheapest possible answer to "has this file changed": one
+//! process, forty bytes of output, and no object store opened. It also works in a repository
+//! `gix` cannot open.
 //!
-//! Everything the panel needs — the graph, the index, staging a hunk — is in the sibling modules
-//! and goes through `gix`, because those questions cannot be answered in forty bytes.
+//! The graph, the index and hunk staging are in the sibling modules and go through `gix`. Those
+//! questions cannot be answered in forty bytes.
 
 use std::path::Path;
 
@@ -53,8 +53,8 @@ impl Hunk {
 
 /// What git says has changed in `path`.
 ///
-/// Blocking; it runs a process. Nothing when the file is not in a repository, is not tracked, or
-/// git is not installed — all of which are "no signs to draw" rather than errors worth reporting.
+/// Blocking, because it runs a process. It answers nothing when the file is outside a repository,
+/// is untracked, or git is absent. All three mean "no signs to draw".
 #[must_use]
 pub fn hunks(path: &Path) -> Vec<Hunk> {
     let Some(directory) = path.parent() else {
@@ -177,8 +177,8 @@ mod tests {
 
     #[test]
     fn a_removal_is_marked_on_the_line_below_the_hole() {
-        // Three lines taken out after line 4; there is nothing left to underline, so the mark goes
-        // where the reader's eye is — the line that is now there.
+        // Three lines taken out after line 4. Nothing is left to underline, so the mark goes
+        // where the reader's eye is: the line that is now there.
         let hunks = parse("@@ -5,3 +4,0 @@\n-gone\n-gone\n-gone\n");
         assert_eq!(
             hunks,

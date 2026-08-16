@@ -1,0 +1,13 @@
+[package]
+name = "zdt-icons"
+description = "The vendored icon set, and the element that draws one"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zgui.workspace = true

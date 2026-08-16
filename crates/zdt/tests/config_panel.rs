@@ -1,15 +1,15 @@
 //! The settings page, as a page: mounted, pressed, and asked whether anything changed.
 //!
-//! Two things are guarded. That a control is wired to the setting it names, which is ordinary;
-//! and that no floating panel is centred by a transform, which is not — a transformed box's
-//! descendants are tested against a clip measured before the box moved, so everything inside one
-//! past a boundary partway across it paints correctly and cannot be pressed.
+//! Two things are guarded. First, that a control is wired to the setting it names, which is
+//! ordinary. Second, that no floating panel is centred by a transform, which is not. A transformed
+//! box's descendants are tested against a clip measured before the box moved, so everything inside
+//! one past a boundary partway across it paints correctly and cannot be pressed.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use zdt::settings::Settings;
-use zdt::ui::config::ConfigPanelProps;
+use zdt::settings::view::ConfigPanelProps;
 use zgui::prelude::*;
 use zgui::view;
 use zgui_testkit_view::Window;

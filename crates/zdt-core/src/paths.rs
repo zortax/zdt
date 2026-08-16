@@ -2,9 +2,8 @@
 //!
 //! The tree's `a`, `d`, `r` and `p`. All of it blocking, all of it called from a worker.
 //!
-//! Nothing here overwrites anything. A copy or a move onto a name that exists is an error the
-//! caller reports, not a file quietly replaced — the tree has no undo, so a mistake here is the
-//! kind that is not recoverable.
+//! Nothing here overwrites anything. A copy or a move onto a name that exists is an error for the
+//! caller to report. The tree has no undo, so a mistake here cannot be taken back.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -113,7 +112,7 @@ fn copy_directory(from: &Path, to: &Path) -> io::Result<()> {
 
 /// A name that is not taken, by adding ` copy`, ` copy 2` and so on before the extension.
 ///
-/// What a paste into the directory a file is already in should do, rather than refuse.
+/// What a paste into the directory a file is already in does, instead of refusing.
 #[must_use]
 pub fn free_name(path: &Path) -> PathBuf {
     if !path.exists() {

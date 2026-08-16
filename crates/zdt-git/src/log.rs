@@ -37,14 +37,14 @@ impl Commit {
 
 /// The `limit` commits reachable from `start`, newest first.
 ///
-/// `start` is a revision as git would spell it — a branch name, a hash, `HEAD` — or `None` for
+/// `start` is a revision as git would spell it: a branch name, a hash, or `HEAD`. `None` means
 /// whatever is checked out.
 ///
 /// # Errors
 ///
-/// When the revision does not resolve, or the object store cannot be read. An empty repository is
-/// an empty list rather than an error: a project on its first commit is a perfectly ordinary
-/// project, and the panel should open on it.
+/// When the revision does not resolve, or the object store cannot be read. An empty repository
+/// answers an empty list. A project on its first commit is an ordinary project, and the panel
+/// should open on it.
 pub fn log(repo: &Repo, start: Option<&str>, limit: usize) -> Result<Vec<Commit>, Error> {
     let git = repo.git();
 

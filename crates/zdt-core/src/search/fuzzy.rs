@@ -6,8 +6,8 @@
 //! call. It allocates a matcher each time, which at that size is not worth avoiding.
 //!
 //! [`Ranker`] is the large one: a hundred thousand paths, matched on a pool of threads while the
-//! interface stays responsive. It is a thin cover over `nucleo` — the value it adds is that the
-//! caller never sees a matcher, a pattern object or a tick timeout, only "here are the candidates"
+//! interface stays responsive. It is a thin cover over `nucleo`. What it adds is that the caller
+//! never sees a matcher, a pattern object or a tick timeout. It sees "here are the candidates"
 //! and "here is what somebody typed".
 //!
 //! Both rank the same way, so a picker that outgrows one can move to the other without the results
@@ -31,8 +31,8 @@ pub struct Ranked {
 
 /// Ranks `candidates` against `pattern`, best first.
 ///
-/// An empty pattern matches everything, in the order handed in, which is what a picker shows
-/// before anybody has typed. Blocking, and linear — for a list small enough that linear is fine.
+/// An empty pattern matches everything, in the order handed in. That is what a picker shows
+/// before anybody has typed. Blocking, and linear, for a list small enough that linear is fine.
 #[must_use]
 pub fn rank(candidates: &[String], pattern: &str, limit: usize) -> Vec<Ranked> {
     let mut matcher = nucleo::Matcher::new(Config::DEFAULT.match_paths());
@@ -99,7 +99,7 @@ impl Ranker {
     /// A ranking with nothing in it yet.
     ///
     /// `wake` is called from a worker whenever there is something new to poll for. It must be
-    /// cheap and safe to call from any thread — waking the interface is what it is for.
+    /// cheap, and safe to call from any thread. Waking the interface is what it is for.
     #[must_use]
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
         Self {

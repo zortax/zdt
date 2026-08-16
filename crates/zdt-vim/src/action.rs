@@ -13,8 +13,8 @@ use std::fmt;
 
 /// The arguments an action was given.
 ///
-/// A TOML table, because that is what it was written as. Typed getters rather than a struct per
-/// action: an action this crate has never heard of still has to carry its arguments through.
+/// A TOML table, because that is what it was written as. Typed getters, so that an action this
+/// crate has never heard of can still carry its arguments through.
 #[derive(Clone, Default, PartialEq)]
 pub struct Args(toml::Table);
 
@@ -63,9 +63,8 @@ impl Args {
 
     /// The count `name` was given, at least one.
     ///
-    /// Counts in this editor are always one or more — `0` is a motion, not a multiplier — so a
-    /// zero or a negative in a keymap is a mistake that reads as one rather than as nothing
-    /// happening.
+    /// Counts in this editor are always one or more. `0` is a motion, so a zero or a negative in
+    /// a keymap is a mistake. It reads as one, which shows the mistake instead of hiding it.
     #[must_use]
     pub fn count(&self, name: &str) -> Option<u32> {
         let value = self.number(name)?;

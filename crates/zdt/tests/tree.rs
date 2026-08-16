@@ -1,12 +1,12 @@
 //! The file tree, driven the way a person drives it.
 //!
 //! The tree model itself is asserted in `zdt-core`, against a directory and nothing else. What is
-//! asserted here is the layer above it: that a key resolves against the tree's overlay rather than
-//! the editor's map, that walking and opening move the caret where they should, and that the
-//! filesystem operations reach the disk.
+//! asserted here is the layer above it: a key resolves against the tree's overlay and not the
+//! editor's map, walking and opening move the caret where they should, and the filesystem
+//! operations reach the disk.
 //!
-//! Every one of these is synchronous where it can be, and pumps the window's tasks where it cannot:
-//! reading a directory happens on a worker, so the assertion has to wait for it.
+//! Every one of these is synchronous where it can be, and pumps the window's tasks where it
+//! cannot. Reading a directory happens on a worker, so the assertion has to wait for it.
 
 use std::path::{Path, PathBuf};
 
@@ -138,7 +138,7 @@ fn opening_a_directory_shows_what_is_in_it() {
 
     assert!(
         explorer.open_selected().is_none(),
-        "a directory opens rather than answering a file to open"
+        "a directory opens, and answers no file to open"
     );
     settle(&window);
 

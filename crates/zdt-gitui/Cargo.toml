@@ -1,0 +1,24 @@
+[package]
+name = "zdt-gitui"
+description = "The git panel: what it is looking at, and how it is drawn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zdt-git.workspace = true
+zdt-icons.workspace = true
+zdt-view.workspace = true
+
+zgui.workspace = true
+zgui-ui.workspace = true
+zgui-ui-primitives.workspace = true
+
+[dev-dependencies]
+zdt-vim.workspace = true
+zgui-platform-headless = { git = "https://github.com/zortax/zgui" }
+zgui-testkit-view = { git = "https://github.com/zortax/zgui" }

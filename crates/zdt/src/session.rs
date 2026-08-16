@@ -4,9 +4,9 @@
 //! where the caret was in each. What is not: the undo history, the folds, the terminals.
 //!
 //! Deliberately little. A session is a convenience for reopening yesterday's work, and every
-//! additional thing in it is another thing that can be stale, wrong or enormous — a session file
-//! that carries undo histories is a session file nobody can read and one bad restore away from
-//! putting text back that was deliberately taken out.
+//! extra thing in it is another thing that can be stale, wrong or enormous. A session file that
+//! carries undo histories is one nobody can read, and one bad restore away from putting back text
+//! that was deliberately taken out.
 //!
 //! Sessions live in the configuration directory, named after the directory they were taken in, so
 //! that "the session for this project" needs nothing remembered.
@@ -300,7 +300,7 @@ mod tests {
         let temp = Temp::new("recent");
         save(&temp.0, &session("/first")).expect("it writes");
         // The filesystem's timestamps can be coarse, so the second write is made unambiguously
-        // later rather than trusting that two writes in a row differ.
+        // later. Two writes in a row can carry the same timestamp.
         std::thread::sleep(std::time::Duration::from_millis(20));
         save(&temp.0, &session("/second")).expect("it writes");
 

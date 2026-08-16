@@ -1,8 +1,8 @@
 //! What the engine asks for, and what it needs to know to decide.
 //!
-//! The engine never touches an editor. It is handed what the buffer looks like right now and
-//! answers a list of things to do — which is what lets the whole grammar be driven by a test that
-//! writes down keys and asserts on text.
+//! The engine never touches an editor. It is handed what the buffer looks like right now, and
+//! answers a list of things to do. That is what lets a test drive the whole grammar by writing
+//! down keys and asserting on text.
 
 use std::ops::Range;
 
@@ -104,14 +104,14 @@ pub enum Effect {
     SetClipboard {
         /// The text.
         text: String,
-        /// Whether it is the selection clipboard rather than the ordinary one.
+        /// Whether it is the selection clipboard. The ordinary one otherwise.
         primary: bool,
     },
     /// Read a system clipboard, and paste what comes back.
     ReadClipboard {
         /// Whether it is the selection clipboard.
         primary: bool,
-        /// Whether to put it before the caret rather than after.
+        /// Whether to put it before the caret. After it otherwise.
         before: bool,
     },
     /// Something the application owns: a picker, a language server, a window.
@@ -158,8 +158,8 @@ pub enum Step {
     Consumed(Vec<Effect>),
     /// The key is part of a sequence that has not finished.
     Pending,
-    /// The key is not the engine's. The editor should have it, which is what makes typing in
-    /// insert mode the editor's own business — including its auto-indent and its undo grouping.
+    /// The key is not the engine's. The editor takes it, which makes typing in insert mode the
+    /// editor's own business. That includes its auto-indent and its undo grouping.
     PassThrough,
 }
 

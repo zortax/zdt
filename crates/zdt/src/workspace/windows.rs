@@ -1,0 +1,108 @@
+//! Splitting windows, closing them, and moving between them.
+
+use super::*;
+
+impl Workspace {
+    // ---- Windows ---------------------------------------------------------------------------
+
+    /// Splits the focused window along `axis`, showing the same buffer in both.
+    pub fn split(&self, axis: Axis) -> Option<WindowId> {
+        let focused = self.focused_untracked();
+        let current = self.buffer_in_untracked(focused)?;
+        let new = self
+            .inner
+            .windows
+            .try_update(|windows| {
+                windows.insert(WindowState {
+                    current: Some(current),
+                    mounted: vec![current],
+                    font_step: 0,
+                })
+            })
+            .expect("the window map is writable");
+        let split = self
+            .inner
+            .layout
+            .try_update(|layout| layout.split(focused, axis, new))
+            .unwrap_or(false);
+        if !split {
+            self.inner.windows.update(|windows| {
+                windows.remove(new);
+            });
+            return None;
+        }
+        self.inner.focused.set(new);
+        Some(new)
+    }
+
+    /// Closes the focused window, unless it is the only one.
+    pub fn close_window(&self) -> bool {
+        let focused = self.focused_untracked();
+        let closed = self
+            .inner
+            .layout
+            .try_update(|layout| layout.close(focused))
+            .unwrap_or(false);
+        if !closed {
+            return false;
+        }
+        self.inner.windows.update(|windows| {
+            windows.remove(focused);
+        });
+        if let Some(next) = self.inner.layout.get_untracked().windows().first().copied() {
+            self.inner.focused.set(next);
+        }
+        true
+    }
+
+    /// Closes `window`, whichever it is.
+    ///
+    /// The last one stays: a workspace with no window in it has nowhere to put the next buffer.
+    pub fn close_window_at(&self, window: WindowId) -> bool {
+        let closed = self
+            .inner
+            .layout
+            .try_update(|layout| layout.close(window))
+            .unwrap_or(false);
+        if !closed {
+            return false;
+        }
+        self.inner.windows.update(|windows| {
+            windows.remove(window);
+        });
+        if self.focused_untracked() == window
+            && let Some(next) = self.inner.layout.get_untracked().windows().first().copied()
+        {
+            self.inner.focused.set(next);
+        }
+        true
+    }
+
+    /// Gives the keyboard to `window`.
+    pub fn focus_window(&self, window: WindowId) {
+        if self.inner.focused.get_untracked() != window {
+            self.inner.focused.set(window);
+        }
+    }
+
+    /// Gives the keyboard to the next window in the walking order.
+    pub fn cycle_window(&self, forward: bool) {
+        let layout = self.inner.layout.get_untracked();
+        let focused = self.inner.focused.get_untracked();
+        let next = if forward {
+            layout.next_after(focused)
+        } else {
+            layout.previous_before(focused)
+        };
+        if let Some(next) = next {
+            self.inner.focused.set(next);
+        }
+    }
+
+    /// Writes the sizes a dragged handle reported into the split it belongs to.
+    pub fn resize(&self, window: WindowId, sizes: &[f64]) {
+        self.inner.layout.update(|layout| {
+            layout.resize(window, sizes);
+        });
+    }
+}

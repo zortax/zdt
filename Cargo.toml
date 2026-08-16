@@ -26,6 +26,9 @@ zdt-core = { path = "crates/zdt-core" }
 zdt-vim = { path = "crates/zdt-vim" }
 zdt-lsp = { path = "crates/zdt-lsp" }
 zdt-git = { path = "crates/zdt-git" }
+zdt-view = { path = "crates/zdt-view" }
+zdt-icons = { path = "crates/zdt-icons" }
+zdt-gitui = { path = "crates/zdt-gitui" }
 
 # --- text --------------------------------------------------------------------------------
 ropey = "1.6"

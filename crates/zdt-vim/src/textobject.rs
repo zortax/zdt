@@ -1,8 +1,8 @@
 //! What `iw`, `a"`, `i(` and the rest select.
 //!
-//! A text object answers a byte range rather than a place to go, which is the whole difference
-//! between it and a motion: `diw` deletes the word the caret is *in*, wherever in it the caret
-//! happens to be, and needs no knowledge of which way to move first.
+//! A text object answers a byte range, where a motion answers a place to go. That is the whole
+//! difference. `diw` deletes the word the caret is *in*, wherever in it the caret happens to be,
+//! and needs no knowledge of which way to move first.
 //!
 //! Ranges are half-open and end-exclusive throughout, so the caller never has to ask which of the
 //! three vim measurements applies.
@@ -15,9 +15,9 @@ use crate::text::{self, Class};
 
 /// The word the caret is in.
 ///
-/// `around` takes the blanks after the word too — the whole difference between `diw` on
+/// `around` takes the blanks after the word too. That is the whole difference between `diw` on
 /// `hello world` leaving two spaces and `daw` leaving one. With no blanks after it, the ones
-/// before it are taken instead, which is what makes `daw` on the last word of a line tidy.
+/// before it go instead, which keeps `daw` on the last word of a line tidy.
 #[must_use]
 pub fn word(rope: &Rope, at: usize, big: bool, around: bool) -> Option<Range<usize>> {
     let length = rope.len_bytes();
@@ -102,7 +102,7 @@ pub fn paragraph(rope: &Rope, at: usize, around: bool) -> Option<Range<usize>> {
     }
 
     if around {
-        // The run of the other kind after it — which for a paragraph of text is the blank lines
+        // The run of the other kind after it. For a paragraph of text those are the blank lines
         // that separate it from the next one.
         while end < last && text::line_is_empty(rope, end + 1) != blank {
             end += 1;
@@ -168,8 +168,8 @@ pub fn sentence(rope: &Rope, at: usize, around: bool) -> Option<Range<usize>> {
 
 /// What is inside a pair of `quote` characters, on the caret's line.
 ///
-/// The line rather than the file, because a quote is nearly always closed on the line it opens on
-/// and searching the whole file for one turns a typo into a very large selection.
+/// The line, and not the file. A quote is nearly always closed on the line it opens on, and
+/// searching the whole file for one turns a typo into a very large selection.
 #[must_use]
 pub fn quote(rope: &Rope, at: usize, quote: char, around: bool) -> Option<Range<usize>> {
     let line = text::line_of(rope, at);
@@ -196,8 +196,8 @@ pub fn quote(rope: &Rope, at: usize, quote: char, around: bool) -> Option<Range<
         return None;
     }
 
-    // The pair the caret is in, or the first pair after it — which is what makes `ci"` work with
-    // the caret before the string as well as inside it.
+    // The pair the caret is in, or the first pair after it. So `ci"` works with the caret before
+    // the string as well as inside it.
     for pair in marks.chunks_exact(2) {
         let (open, close) = (pair[0], pair[1]);
         if at <= close {
@@ -212,10 +212,10 @@ pub fn quote(rope: &Rope, at: usize, quote: char, around: bool) -> Option<Range<
     None
 }
 
-/// The pair matching `open` — `(`, `[`, `{` or `<` — that the caret is inside.
+/// The pair matching `open`, which is one of `(`, `[`, `{` or `<`, that the caret is inside.
 ///
-/// Searches the whole text, because a brace really does span lines and a function body is the
-/// commonest thing anybody selects.
+/// Searches the whole text. A brace really does span lines, and a function body is the commonest
+/// thing anybody selects.
 #[must_use]
 pub fn pair(rope: &Rope, at: usize, open: char, around: bool) -> Option<Range<usize>> {
     let close = match open {

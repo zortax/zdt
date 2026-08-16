@@ -1,8 +1,8 @@
 //! What is open, and what happens to it.
 //!
-//! The workspace holds signals, so it needs a reactive runtime to exist in — the testkit window
-//! is the smallest one there is. No view is built: what is asserted is the state every part of
-//! the interface reads, not how any of them draws it.
+//! The workspace holds signals, so it needs a reactive runtime to exist in. The testkit window is
+//! the smallest one there is. No view is built. What is asserted is the state every part of the
+//! interface reads, and never how any of them draws it.
 
 use zdt_core::Project;
 use zgui_testkit_view::Window;

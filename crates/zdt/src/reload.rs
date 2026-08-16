@@ -1,102 +1,21 @@
-//! Noticing that the configuration changed.
+//! Reading the configuration again after it changed.
 //!
-//! A watcher on the configuration directory, debounced, reporting on the interface thread. What it
-//! reports is *that* something changed; what to do about it is [`apply`], which reads the files
-//! again and puts the results where the interface reads them.
+//! The watch itself is [`zdt_view::watch`]. What it reports is *that* something changed. This is
+//! the other half: reading the files again and putting the results where the interface reads them.
 //!
-//! Every part of the configuration can be changed while the editor is running, which is what makes
-//! it worth changing: a theme is judged by looking at it, and a keymap by using it.
+//! Every part of the configuration can change while the editor is running, which is what makes it
+//! worth changing. A theme is judged by looking at it, and a keymap by using it.
 
 use std::path::PathBuf;
-use std::time::Duration;
 
 use zdt_core::config::Paths;
-use zgui::task::spawn_local;
-use zgui::tokio::spawn_receiver;
 
-/// How long to wait after a change before reading, so that a save that writes several files —
-/// which every editor's atomic save does — is read once rather than four times.
-const SETTLE: Duration = Duration::from_millis(120);
-
-/// Watches `paths` and calls `changed` on the interface thread whenever something under it moves.
+/// Watches the configuration directory and calls `changed` on the interface thread.
 ///
-/// The watcher runs on its own thread and is kept alive by the returned handle; dropping it stops
-/// the watching. A directory that does not exist is not an error — a person who has never
-/// configured anything has no directory, and may make one later.
+/// The returned handle keeps the watch alive. Dropping it stops the watching.
 #[must_use]
-pub fn watch(paths: &Paths, changed: impl Fn() + 'static) -> Option<Watcher> {
-    use notify::{RecursiveMode, Watcher as _};
-
-    // A tokio channel rather than the standard one: the receiving end is awaited on the interface
-    // thread, and `spawn_receiver` is what turns it into a call there. The sending end goes to the
-    // watcher's own thread, which is why it has to be one that crosses threads.
-    let (tx, rx) = tokio::sync::mpsc::channel::<()>(16);
-
-    let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-        // Anything that is not a read: written, made, removed, renamed.
-        let interesting = event
-            .map(|event| !matches!(event.kind, notify::EventKind::Access(_)))
-            .unwrap_or(false);
-        if interesting {
-            // Full is fine: a change is a change, and one that arrives while another is being
-            // dealt with is the same reload.
-            let _ = tx.try_send(());
-        }
-    })
-    .ok()?;
-
-    // The directory rather than the files: an atomic save replaces a file rather than writing it,
-    // and a watch on the file itself would follow the one that was renamed away. A directory that
-    // is not there is not an error — somebody who has never configured anything has none, and may
-    // make one later; the editor notices at the next start.
-    if watcher
-        .watch(&paths.root, RecursiveMode::Recursive)
-        .is_err()
-    {
-        return None;
-    }
-
-    // One task takes what arrives and reports it, after a pause: an atomic save writes a temporary
-    // and renames it, which is two events for one change. The report is shared rather than moved
-    // because it is called once per change and the channel goes on delivering.
-    let changed = std::rc::Rc::new(changed);
-    let pump = spawn_receiver(rx, move |()| {
-        if held().replace(true) {
-            // Something is already waiting to report; this change joins it.
-            return;
-        }
-        let changed = std::rc::Rc::clone(&changed);
-        let task = spawn_local(async move {
-            zgui::task::blocking(move || std::thread::sleep(SETTLE)).await;
-            held().set(false);
-            changed();
-        });
-        // The task outlives this call by design; the watch's own handle is what ends the
-        // reporting, because dropping it drops the channel and ends the pump.
-        std::mem::forget(task);
-    });
-
-    Some(Watcher {
-        _watcher: watcher,
-        _pump: pump,
-    })
-}
-
-/// Whether a report is already waiting to be made.
-///
-/// A cell on the interface thread rather than a flag in the closure, because the closure is called
-/// again while the pause is running and both calls have to see the same answer.
-fn held() -> &'static std::thread::LocalKey<std::cell::Cell<bool>> {
-    thread_local! {
-        static WAITING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    }
-    &WAITING
-}
-
-/// Keeps a watch alive. Dropping it stops the watching.
-pub struct Watcher {
-    _watcher: notify::RecommendedWatcher,
-    _pump: zgui::task::Task,
+pub fn watch(paths: &Paths, changed: impl Fn() + 'static) -> Option<zdt_view::Watcher> {
+    zdt_view::watch(&paths.root, changed)
 }
 
 /// Everything a change to the configuration directory can bring.

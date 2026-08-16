@@ -1,12 +1,11 @@
 //! Walking a project.
 //!
 //! One parallel walk, honouring `.gitignore`, producing every path in the project relative to its
-//! root. On this machine that is a few milliseconds for a thousand files and well under a second
-//! for a hundred thousand — but it is blocking, and belongs on a worker.
+//! root. On this machine that takes a few milliseconds for a thousand files, and well under a
+//! second for a hundred thousand. It blocks, so it belongs on a worker.
 //!
-//! The paths come back as `String` rather than `PathBuf` because everything downstream of here —
-//! the matcher, the list, the preview's header — wants text, and converting once at the edge is
-//! cheaper than converting at every use.
+//! The paths come back as `String`. Everything downstream wants text: the matcher, the list, and
+//! the preview's header. Converting once at the edge is cheaper than converting at every use.
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -85,8 +84,8 @@ pub fn walk(root: &Path, options: Walk) -> Vec<String> {
     let mut found = found
         .into_inner()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    // Sorted, so that two runs over the same project give the same order and an unmatched list
-    // reads as a tree rather than as whatever order the threads happened to finish in.
+    // Sorted, so two runs over the same project give the same order. An unmatched list then
+    // reads as a tree. The order the threads finish in is arbitrary.
     found.sort_unstable();
     found
 }

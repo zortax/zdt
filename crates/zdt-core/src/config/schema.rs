@@ -1,10 +1,10 @@
 //! What a `config.toml` says.
 //!
-//! Every field has a default, so a configuration file is a list of disagreements with the editor
-//! rather than a description of it. A missing file is the same as an empty one.
+//! Every field has a default. A configuration file is a list of disagreements with the editor. A
+//! missing file is the same as an empty one.
 //!
-//! Unknown fields are refused. A misspelled setting that silently did nothing is the worst kind of
-//! configuration bug, because the only symptom is the editor not doing what the file plainly says.
+//! Unknown fields are refused. A misspelled setting that silently does nothing is the worst kind
+//! of configuration bug. The only symptom is the editor ignoring what the file plainly says.
 
 use std::collections::BTreeMap;
 
@@ -110,12 +110,12 @@ pub struct Editor {
     pub tab_size: u32,
     /// Whether tab inserts spaces.
     pub expand_tab: bool,
-    /// Whether the view glides rather than jumping.
+    /// Whether the view glides to its new position.
     pub smooth_scroll: bool,
-    /// How far the view may move and still jump rather than glide, in lines.
+    /// How far the view may move and still jump, in lines. A longer move glides.
     ///
     /// Zero animates every scroll, `j` at the bottom of the view included. Raise it if a
-    /// line-at-a-time glide feels like the view lagging behind the keystroke.
+    /// line-at-a-time glide feels like the view lags behind the keystroke.
     pub smooth_scroll_min_lines: f64,
     /// Whether the caret's line is tinted.
     pub cursorline: bool,
@@ -313,8 +313,8 @@ pub struct Lsp {
     pub servers: BTreeMap<String, Server>,
 }
 
-// Written out rather than derived, because a derived `Default` would leave language servers off —
-// and a whole file with no `[lsp]` table in it takes every field from here.
+// Written out, because a derived `Default` would leave language servers off. A file with no
+// `[lsp]` table takes every field from here.
 impl Default for Lsp {
     fn default() -> Self {
         Self {

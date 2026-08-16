@@ -1,8 +1,8 @@
 //! One press of one key.
 //!
-//! The vocabulary the keymap is written in and the engine matches against. It is this crate's own
-//! rather than the framework's for one reason: everything here has to be constructible in a test
-//! from a string, so that the whole grammar can be driven by writing down what somebody typed.
+//! The vocabulary the keymap is written in and the engine matches against. This crate has its own
+//! for one reason: everything here must be constructible in a test from a string, so the whole
+//! grammar can be driven by writing down what somebody typed.
 
 use std::fmt;
 
@@ -72,8 +72,8 @@ impl Named {
 
     /// The key written as `name`, when there is one. Case-insensitive, as vim's notation is.
     ///
-    /// Not `FromStr`: that trait's error type would have to say something, and there is nothing
-    /// to say beyond "no key is written that way".
+    /// This is no `FromStr`. That trait's error type would have to say something, and there is
+    /// nothing to say beyond "no key is written that way".
     #[must_use]
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(name: &str) -> Option<Self> {
@@ -111,8 +111,8 @@ impl Named {
 pub enum Key {
     /// A key that produces a character, as the layout and shift leave it.
     ///
-    /// Shift is *in* the character rather than beside it: `A` is one binding and `a` is another,
-    /// and a keymap that had to say `<S-a>` for the first would be unreadable.
+    /// Shift is *in* the character. `A` is one binding and `a` is another. A keymap that had to
+    /// say `<S-a>` for the first would be unreadable.
     Char(char),
     /// A key that has a name instead.
     Named(Named),

@@ -1,9 +1,8 @@
 //! The announcements.
 //!
 //! The queue itself belongs to the component library and is asserted there. What is asserted here
-//! is the layer over it: that a keyed announcement replaces the one it is replacing rather than
-//! stacking beside it, that a failure waits to be read, and that switching announcements off
-//! switches them off rather than merely hiding them.
+//! is the layer over it: a keyed announcement replaces the one under its key, a failure waits to
+//! be read, and switching announcements off stops them being made.
 //!
 //! Every one of these runs against a real `ToastQueue` provided into the scope, because the whole
 //! point of `Notify` is what it does *to* a queue.
@@ -15,8 +14,8 @@ use zgui_ui::toast::{Toast, ToastKind, ToastQueue};
 
 /// Runs `body` in a reactive scope with somewhere for announcements to go.
 ///
-/// The queue is provided rather than a `Toaster` mounted: `Notify::new` finds it with
-/// `use_toaster`, which is a context read, and a context is all it needs.
+/// The queue is provided, and no `Toaster` is mounted. `Notify::new` finds it with `use_toaster`,
+/// which is a context read, and a context is all it needs.
 fn with_queue<R>(config: zdt_core::Config, body: impl FnOnce(Notify) -> R) -> R {
     let window = Window::open();
     window.scope.with(|| {
@@ -130,7 +129,7 @@ fn switching_announcements_off_switches_them_off() {
         assert_eq!(
             notify.showing(),
             0,
-            "nothing is pushed at all, rather than pushed and hidden"
+            "nothing is pushed at all, so nothing is merely hidden"
         );
     });
 }
@@ -165,9 +164,9 @@ fn announcements_survive_having_nowhere_to_go() {
 
 /// The language layer, with somewhere for its announcements to go.
 ///
-/// Built in one scope so that `Language::new` finds the queue: it takes the announcements once at
-/// construction rather than looking them up later, because most of what it says happens inside a
-/// task or a timer and neither is inside a scope that has them.
+/// Built in one scope, so `Language::new` finds the queue. It takes the announcements once at
+/// construction. Most of what it says happens inside a task or a timer, and neither runs inside a
+/// scope that has them.
 fn language(window: &Window) -> (zdt::language::Language, Notify) {
     window.scope.with(|| {
         let _queue = ToastQueue::provide();
@@ -232,7 +231,7 @@ fn a_flood_of_progress_is_one_announcement() {
 #[test]
 fn a_second_job_does_not_open_a_second_row() {
     // Both keyed on the server, so a server that finishes indexing and starts something else
-    // replaces its own row rather than stacking beside it.
+    // replaces its own row.
     let window = Window::open();
     let (language, notify) = language(&window);
     let notices = language.notices();

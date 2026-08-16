@@ -1,8 +1,8 @@
 //! Reading and changing a git repository.
 //!
-//! Everything here is blocking and knows nothing about the interface — no signals, no components,
-//! no `Rc`. That is what lets it be tested against a real repository in a temporary directory,
-//! which is the only way to have any confidence in code that stages hunks.
+//! Everything here is blocking and knows nothing about the interface. No signals, no components,
+//! no `Rc`. That is what lets a test drive it against a real repository in a temporary directory,
+//! which is the only way to have confidence in code that stages hunks.
 //!
 //! # Why `gix` and not the `git` command
 //!
@@ -15,11 +15,11 @@
 //! actually is: read the blob the index holds, apply the chosen hunks to *that* text, write the
 //! result as a new blob, and point the index entry at it. Expressed through `git apply --cached`
 //! it is a patch that has to be generated, escaped, and applied to a file that may have moved
-//! underneath it; expressed against the object store it is four steps that either all happen or
+//! underneath it. Expressed against the object store it is four steps that either all happen or
 //! none do.
 //!
-//! One thing still runs a process — see [`hunks`], whose whole job is to be the cheapest possible
-//! answer to "has this file changed at all" for a gutter that asks per file per save.
+//! One module still runs a process. See [`hunks`], whose whole job is to be the cheapest possible
+//! answer to "has this file changed at all" for a gutter that asks once per file per save.
 
 pub mod commit;
 pub mod diff;

@@ -2,7 +2,7 @@
 //!
 //! A `WorkspaceEdit` is the answer to a rename, to most code actions, and to "organize imports".
 //! All three need exactly the same thing done with it, and all three corrupt files silently when
-//! it is done wrong — which is why it is written once, here, rather than three times.
+//! it is done wrong. So it is written once, here.
 //!
 //! # The four rules
 //!
@@ -10,16 +10,15 @@
 //! everything after it. Sorted descending by start, each edit lands where the server said.
 //!
 //! **One transaction per file.** All of a file's edits go in a single `ReplaceRanges`, so undo
-//! takes back the whole rename rather than one occurrence of it.
+//! takes back the whole rename in one step.
 //!
-//! **Versioned edits are checked.** A server that names a version is a server saying "this edit is
-//! against exactly that text". If the buffer has moved on since, the edit is refused rather than
-//! applied to text it was not computed for. This is the same rule the diagnostics already follow,
-//! for the same reason: applying a stale answer is worse than applying none.
+//! **Versioned edits are checked.** A server that names a version is saying "this edit is against
+//! exactly that text". If the buffer has moved on since, the edit is refused. The diagnostics
+//! follow the same rule, for the same reason: applying a stale answer is worse than applying none.
 //!
-//! **Files it names are opened.** A rename crosses files, and most of them are not open. Each is
-//! opened, edited, and left open — because somebody who renamed a symbol in nine files wants to be
-//! able to look at what happened in all nine, and to undo it.
+//! **Files it names are opened.** A rename crosses files, and most of them are closed. Each one is
+//! opened, edited, and left open. Somebody who renamed a symbol in nine files wants to look at
+//! what happened in all nine, and to undo it.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -103,8 +102,8 @@ pub fn apply(
         into_file(workspace, path, edits, version, encoding);
     }
 
-    // Handed in rather than looked up: this is called from inside a task, and a context looked up
-    // after an await is not there — see `tests/context.rs`.
+    // Handed in, because this is called from inside a task and a context looked up after an
+    // await is gone. See `tests/context.rs`.
     match notify {
         Some(notify) => notify.say(applied.summary()),
         None => workspace.say(applied.summary()),
@@ -113,8 +112,8 @@ pub fn apply(
 
 /// Every file an edit names, with what to do to it and which version it was computed against.
 ///
-/// The two shapes the protocol allows — a plain map, and a list of versioned documents — flattened
-/// into one, so that everything below has a single thing to deal with.
+/// The protocol allows two shapes: a plain map, and a list of versioned documents. Both flatten
+/// into this one, so everything below deals with a single thing.
 fn grouped(edit: lsp_types::WorkspaceEdit) -> Vec<(PathBuf, Vec<TextEdit>, Option<i32>)> {
     let mut out: BTreeMap<PathBuf, (Vec<TextEdit>, Option<i32>)> = BTreeMap::new();
 
@@ -197,9 +196,9 @@ fn into_file(
         }
     }
 
-    // Not open, or open with no editor mounted on it. Open it and edit it once it is there: the
-    // buffer is read on a worker and the editor is built on the frame after that, so this cannot
-    // be done in one go.
+    // Closed, or open with no editor mounted on it. Open it, and edit it once it is there. The
+    // buffer is read on a worker and the editor is built on the frame after that, so this takes
+    // two steps.
     crate::files::open(workspace, path.clone());
 
     let Some(timers) = zgui::view::time::Timers::current() else {
@@ -244,9 +243,9 @@ fn write(handle: &zgui_editor::EditorHandle, edits: &[TextEdit], encoding: zdt_l
 
 /// Creates, renames or removes a file, as a server asked.
 ///
-/// Answers whether it worked. The operations themselves are [`zdt_core::paths`]'s, which are the
-/// same ones the file tree uses — so a rename from a language server and a rename from `r` in the
-/// tree do exactly the same thing.
+/// Answers whether it worked. The operations belong to [`zdt_core::paths`], which is what the
+/// file tree uses too. So a rename from a language server and a rename from `r` in the tree do
+/// exactly the same thing.
 fn resource(op: &ResourceOp) -> bool {
     match op {
         ResourceOp::Create(create) => {

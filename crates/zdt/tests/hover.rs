@@ -1,13 +1,12 @@
 //! The documentation panel, opened and closed and opened again.
 //!
-//! Twice matters: anything held across a rebuild — an observation, a mounted editor for a fenced
-//! block, a context looked up in the wrong scope — shows up on the second open and never the
-//! first.
+//! Twice matters. Anything held across a rebuild shows up on the second open and never the first:
+//! an observation, a mounted editor for a fenced block, a context looked up in the wrong scope.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zdt::ui::hover::{Hover, HoverPanelProps};
+use zdt::hover::{Hover, HoverPanelProps};
 use zgui::prelude::*;
 use zgui::view;
 use zgui_testkit_view::Window;
@@ -22,7 +21,7 @@ fn mounted() -> (Window, Hover) {
         let taken = Rc::clone(&taken);
         window.scope.with(|| {
             let hover = Hover::new();
-            zdt::ui::hover::provide(hover);
+            zdt::hover::provide(hover);
             *taken.borrow_mut() = Some(hover);
 
             let view = view! { HoverPanel() };
@@ -76,8 +75,8 @@ fn plain_prose_opens_twice() {
 
 #[test]
 fn a_fenced_block_opens_twice() {
-    // A fence mounts an editor of its own, which is the one thing in this panel with a worker and
-    // a parser behind it — so it is the thing most likely to object to being built again.
+    // A fence mounts an editor of its own, which is the one thing in this panel with a worker
+    // and a parser behind it. So it is the thing most likely to object to being built again.
     let (window, hover) = mounted();
     let doc = "```rust\npub fn len(&self) -> usize\n```\n\nThe number of bytes.";
 
@@ -131,9 +130,9 @@ fn tick(window: &Window) {
 
 #[test]
 fn opening_it_again_while_it_is_still_leaving() {
-    // What the second `K` actually does. The key first *hides* the panel — that is the rule that
-    // makes a documentation panel go away on the next keystroke — and the action it then runs asks
-    // the server again and shows a new one a few milliseconds later. So the new panel arrives while
+    // What the second `K` actually does. The key first *hides* the panel, which is the rule that
+    // makes a documentation panel go away on the next keystroke. The action it then runs asks the
+    // server again and shows a new one a few milliseconds later. So the new panel arrives while
     // the old one is still playing its exit, and for a moment the presence holds both.
     let (window, hover) = mounted();
 
@@ -222,8 +221,8 @@ fn the_key_that_opens_documentation_is_the_key_that_focuses_it() {
 
 #[test]
 fn an_unrelated_key_is_not_mistaken_for_it() {
-    // The guard has to be about *this* key rather than about any key arriving while the panel is
-    // up, or the panel would take the keyboard from the first thing typed after it opened.
+    // The guard has to be about *this* key. A guard about any key arriving while the panel is up
+    // would take the keyboard from the first thing typed after it opened.
     let (_window, vim) = keys();
     assert!(!vim.chord_runs(zdt_vim::chord::Chord::char('j'), "lsp.hover"));
     assert!(!vim.chord_runs(zdt_vim::chord::Chord::char('w'), "lsp.hover"));

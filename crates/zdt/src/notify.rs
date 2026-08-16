@@ -1,26 +1,26 @@
 //! What the editor announces.
 //!
 //! The status line has one slot, and a slot is a place where the last thing said replaces the one
-//! before it. That is right for a reply — `:w` saying "written", `gr` saying "3 references" — and
-//! wrong for news: a server failing to start while another is indexing is two pieces of news, and
-//! a slot shows one of them.
+//! before it. That is right for a reply, such as `:w` saying "written" or `gr` saying "3
+//! references". It is wrong for news. A server failing to start while another is indexing is two
+//! pieces of news, and a slot shows one of them.
 //!
-//! So there are two channels, and the difference between them is not urgency but *shape*:
+//! There are two channels. The shape of the message selects one:
 //!
 //!   * a **reply** goes to [`Workspace::say`](crate::workspace::Workspace::say). It answers a key
 //!     that was just pressed, it is one line, and it is worth exactly as long as it takes to read.
-//!   * an **announcement** comes here. Nobody asked for it, it arrived on its own, and it has to
-//!     wait to be read rather than be replaced by the next thing that happens.
+//!   * an **announcement** comes here. Nobody asked for it, it arrived on its own, and it waits to
+//!     be read.
 //!
 //! # Keyed announcements
 //!
-//! A language server says "indexing" and later says it has finished. Those are one piece of news
-//! twice, not two, and a stack that showed both would be a stack that grows while nothing changes.
-//! [`Notify::progress`] takes a key and replaces whatever is already under it, so a server owns one
-//! row for its whole life; [`Notify::clear`] gives the row back.
+//! A language server says "indexing" and later says it has finished. That is one piece of news
+//! twice, and a stack that showed both would grow while nothing changed. [`Notify::progress`]
+//! takes a key and replaces whatever is already under it, so a server owns one row for its whole
+//! life. [`Notify::clear`] gives the row back.
 //!
-//! The queue itself has no update-in-place — replacing is dismissing and pushing — which is why the
-//! identifiers are held here rather than being worked out from what is on screen.
+//! The queue has no update-in-place. Replacing is dismissing and pushing, so the identifiers are
+//! held here. Working them out from what is on screen would need a queue that can be read.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -58,8 +58,8 @@ struct Inner {
 impl Notify {
     /// The announcements of the toaster above this component, when there is one.
     ///
-    /// Built inside the toaster rather than beside it, because the queue reaches its callers
-    /// through the scope tree and a scope tree only goes downwards.
+    /// Built inside the toaster, and never beside it. The queue reaches its callers through the
+    /// scope tree, and a scope tree only goes downwards.
     #[must_use]
     pub fn new(settings: crate::settings::Settings) -> Self {
         Self {
@@ -100,8 +100,8 @@ impl Notify {
 
     /// The announcement under `key`, replacing whatever was there.
     ///
-    /// What a long-running job uses: one row for the job rather than one row per thing it says
-    /// about itself.
+    /// What a long-running job uses: one row for the job, however many things it says about
+    /// itself.
     pub fn progress(&self, key: &str, toast: Toast) -> Option<ToastId> {
         self.clear(key);
         let id = self.push(toast)?;
@@ -146,7 +146,7 @@ impl Notify {
     }
 
     /// Whether announcements are wanted.
-    fn wanted(&self) -> bool {
+    pub(super) fn wanted(&self) -> bool {
         self.inner
             .settings
             .with_untracked(|config| config.ui.notifications)
@@ -181,9 +181,9 @@ pub fn provide(notify: Notify) {
 
 /// Them, from inside a component.
 ///
-/// Unlike the workspace and the settings, this answers `None` rather than panicking: announcing
-/// something is not a thing any component depends on being able to do, and a test that mounts one
-/// component without a toaster over it should not fail for want of somewhere to put a message.
+/// This answers `None` where the workspace and the settings panic. No component depends on being
+/// able to announce something, and a test that mounts one component without a toaster over it
+/// should not fail for want of somewhere to put a message.
 #[must_use]
 pub fn use_notify() -> Option<Notify> {
     zgui::reactive::use_local_context::<Notify>()
@@ -191,7 +191,7 @@ pub fn use_notify() -> Option<Notify> {
 
 /// Announces `title`, if there is anywhere to announce it.
 ///
-/// The shorthand the call sites use, so that announcing something is one line rather than three.
+/// The shorthand the call sites use, so announcing something is one line.
 pub fn say(title: impl Into<String>) {
     if let Some(notify) = use_notify() {
         notify.say(title);

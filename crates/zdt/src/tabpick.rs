@@ -3,10 +3,10 @@
 //! `<Leader>bb` puts a letter on every tab; the next key goes to that tab. `<Leader>bd` does the
 //! same and closes the one chosen.
 //!
-//! This is leap for the buffer line, and it is here rather than in the picker for the same reason
-//! leap is not a picker: the tabs are already on screen with their names on them, so a modal that
-//! covers them to list them again is a worse way to do the same thing. Two keystrokes, no modal,
-//! and the eye never leaves the row it was already reading.
+//! This is leap for the buffer line, and it lives here for the same reason leap is no picker. The
+//! tabs are already on screen with their names on them, so a modal that covers them to list them
+//! again is a worse way to do the same thing. Two keystrokes, no modal, and the eye never leaves
+//! the row it was already reading.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +18,7 @@ use crate::workspace::{BufferId, Workspace};
 
 /// The keys tabs are labelled with, in the order they are handed out.
 ///
-/// The home row first, and no `q` — the key people press to get out of things.
+/// The home row first, and no `q`. People press `q` to get out of things.
 const ALPHABET: &str = "asdfghjklwertyuiopzxcvbnm";
 
 /// What choosing a tab should do.
@@ -115,9 +115,9 @@ impl TabPick {
 
     /// Takes one key while the labels are up.
     ///
-    /// Always answers `true`: every key belongs to this while it is running, the ones that end it
-    /// included. A label that means nothing ends it rather than being ignored, because otherwise
-    /// a mistyped key would eat the one after it too.
+    /// Always answers `true`. Every key belongs to this while it is running, the ones that end
+    /// it included. A label that means nothing ends it, because a mistyped key would otherwise eat
+    /// the one after it too.
     pub fn key(&self, character: Option<char>) -> bool {
         let then = *self.inner.then.borrow();
         let chosen = character.and_then(|character| {

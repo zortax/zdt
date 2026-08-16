@@ -3,9 +3,9 @@
 //! Everything in this crate addresses text by byte offset into a rope, and every motion and text
 //! object is built out of what is here. The rules that matter and are easy to get wrong:
 //!
-//! * a line's *end* is before its break, and a caret in normal mode may not sit on the break;
-//! * the last line of a text ending in a break is a real, empty line the caret can be on;
-//! * a step is a grapheme rather than a character, so an emoji with a modifier moves once.
+//! * a line's *end* is before its break, and a caret in normal mode may not sit on the break.
+//! * the last line of a text ending in a break is a real, empty line the caret can be on.
+//! * a step moves one grapheme, so an emoji with a modifier moves once.
 
 use std::borrow::Cow;
 
@@ -254,8 +254,8 @@ pub fn line_range_with_break(rope: &Rope, line: usize) -> std::ops::Range<usize>
 /// The byte range of the lines `from` to `to`, taking their breaks with them.
 ///
 /// What a linewise operator acts on. When the last line of the text is in the range and has no
-/// break of its own, the break *before* the range is taken instead — otherwise deleting the last
-/// line would leave an empty one behind.
+/// break of its own, the break *before* the range goes with it. Deleting the last line would
+/// otherwise leave an empty one behind.
 #[must_use]
 pub fn linewise_range(rope: &Rope, from: usize, to: usize) -> std::ops::Range<usize> {
     let last = rope.len_lines().saturating_sub(1);

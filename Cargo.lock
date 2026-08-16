@@ -6935,7 +6935,10 @@ dependencies = [
  "tracing-subscriber",
  "zdt-core",
  "zdt-git",
+ "zdt-gitui",
+ "zdt-icons",
  "zdt-lsp",
+ "zdt-view",
  "zdt-vim",
  "zgui",
  "zgui-editor",
@@ -6985,6 +6988,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "zdt-gitui"
+version = "0.1.0"
+dependencies = [
+ "zdt-git",
+ "zdt-icons",
+ "zdt-view",
+ "zdt-vim",
+ "zgui",
+ "zgui-platform-headless",
+ "zgui-testkit-view",
+ "zgui-ui",
+ "zgui-ui-primitives",
+]
+
+[[package]]
+name = "zdt-icons"
+version = "0.1.0"
+dependencies = [
+ "zgui",
+]
+
+[[package]]
 name = "zdt-lsp"
 version = "0.1.0"
 dependencies = [
@@ -7002,6 +7027,20 @@ dependencies = [
  "tower",
  "tracing",
  "zdt-core",
+]
+
+[[package]]
+name = "zdt-view"
+version = "0.1.0"
+dependencies = [
+ "notify",
+ "tokio",
+ "zgui",
+ "zgui-editor",
+ "zgui-platform-headless",
+ "zgui-testkit-view",
+ "zgui-ui",
+ "zgui-ui-primitives",
 ]
 
 [[package]]

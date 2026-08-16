@@ -21,8 +21,8 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/toast.css"),
     include_str!("../../../assets/css/completion.css"),
     include_str!("../../../assets/css/settings.css"),
-    include_str!("../../../assets/css/git.css"),
-    // Last, so that what moves is decided in one place rather than beside each thing that moves.
+    zdt_gitui::STYLE,
+    // Last, so one place decides what moves. Each thing that moves says nothing about it.
     include_str!("../../../assets/css/motion.css"),
     include_str!("../../../assets/css/whichkey.css"),
 ];
@@ -36,9 +36,9 @@ pub const TREE_KEYMAP: &str = include_str!("../../../assets/keymap-tree.toml");
 /// Every region that answers keys of its own: what it is called, the keys it ships with, and the
 /// file a person overrides them in.
 ///
-/// The tree is not in this table because it is loaded before anything else is built — it is what
-/// makes `j` in the panel the tree's `j` rather than the editor's, and a window that started
-/// without it would be a window whose file tree does nothing.
+/// The tree stays out of this table, because it is loaded before anything else is built. It is
+/// what makes `j` in the panel the tree's `j`, and a window that started without it would have a
+/// file tree that does nothing.
 pub const OVERLAYS: &[(&str, &str, &str)] = &[
     (
         "hover",
@@ -50,11 +50,7 @@ pub const OVERLAYS: &[(&str, &str, &str)] = &[
         include_str!("../../../assets/keymap-completion.toml"),
         "keymap-completion.toml",
     ),
-    (
-        "git",
-        include_str!("../../../assets/keymap-git.toml"),
-        "keymap-git.toml",
-    ),
+    (zdt_gitui::REGION, zdt_gitui::KEYMAP, "keymap-git.toml"),
 ];
 
 /// Every compiled-in style sheet, joined.

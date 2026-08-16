@@ -47,8 +47,8 @@ fn in_scope<R>(body: impl FnOnce() -> R) -> R {
 
 #[test]
 fn a_change_is_live_before_it_is_written() {
-    // Which is the whole point of the panel: the theme repaints and the tree re-filters as the
-    // control moves, because everything reads the one signal rather than the file.
+    // That is the whole point of the panel. The theme repaints and the tree re-filters as the
+    // control moves, because everything reads the one signal.
     in_scope(|| {
         let settings = Settings::new(zdt_core::Config::default(), None);
         assert_eq!(settings.with(|config| config.editor.tab_size), 4);
@@ -105,8 +105,8 @@ fn what_is_written_reads_back_as_what_was_meant() {
 #[test]
 fn the_editors_own_write_does_not_come_back_around() {
     // The defect this prevents: dragging a slider writes the file, the watcher reports the write,
-    // the reload applies what is already applied and announces "configuration reloaded" — once per
-    // pixel the slider moved.
+    // and the reload applies what is already applied and announces "configuration reloaded". Once
+    // per pixel the slider moved.
     let temp = Temp::new("stamp");
     in_scope(|| {
         let settings = Settings::new(zdt_core::Config::default(), Some(temp.paths()));
@@ -143,7 +143,7 @@ fn somebody_elses_write_is_not_mistaken_for_the_editors() {
 #[test]
 fn the_stamp_is_taken_rather_than_kept() {
     // Otherwise the *second* time somebody else writes exactly what the editor once wrote, it
-    // would be ignored — and what they changed would silently not apply.
+    // would be ignored, and what they changed would silently stay unapplied.
     let temp = Temp::new("stamp-once");
     in_scope(|| {
         let settings = Settings::new(zdt_core::Config::default(), Some(temp.paths()));

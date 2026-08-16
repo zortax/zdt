@@ -1,15 +1,15 @@
 //! Where the work is: the directory the editor was opened on, and what git says about it.
 //!
 //! A project is one root and the things derived from it. The root is what the file tree shows,
-//! what the pickers search, and what a language server is told to index — so it is decided once,
-//! at start-up, and everything downstream reads it rather than working it out again.
+//! what the pickers search, and what a language server is told to index. It is decided once, at
+//! start-up, and everything downstream reads it from here.
 
 use std::path::{Path, PathBuf};
 
 /// The markers that say a directory is the top of something.
 ///
-/// In order: the first one found walking up wins, so a crate inside a workspace is rooted at the
-/// workspace when both are there — which is what a language server wants and what a search across
+/// In order. The first one found walking up wins, so a crate inside a workspace is rooted at the
+/// workspace when both are there. That is what a language server wants, and what a search across
 /// "the project" means.
 const ROOT_MARKERS: &[&str] = &[
     ".git",
@@ -30,10 +30,10 @@ pub struct Project {
 impl Project {
     /// The project `path` belongs to.
     ///
-    /// Walks up from `path` looking for a root marker and stops at the highest directory that has
-    /// one, so a crate inside a workspace opens as the workspace. With no marker anywhere, the
-    /// directory itself is the project — opening a loose file in a home directory should not make
-    /// the home directory the project.
+    /// Walks up from `path` looking for a root marker, and stops at the highest directory that
+    /// has one. So a crate inside a workspace opens as the workspace. With no marker anywhere,
+    /// the directory itself is the project. Opening a loose file in a home directory must leave
+    /// the home directory alone.
     #[must_use]
     pub fn discover(path: &Path) -> Self {
         let start = if path.is_dir() {
@@ -92,9 +92,9 @@ impl Project {
 
     /// Which branch git has checked out, when the root is a repository.
     ///
-    /// Read from `.git/HEAD` rather than by running git: this is drawn in the header on every
-    /// frame's worth of state and must not cost a process. A detached head answers with the short
-    /// commit instead, which is what it is checked out at.
+    /// Read from `.git/HEAD`, because the header draws this on every frame's worth of state and
+    /// must not cost a process. A detached head answers with the short commit it is checked out
+    /// at.
     ///
     /// Blocking, but on a file of about forty bytes.
     #[must_use]

@@ -8,20 +8,19 @@
 //!
 //! # Why two characters
 //!
-//! One is not enough — a screen of code has fifty `e`s — and three is more than the eye needs.
-//! Two narrows a screenful to a handful, which is few enough that the labels can be single keys
-//! from a home-row alphabet rather than sequences.
+//! One is not enough. A screen of code has fifty `e`s. Three is more than the eye needs. Two
+//! narrows a screenful to a handful, so every label can be one key from a home-row alphabet.
 
 use ropey::Rope;
 
 /// Which way a leap looks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
-    /// Forward from the caret — `s`.
+    /// Forward from the caret. Bound to `s`.
     Forward,
-    /// Backward from the caret — `S`.
+    /// Backward from the caret. Bound to `S`.
     Backward,
-    /// Both, nearest first — `gs`, and what a window-wide leap comes to.
+    /// Both, nearest first. Bound to `gs`, and what a window-wide leap comes to.
     Both,
 }
 
@@ -59,8 +58,8 @@ pub fn landings(
 ) -> Vec<Landing> {
     let mut found = matches_in(rope, window, caret, pair, direction);
 
-    // Nearest first, so the earliest labels — the ones under the fingers — go to the places the
-    // eye is most likely already on.
+    // Nearest first. The earliest labels are the ones under the fingers, and they go to the
+    // places the eye is most likely already on.
     found.sort_by_key(|at| at.abs_diff(caret));
 
     let labels: Vec<char> = alphabet.chars().collect();
@@ -96,9 +95,9 @@ pub fn matches_in(
     } else {
         text.clone()
     };
-    // Lowercasing can change a string's length — `İ` becomes two characters — which would put
-    // every offset after it wrong. When it does, match case-sensitively instead: a wrong jump is
-    // worse than a fussy one.
+    // Lowercasing can change a string's length. `İ` becomes two characters, which puts every
+    // offset after it wrong. When that happens, match case-sensitively. A wrong jump is worse
+    // than a fussy one.
     let haystack = if haystack.len() == text.len() {
         haystack
     } else {
@@ -126,10 +125,10 @@ pub fn matches_in(
                 found.push(at);
             }
         }
-        // Overlapping matches count: `aaa` has two places `aa` begins, and a leap that offered
-        // one of them would be a leap that could not reach the other. So the search resumes one
-        // character on rather than past the whole match — one *character*, because slicing a
-        // string in the middle of one is a panic.
+        // Overlapping matches count. `aaa` has two places where `aa` begins, and a leap that
+        // offered one of them could not reach the other. So the search resumes one character on,
+        // and not past the whole match. One *character*, because slicing a string in the middle
+        // of one is a panic.
         from += offset + 1;
         while from < haystack.len() && !haystack.is_char_boundary(from) {
             from += 1;

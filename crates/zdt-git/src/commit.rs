@@ -2,19 +2,18 @@
 //!
 //! # The one thing that is not gix
 //!
-//! Everything else in this crate goes through the object store. This does not, because `gix` 0.85
-//! has no way to write a tree from an index — `gix-index` reads and writes the index file and
-//! stops there, and without index-to-tree there is no commit to make.
+//! Everything else in this crate goes through the object store. This module runs `git commit`,
+//! because `gix` 0.85 has no way to write a tree from an index. `gix-index` reads and writes the
+//! index file and stops there, and without index-to-tree there is no commit to make.
 //!
 //! The alternative was to build the tree here: sort the index entries, group them into nested
-//! trees, write each one, and hope the ordering rules match git's exactly. Getting that subtly
-//! wrong produces a repository that looks fine until somebody clones it. Running `git commit` gets
-//! it exactly right by definition, and it is one process at the one moment when a person has
-//! stopped to type a message — which is the one moment in this whole crate where a process spawn
-//! costs nothing anybody can perceive.
+//! trees, write each one, and match git's ordering rules exactly. Getting that subtly wrong
+//! produces a repository that looks fine until somebody clones it. `git commit` gets it right by
+//! definition. It is one process at the one moment when a person has stopped to type a message,
+//! which is the one moment in this crate where a process spawn costs nothing anybody can feel.
 //!
-//! No shell is involved: the message is an argument, so quoting, backticks and newlines in it are
-//! ordinary characters rather than something to escape.
+//! No shell is involved. The message is an argument, so quoting, backticks and newlines in it are
+//! ordinary characters.
 
 use std::process::Command;
 
@@ -24,14 +23,14 @@ use crate::repo::{Error, Repo};
 ///
 /// Answers the new commit's identifier.
 ///
-/// `amend` replaces the last commit rather than adding one, keeping its parents — which is what
-/// somebody who has just noticed a typo in their message wants.
+/// `amend` replaces the last commit and keeps its parents. That is what somebody who has just
+/// noticed a typo in their message wants.
 ///
 /// # Errors
 ///
 /// When the message is empty, when there is nothing staged, or when git refuses. An empty message
-/// is refused here rather than passed on: git refuses it too, and refusing early means the panel
-/// says so without a process spawn.
+/// is refused here. Git refuses it too, and refusing early lets the panel say so with no process
+/// spawn.
 pub fn commit(repo: &Repo, message: &str, amend: bool) -> Result<String, Error> {
     let message = message.trim();
     if message.is_empty() {
@@ -118,8 +117,8 @@ mod tests {
 
         assert!(commit(&temp.repo(), "   \n  ", false).is_err());
         assert!(commit(&temp.repo(), "", false).is_err());
-        // And nothing happened. Counted rather than logged, because `git log` in a repository
-        // with no commits in it is itself an error.
+        // And nothing happened. This counts the commits, because `git log` in a repository with
+        // no commits in it is itself an error.
         assert_eq!(temp.run(&["rev-list", "--count", "--all"]).trim(), "0");
     }
 
