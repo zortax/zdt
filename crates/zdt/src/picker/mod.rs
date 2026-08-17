@@ -105,6 +105,12 @@ struct Inner {
     /// it. So the caret moving applies it, and `<Esc>` puts back whatever was in force before the
     /// picker opened.
     restore: RefCell<Option<String>>,
+    /// The theme a just-opened picker should put its caret on.
+    ///
+    /// The rows do not exist when the picker opens, so the row to land on cannot be chosen there.
+    /// The name is left here instead, and the first ranking takes it and finds its row. Taken, so
+    /// that every keystroke after the first leaves the caret where the ranking put it.
+    land: RefCell<Option<String>>,
 }
 
 impl Picker {
@@ -130,6 +136,7 @@ impl Picker {
                 pending: RefCell::new(None),
                 cancel: RefCell::new(None),
                 restore: RefCell::new(None),
+                land: RefCell::new(None),
             }),
         }
     }

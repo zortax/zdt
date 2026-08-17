@@ -1,0 +1,232 @@
+/* Oxocarbon, for a dark surface.
+ *
+ * Nyoom Engineering's, built on IBM's Carbon design colours. Like Vesper it is a short palette:
+ * there is no yellow and no orange in it, so the tokens that name those hold the purple Carbon
+ * uses for a warning and the light blue it uses for a number. The greys are Carbon's own ramp and
+ * the sixteen are Oxocarbon's own table, which is why its terminal green is a purple.
+ *
+ * Written by `assets/themes/generate.py` — change the palette there, not the colours here.
+ *
+ * Two vocabularies live in this file. `--zui-*` are the component library's tokens, read by the
+ * theme provider; everything else is this application's own, read straight from the cascade by
+ * the editor, the terminal and the chrome. */
+
+/* --- the component library ------------------------------------------------------------- */
+
+--zui-color-background: #161616;
+--zui-color-foreground: #dde1e6;
+--zui-color-card: #161616;
+--zui-color-card-foreground: #dde1e6;
+--zui-color-popover: #262626;
+--zui-color-popover-foreground: #dde1e6;
+
+--zui-color-primary: #78a9ff;
+--zui-color-primary-foreground: #161616;
+--zui-color-secondary: #393939;
+--zui-color-secondary-foreground: #dde1e6;
+
+--zui-color-muted: #262626;
+--zui-color-muted-foreground: #525252;
+--zui-color-accent: #393939;
+--zui-color-accent-foreground: #dde1e6;
+
+--zui-color-destructive: #ee5396;
+--zui-color-destructive-foreground: #161616;
+--zui-color-success: #42be65;
+--zui-color-success-foreground: #161616;
+--zui-color-warning: #be95ff;
+--zui-color-warning-foreground: #161616;
+--zui-color-info: #78a9ff;
+--zui-color-info-foreground: #161616;
+
+/* Borders are alpha over whatever is behind them, never a solid grey — a solid line is visible
+ * as a line, and this interface wants planes told apart by tone. */
+--zui-color-border: oklch(1 0 0 / 8%);
+--zui-color-input: oklch(1 0 0 / 12%);
+--zui-color-ring: #78a9ff;
+--zui-color-scrim: oklch(0 0 0 / 55%);
+
+--zui-color-sidebar: #131313;
+--zui-color-sidebar-foreground: #dde1e6;
+--zui-color-sidebar-primary: #78a9ff;
+--zui-color-sidebar-primary-foreground: #161616;
+--zui-color-sidebar-accent: #393939;
+--zui-color-sidebar-accent-foreground: #dde1e6;
+--zui-color-sidebar-border: oklch(1 0 0 / 10%);
+--zui-color-sidebar-ring: #78a9ff;
+
+/* --- the application ------------------------------------------------------------------- */
+
+--zdt-danger: #ee5396;
+--zdt-warning: #be95ff;
+--zdt-info: #78a9ff;
+--zdt-hint: #3ddbd9;
+--zdt-added: #42be65;
+--zdt-changed: #be95ff;
+--zdt-removed: #ee5396;
+--zdt-leap-label: #82cfff;
+--zdt-leap-label-fg: #161616;
+--zdt-match: #be95ff;
+
+/* Mode colours, used by the status line block and nothing else. */
+--zdt-mode-normal: #78a9ff;
+--zdt-mode-insert: #42be65;
+--zdt-mode-visual: #be95ff;
+--zdt-mode-replace: #ee5396;
+--zdt-mode-command: #be95ff;
+--zdt-mode-terminal: #3ddbd9;
+
+/* --- devicon tints ------------------------------------------------------------------------ */
+
+--zdt-icon-rust: #82cfff;
+--zdt-icon-python: #be95ff;
+--zdt-icon-ts: #78a9ff;
+--zdt-icon-js: #be95ff;
+--zdt-icon-go: #3ddbd9;
+--zdt-icon-c: #78a9ff;
+--zdt-icon-lua: #78a9ff;
+--zdt-icon-shell: #42be65;
+--zdt-icon-html: #82cfff;
+--zdt-icon-css: #78a9ff;
+--zdt-icon-config: #be95ff;
+--zdt-icon-doc: #dde1e6;
+--zdt-icon-image: #be95ff;
+--zdt-icon-git: #82cfff;
+
+/* --- the editor element ----------------------------------------------------------------- */
+
+--editor-bg: #161616;
+--editor-fg: #dde1e6;
+--editor-selection: #393939;
+--editor-cursor: #dde1e6;
+--editor-cursor-text: #161616;
+--editor-current-line: #262626;
+--editor-gutter-bg: #161616;
+--editor-gutter-fg: #525252;
+--editor-gutter-current-fg: #dde1e6;
+--editor-scrollbar-thumb: oklch(1 0 0 / 10%);
+--editor-scrollbar-track: transparent;
+--editor-search: #393939;
+--editor-search-current: #be95ff;
+--editor-search-current-text: #161616;
+--editor-indent-guide: #393939;
+
+/* --- syntax, one property per tree-sitter capture ---------------------------------------- */
+
+--syntax-attribute: #ee5396;
+--syntax-comment: #525252;
+--syntax-comment-doc: #525252;
+--syntax-constant: #82cfff;
+--syntax-constant-builtin: #82cfff;
+--syntax-constructor: #be95ff;
+--syntax-embedded: #dde1e6;
+--syntax-escape: #82cfff;
+--syntax-function: #78a9ff;
+--syntax-function-builtin: #78a9ff;
+--syntax-function-macro: #ee5396;
+--syntax-function-method: #78a9ff;
+--syntax-keyword: #ff7eb6;
+--syntax-label: #ff7eb6;
+--syntax-module: #3ddbd9;
+--syntax-number: #82cfff;
+--syntax-operator: #3ddbd9;
+--syntax-property: #dde1e6;
+--syntax-punctuation: #dde1e6;
+--syntax-punctuation-bracket: #dde1e6;
+--syntax-punctuation-delimiter: #525252;
+--syntax-punctuation-special: #82cfff;
+--syntax-string: #42be65;
+--syntax-string-special: #82cfff;
+--syntax-tag: #ee5396;
+--syntax-type: #be95ff;
+--syntax-type-builtin: #be95ff;
+--syntax-variable: #dde1e6;
+--syntax-variable-builtin: #ee5396;
+--syntax-variable-parameter: #82cfff;
+
+/* --- what git says ------------------------------------------------------------------------ */
+
+--zdt-git-added: #42be65;
+--zdt-git-changed: #78a9ff;
+--zdt-git-removed: #ee5396;
+--zdt-git-untracked: #dde1e6;
+--zdt-git-conflict: #82cfff;
+
+/* The grounds a diff's rows sit on. Barely there: what carries the meaning is the mark and the
+   colour of it, and a band strong enough to notice is a band that makes the code harder to read
+   than the plain file it came from. */
+
+--zdt-git-added-bg: color-mix(in oklch, #42be65 12%, transparent);
+--zdt-git-removed-bg: color-mix(in oklch, #ee5396 12%, transparent);
+
+/* The graph's lanes. Eight, cycling: enough that two lines crossing are different colours, few
+   enough that each stays distinct at two pixels wide. */
+
+--zdt-git-lane-0: #78a9ff;
+--zdt-git-lane-1: #42be65;
+--zdt-git-lane-2: #ff7eb6;
+--zdt-git-lane-3: #be95ff;
+--zdt-git-lane-4: #3ddbd9;
+--zdt-git-lane-5: #82cfff;
+--zdt-git-lane-6: #ee5396;
+--zdt-git-lane-7: #dde1e6;
+
+/* --- what the language servers say ------------------------------------------------------- */
+
+--zdt-diagnostic-error: #ee5396;
+--zdt-diagnostic-warning: #be95ff;
+--zdt-diagnostic-information: #78a9ff;
+--zdt-diagnostic-hint: #3ddbd9;
+
+/* What the servers say at length: a hover, a completion's documentation. The block ground is the
+   same plane a selection sits on, so a signature reads as inset rather than as a card. */
+
+--zdt-doc-heading: #dde1e6;
+--zdt-doc-rule: #525252;
+--zdt-doc-code: #42be65;
+--zdt-doc-link: #78a9ff;
+--zdt-doc-block: #262626;
+
+/* The kinds of thing a completion can offer. Four groups rather than twenty-five: what somebody
+   reads off the glyph is "is this a function, a type, a value or a word", and a palette with a
+   colour per protocol constant is a palette that says nothing. */
+
+--zdt-completion-function: #78a9ff;
+--zdt-completion-type: #be95ff;
+--zdt-completion-value: #82cfff;
+--zdt-completion-keyword: #ff7eb6;
+--zdt-completion-text: #dde1e6;
+
+/* Where a symbol is used, under the caret. Dimmer than a search hit, because it appears without
+   being asked for and must not compete with the text it is marking. */
+
+--zdt-highlight: #393939;
+--zdt-highlight-write: #393939;
+
+/* --- the terminal element ---------------------------------------------------------------- */
+
+--terminal-background: #161616;
+--terminal-foreground: #dde1e6;
+--terminal-cursor: #dde1e6;
+--terminal-cursor-text: #161616;
+--terminal-selection: #393939;
+--terminal-match: #393939;
+--terminal-match-current: #be95ff;
+
+--terminal-black: #262626;
+--terminal-red: #33b1ff;
+--terminal-green: #be95ff;
+--terminal-yellow: #42be65;
+--terminal-blue: #78a9ff;
+--terminal-magenta: #82cfff;
+--terminal-cyan: #3ddbd9;
+--terminal-white: #f2f4f8;
+
+--terminal-bright-black: #525252;
+--terminal-bright-red: #33b1ff;
+--terminal-bright-green: #be95ff;
+--terminal-bright-yellow: #42be65;
+--terminal-bright-blue: #78a9ff;
+--terminal-bright-magenta: #82cfff;
+--terminal-bright-cyan: #08bdba;
+--terminal-bright-white: #ffffff;

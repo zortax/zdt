@@ -23,7 +23,7 @@ use rustc_hash::FxHashMap;
 
 use crate::action::{Action, Args};
 use crate::chord::{Chord, Named};
-use crate::effect::{Context, Effect, Scroll, Selection, Step};
+use crate::effect::{Context, Effect, Scroll, Selection, Step, Visual};
 use crate::keymap::{Layered, Resolution};
 use crate::mode::Mode;
 use crate::motion::{self, FindChar, Kind, Target};
@@ -146,6 +146,11 @@ pub struct Engine {
     awaiting: Option<Awaiting>,
     /// Where the visual selection was started.
     visual_anchor: usize,
+    /// The column that end is at, when a block's own is not the column of its byte.
+    ///
+    /// `o` in a block swaps the two corners, and the one that moves out to the right may be past
+    /// the end of its line, where there is no byte to remember it by.
+    visual_anchor_column: Option<usize>,
     /// Where the visual selection's caret is.
     ///
     /// Kept beside the selections, because a linewise or block selection's ends are somewhere
@@ -203,6 +208,7 @@ impl Engine {
             operator: None,
             awaiting: None,
             visual_anchor: 0,
+            visual_anchor_column: None,
             visual_head: 0,
             resolved: Chord::char(' '),
             goal_column: None,
@@ -283,6 +289,16 @@ impl Engine {
         self.operator = None;
         self.awaiting = None;
         self.mode = Mode::Normal;
+        self.leave_visual();
+    }
+
+    /// Forgets the columns a visual mode was steering by, which leaving one has to do.
+    ///
+    /// A block moves its caret by columns and a normal-mode `j` moves it by bytes; a column left
+    /// over from one would aim the other.
+    fn leave_visual(&mut self) {
+        self.goal_column = None;
+        self.visual_anchor_column = None;
     }
 
     /// Takes one key.

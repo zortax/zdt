@@ -106,22 +106,19 @@ pub(super) fn swap_case(text: &str) -> String {
         .collect()
 }
 
-/// The carets a block selection is, one per line.
-pub(super) fn block_selections(rope: &Rope, anchor: usize, head: usize) -> Vec<Selection> {
-    let (one, two) = (
-        motion::column_of(rope, anchor),
-        motion::column_of(rope, head),
-    );
-    let (left, right) = (one.min(two), one.max(two));
-    let (first, last) = {
-        let (a, b) = (text::line_of(rope, anchor), text::line_of(rope, head));
-        (a.min(b), a.max(b))
-    };
-
-    (first..=last)
+/// The bytes a block selection is, one range per line.
+///
+/// A column past the end of a line has no bytes, so a line that stops inside the rectangle gives
+/// up only what is there. That is what keeps a yanked block free of whitespace nobody typed.
+pub(super) fn block_selections(
+    rope: &Rope,
+    lines: std::ops::Range<usize>,
+    columns: std::ops::Range<usize>,
+) -> Vec<Selection> {
+    lines
         .map(|line| {
-            let start = motion::byte_at_column(rope, line, left);
-            let end = motion::byte_at_column(rope, line, right + 1);
+            let start = motion::byte_at_column(rope, line, columns.start);
+            let end = motion::byte_at_column(rope, line, columns.end);
             Selection::new(start, end.max(start))
         })
         .collect()

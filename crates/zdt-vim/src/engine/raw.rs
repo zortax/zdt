@@ -31,7 +31,7 @@ impl Engine {
                     till,
                 };
                 self.last_find = Some(find);
-                match motion::find_char(cx.rope, cx.cursor(), count, find, false) {
+                match motion::find_char(cx.rope, self.caret(cx), count, find, false) {
                     Some(target) => self.go(target, cx),
                     None => {
                         self.operator = None;
@@ -44,7 +44,7 @@ impl Engine {
                     return Step::nothing();
                 };
                 let rope = cx.rope;
-                let at = cx.cursor();
+                let at = self.caret(cx);
                 let mut end = at;
                 for _ in 0..count {
                     end = text::next_grapheme(rope, end);
@@ -64,7 +64,7 @@ impl Engine {
                 let Some(character) = chord.inserted() else {
                     return Step::nothing();
                 };
-                self.marks.insert(character, cx.cursor());
+                self.marks.insert(character, self.caret(cx));
                 Step::nothing()
             }
             Awaiting::JumpMark { line } => {
@@ -80,7 +80,7 @@ impl Engine {
                 } else {
                     byte
                 };
-                self.jumps.push(cx.cursor());
+                self.jumps.push(self.caret(cx));
                 Step::Consumed(vec![
                     Effect::Select(vec![Selection::caret(text::clamp_normal(cx.rope, byte))]),
                     Effect::Scroll(Scroll::EnsureVisible),

@@ -18,7 +18,20 @@ impl Engine {
         let from = self.caret(cx);
         let args = &action.args;
 
-        let target = match action.leaf() {
+        // A block's caret keeps a column of its own, past the end of a short line. Moving sideways
+        // moves it, moving up and down keeps it, and any other motion gives it up to wherever it
+        // landed. It is the goal column, which up and down already aim at.
+        if self.mode == Mode::VisualBlock {
+            let column = self.block_column(from, cx);
+            self.goal_column = match action.leaf() {
+                "right" => Some(column + count as usize),
+                "left" => Some(column.saturating_sub(count as usize)),
+                "down" | "up" => Some(column),
+                _ => None,
+            };
+        }
+
+        let mut target = match action.leaf() {
             "left" => motion::left(rope, from, count),
             "right" => motion::right(rope, from, count),
             "down" => motion::down(rope, from, count, self.goal_column),
@@ -76,11 +89,23 @@ impl Engine {
             _ => return Step::one(Effect::Complain(format!("no motion {}", action.name))),
         };
 
-        // Only the two vertical motions keep a goal column; everything else sets a new one.
-        if !matches!(action.leaf(), "down" | "up") {
-            self.goal_column = None;
-        } else if self.goal_column.is_none() {
-            self.goal_column = Some(motion::column_of(rope, from));
+        // Sideways in a block, the byte follows the column rather than the column the byte: a
+        // column past the end of a line has no byte of its own, and the line's end is where the
+        // caret must sit on the buffer.
+        if self.mode == Mode::VisualBlock && matches!(action.leaf(), "left" | "right") {
+            let line = text::line_of(rope, from);
+            let column = self.goal_column.unwrap_or_default();
+            target = Target::exclusive(motion::byte_at_column(rope, line, column));
+        }
+
+        // Only the two vertical motions keep a goal column; everything else sets a new one. A
+        // block has already decided, above.
+        if self.mode != Mode::VisualBlock {
+            if !matches!(action.leaf(), "down" | "up") {
+                self.goal_column = None;
+            } else if self.goal_column.is_none() {
+                self.goal_column = Some(motion::column_of(rope, from));
+            }
         }
 
         self.go(target, cx)
@@ -116,10 +141,9 @@ impl Engine {
             self.visual_head = byte;
         }
 
-        Step::Consumed(vec![
-            Effect::Select(self.selections_for(byte, cx)),
-            Effect::Scroll(Scroll::EnsureVisible),
-        ])
+        let mut effects = self.place(byte, cx);
+        effects.push(Effect::Scroll(Scroll::EnsureVisible));
+        Step::Consumed(effects)
     }
 
     /// What a visual selection covers, and whether it is by lines.
@@ -134,14 +158,17 @@ impl Engine {
                 let (from, to) = (text::line_of(rope, anchor), text::line_of(rope, head));
                 (vec![text::linewise_range(rope, from, to)], true)
             }
-            Mode::VisualBlock => (
-                block_selections(rope, anchor, head)
-                    .into_iter()
-                    .map(Selection::range)
-                    .filter(|range| !range.is_empty())
-                    .collect(),
-                false,
-            ),
+            Mode::VisualBlock => {
+                let (lines, columns) = self.block_extent(head, cx);
+                (
+                    block_selections(rope, lines, columns)
+                        .into_iter()
+                        .map(Selection::range)
+                        .filter(|range| !range.is_empty())
+                        .collect(),
+                    false,
+                )
+            }
             _ => {
                 let (start, end) = (anchor.min(head), anchor.max(head));
                 (
@@ -152,26 +179,87 @@ impl Engine {
         }
     }
 
-    /// The selections after the caret moves to `byte`.
-    pub(super) fn selections_for(&self, byte: usize, cx: &Context<'_>) -> Vec<Selection> {
+    /// The rectangle a block selection covers: its lines, and the columns on each of them.
+    ///
+    /// The caret's column is the one it moved to, which may be past the end of its own line. That
+    /// is what keeps the rectangle a rectangle over lines too short to reach it.
+    pub(super) fn block_extent(
+        &self,
+        byte: usize,
+        cx: &Context<'_>,
+    ) -> (std::ops::Range<usize>, std::ops::Range<usize>) {
+        let rope = cx.rope;
+        let anchor = self.anchor_column(cx);
+        let head = self.block_column(byte, cx);
+        let (one, two) = (
+            text::line_of(rope, self.visual_anchor),
+            text::line_of(rope, byte),
+        );
+        (
+            one.min(two)..one.max(two) + 1,
+            anchor.min(head)..anchor.max(head) + 1,
+        )
+    }
+
+    /// The column a block's caret is at, which the goal column carries past the end of a line.
+    pub(super) fn block_column(&self, byte: usize, cx: &Context<'_>) -> usize {
+        self.goal_column
+            .unwrap_or_else(|| motion::column_of(cx.rope, byte))
+    }
+
+    /// The column a block's other corner is at.
+    pub(super) fn anchor_column(&self, cx: &Context<'_>) -> usize {
+        self.visual_anchor_column
+            .unwrap_or_else(|| motion::column_of(cx.rope, self.visual_anchor))
+    }
+
+    /// What to do once the caret has moved to `byte`: which bytes are selected, and how they
+    /// paint.
+    ///
+    /// The two are not the same thing in a visual mode. The bytes are what an operator takes and
+    /// what a copy puts on the clipboard; the paint is where the caret sits and which cells read
+    /// as selected, and vim puts the caret inside what it selected rather than after it.
+    pub(super) fn place(&self, byte: usize, cx: &Context<'_>) -> Vec<Effect> {
+        let rope = cx.rope;
+        let (line, column) = (text::line_of(rope, byte), motion::column_of(rope, byte));
+
         match self.mode {
-            Mode::Visual | Mode::Select => vec![Selection::new(self.visual_anchor, byte)],
-            Mode::VisualLine => {
-                let rope = cx.rope;
-                let (from, to) = (
-                    text::line_of(rope, self.visual_anchor),
-                    text::line_of(rope, byte),
-                );
-                let range = text::linewise_range(rope, from, to);
-                // The head end is the one the caret is on, so `o` and further motion work.
-                if byte >= self.visual_anchor {
-                    vec![Selection::new(range.start, range.end)]
+            Mode::Visual | Mode::Select => {
+                // Through the character the caret is on, which is what makes `vy` take one
+                // character rather than none.
+                let anchor = self.visual_anchor;
+                let selection = if byte >= anchor {
+                    Selection::new(anchor, text::next_grapheme(rope, byte))
                 } else {
-                    vec![Selection::new(range.end, range.start)]
-                }
+                    Selection::new(text::next_grapheme(rope, anchor), byte)
+                };
+                vec![
+                    Effect::Select(vec![selection]),
+                    Effect::Visual(Some(Visual::at(line, column))),
+                ]
             }
-            Mode::VisualBlock => block_selections(cx.rope, self.visual_anchor, byte),
-            _ => vec![Selection::caret(byte)],
+            Mode::VisualLine => {
+                let from = text::line_of(rope, self.visual_anchor);
+                let range = text::linewise_range(rope, from, line);
+                vec![
+                    Effect::Select(vec![Selection::new(range.start, range.end)]),
+                    Effect::Visual(Some(Visual::at(line, column))),
+                ]
+            }
+            Mode::VisualBlock => {
+                let (lines, columns) = self.block_extent(byte, cx);
+                let selections = block_selections(rope, lines.clone(), columns.clone());
+                vec![
+                    Effect::Select(selections),
+                    Effect::Visual(Some(Visual {
+                        line,
+                        column: self.block_column(byte, cx),
+                        lines,
+                        columns,
+                    })),
+                ]
+            }
+            _ => vec![Effect::Select(vec![Selection::caret(byte)])],
         }
     }
 }

@@ -21,7 +21,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use zdt_vim::config::merge;
-use zdt_vim::effect::{Context, Effect, Scroll, Selection, Step};
+use zdt_vim::effect::{Context, Effect, Scroll, Selection, Step, Visual};
 use zdt_vim::engine::Engine;
 use zdt_vim::keymap::{Keymap, Layered, Resolution};
 use zdt_vim::motion::View;
@@ -29,7 +29,9 @@ use zdt_vim::notation::{Leaders, parse};
 use zdt_vim::{Chord, Mode};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
-use zgui_editor::{Clipboard, Command, EditorHandle, InsertPoint, ScrollCmd};
+use zgui_editor::{
+    Band, Caret, Clipboard, Command, Decoration, EditorHandle, InsertPoint, Overlay, ScrollCmd,
+};
 
 use crate::workspace::Workspace;
 
@@ -75,6 +77,8 @@ struct Inner {
     settings: crate::settings::Settings,
     /// How deep a replay is, so a macro that plays itself stops.
     depth: std::cell::Cell<u32>,
+    /// What is waiting to put a flash out.
+    flash: RefCell<Option<zgui::view::time::TimeoutHandle>>,
     // What the interface shows, and nothing else.
     mode: RwSignal<Mode, LocalStorage>,
     pending: RwSignal<String, LocalStorage>,
@@ -104,6 +108,7 @@ impl Vim {
                 workspace,
                 settings,
                 depth: std::cell::Cell::new(0),
+                flash: RefCell::new(None),
                 mode: RwSignal::new_local(Mode::Normal),
                 pending: RwSignal::new_local(String::new()),
                 recording: RwSignal::new_local(None),

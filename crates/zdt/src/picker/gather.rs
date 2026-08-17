@@ -111,6 +111,9 @@ impl Picker {
 
         self.inner.counts.set((rows.len(), total));
         self.publish(rows);
+        // Before the preview, so that a picker opening on the theme in force previews it rather
+        // than whatever the ranking put first.
+        self.land_caret();
         self.preview_row();
     }
 

@@ -67,6 +67,37 @@ impl Selection {
     }
 }
 
+/// How a visual mode paints, which the selected bytes alone cannot say.
+///
+/// The caret is a cell rather than a byte: a linewise selection covers whole lines while its caret
+/// stays on a column, and a block one reaches past the end of a short line. `lines` and `columns`
+/// are the rectangle, and are empty in the two modes that are not a block — there the selected
+/// bytes already describe what reads as selected.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Visual {
+    /// The caret's line.
+    pub line: usize,
+    /// The caret's column, counted in graphemes.
+    pub column: usize,
+    /// The lines a block covers.
+    pub lines: Range<usize>,
+    /// The columns a block covers on each of them.
+    pub columns: Range<usize>,
+}
+
+impl Visual {
+    /// A caret at `line` and `column`, with no rectangle around it.
+    #[must_use]
+    pub fn at(line: usize, column: usize) -> Self {
+        Self {
+            line,
+            column,
+            lines: 0..0,
+            columns: 0..0,
+        }
+    }
+}
+
 /// Where to move the view.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Scroll {
@@ -87,6 +118,13 @@ pub enum Scroll {
 pub enum Effect {
     /// Put the carets here. The first is the primary one.
     Select(Vec<Selection>),
+    /// Paint a visual selection this way, or paint none at all.
+    Visual(Option<Visual>),
+    /// Light these ranges for a moment.
+    ///
+    /// What a command that leaves the text as it was answers with, so that the person can see
+    /// what it took.
+    Flash(Vec<Range<usize>>),
     /// Replace these ranges with this text, as one change.
     ///
     /// Ranges are in the text as it is now and must not overlap. Deleting is replacing with

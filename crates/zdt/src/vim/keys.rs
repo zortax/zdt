@@ -4,8 +4,14 @@ use super::*;
 
 impl Vim {
     /// Puts the engine back in normal mode, which a buffer or window switch has to do.
+    ///
+    /// The editor being left takes its visual painting off with it: nothing is selected in a mode
+    /// nobody is in any more.
     pub fn reset(&self) {
         self.inner.engine.borrow_mut().reset();
+        if let Some(handle) = self.inner.workspace.current_handle() {
+            handle.set_overlay(Overlay::default());
+        }
         self.publish();
     }
 

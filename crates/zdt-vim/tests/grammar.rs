@@ -8,7 +8,7 @@
 
 use ropey::Rope;
 use zdt_vim::config::merge;
-use zdt_vim::effect::{Context, Effect, Selection, Step};
+use zdt_vim::effect::{Context, Effect, Selection, Step, Visual};
 use zdt_vim::engine::Engine;
 use zdt_vim::keymap::{Keymap, Layered};
 use zdt_vim::motion::View;
@@ -27,6 +27,10 @@ struct Editor {
     redo: Vec<(Rope, Vec<Selection>)>,
     said: Vec<String>,
     app: Vec<String>,
+    /// How the last visual selection asked to be painted.
+    visual: Option<Visual>,
+    /// What the last command lit.
+    flashed: Vec<std::ops::Range<usize>>,
 }
 
 impl Editor {
@@ -46,6 +50,8 @@ impl Editor {
             redo: Vec::new(),
             said: Vec::new(),
             app: Vec::new(),
+            visual: None,
+            flashed: Vec::new(),
         }
     }
 
@@ -147,6 +153,8 @@ impl Editor {
                         self.app.push(action.name);
                     }
                 }
+                Effect::Visual(visual) => self.visual = visual,
+                Effect::Flash(ranges) => self.flashed = ranges,
                 Effect::Mode(_) | Effect::Scroll(_) => {}
                 Effect::SetClipboard { .. } | Effect::ReadClipboard { .. } => {}
             }
@@ -548,6 +556,87 @@ fn visual_block_deletes_a_rectangle() {
     let mut editor = Editor::new("|abcd\nabcd\nabcd");
     editor.keys("<C-v>jjld");
     assert_eq!(editor.text(), "cd\ncd\ncd");
+}
+
+#[test]
+fn a_charwise_selection_reaches_through_the_character_its_caret_is_on() {
+    // The caret is on the last selected character rather than after it, and what is selected
+    // covers the character it is on. Anything else selects one character less than it shows.
+    let mut editor = Editor::new("|hello");
+    editor.keys("vl");
+    let visual = editor.visual.clone().expect("visual mode paints");
+    assert_eq!((visual.line, visual.column), (0, 1));
+    assert_eq!(editor.selections[0].range(), 0..2);
+}
+
+#[test]
+fn a_linewise_selection_leaves_the_caret_on_the_line_it_moved_to() {
+    // Moving down, the caret belongs on the lowest selected line and not on the one below it.
+    let mut editor = Editor::new("|one\ntwo\nthree");
+    editor.keys("Vj");
+    let visual = editor.visual.clone().expect("visual mode paints");
+    assert_eq!(visual.line, 1);
+    assert_eq!(
+        editor.selections[0].range(),
+        0..8,
+        "both lines and the break"
+    );
+
+    // Moving up, it belongs on the topmost one.
+    let mut editor = Editor::new("one\ntwo\n|three");
+    editor.keys("Vk");
+    assert_eq!(editor.visual.clone().expect("visual mode paints").line, 1);
+}
+
+#[test]
+fn a_blocks_caret_moves_past_the_end_of_a_short_line() {
+    // The rectangle is the one the person drew, whether or not there is text to draw it over.
+    let mut editor = Editor::new("|long line here\nab\nlong line here");
+    editor.keys("<C-v>jjllll");
+    let visual = editor.visual.clone().expect("visual mode paints");
+    assert_eq!((visual.line, visual.column), (2, 4));
+    assert_eq!(visual.lines, 0..3);
+    assert_eq!(visual.columns, 0..5);
+}
+
+#[test]
+fn swapping_a_blocks_ends_keeps_its_rectangle() {
+    // The corner that moves out to the right may be past the end of its line, where there is no
+    // byte to remember it by. Swapping must not collapse the block onto the text.
+    let mut editor = Editor::new("|long line here\nab");
+    editor.keys("<C-v>jllll");
+    assert_eq!(
+        editor.visual.clone().expect("visual mode paints").columns,
+        0..5
+    );
+    editor.keys("o");
+    let visual = editor.visual.clone().expect("visual mode paints");
+    assert_eq!(visual.columns, 0..5, "the rectangle is where it was");
+    assert_eq!(
+        (visual.line, visual.column),
+        (0, 0),
+        "the caret is on the other corner"
+    );
+}
+
+#[test]
+fn a_block_takes_only_the_text_that_is_there() {
+    // No whitespace nobody typed: the short line gives up what it has and no more.
+    let mut editor = Editor::new("|abcd\nab\nabcd");
+    editor.keys("<C-v>jjllld");
+    assert_eq!(editor.text(), "\n\n");
+}
+
+#[test]
+fn a_yank_lights_what_it_took() {
+    // A yank leaves the text as it was, so the flash is the only sign it did anything.
+    let mut editor = Editor::new("hello |world here");
+    editor.keys("yiw");
+    assert_eq!(editor.flashed, vec![6..11]);
+
+    let mut editor = Editor::new("|one\ntwo");
+    editor.keys("yy");
+    assert_eq!(editor.flashed, vec![0..4]);
 }
 
 #[test]

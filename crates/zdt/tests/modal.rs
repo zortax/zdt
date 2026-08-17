@@ -219,7 +219,9 @@ fn visual_mode_selects_in_the_editor() {
         .handle
         .query(|snapshot| snapshot.selections().primary());
     assert_eq!(selection.anchor, 0);
-    assert_eq!(selection.head, 2);
+    // Through the character the caret is on: what the editor has selected is what `d` takes and
+    // what a copy puts on the clipboard.
+    assert_eq!(selection.head, 3);
     modal.keys("d");
     assert_eq!(modal.text(), "lo world");
 }

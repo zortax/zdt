@@ -263,6 +263,37 @@ fn the_theme_picker_offers_the_built_in_ones() {
 }
 
 #[test]
+fn the_theme_picker_opens_on_the_theme_in_force() {
+    let temp = Temp::new("theme-caret");
+    let window = Window::open();
+    let picker = mount(&window, &temp.0);
+
+    window.scope.with(|| {
+        let settings = zdt::settings::use_settings();
+        settings.update(|config| config.ui.theme = "vesper".to_owned());
+        picker.open(Source::Themes);
+    });
+    settle(&window);
+
+    assert!(
+        matches!(
+            picker.selected().expect("a row").target,
+            Target::Theme(ref name) if name == "vesper"
+        ),
+        "the caret is on the theme in force, not on the first name in the list: {:?}",
+        labels(&picker).first()
+    );
+    window.scope.with(|| {
+        let settings = zdt::settings::use_settings();
+        assert_eq!(
+            settings.with_untracked(|config| config.ui.theme.clone()),
+            "vesper",
+            "and opening the picker previewed nothing"
+        );
+    });
+}
+
+#[test]
 fn closing_it_stops_everything_it_started() {
     let temp = Temp::new("close");
     let window = Window::open();

@@ -10,17 +10,23 @@ impl Picker {
         self.stop();
         // What to put back if this is given up on. Taken before anything is shown, because a
         // preview overwrites it.
-        *self.inner.restore.borrow_mut() = matches!(source, Source::Themes).then(|| {
+        let held = matches!(source, Source::Themes).then(|| {
             self.inner
                 .settings
                 .with_untracked(|config| config.ui.theme.clone())
         });
+        *self.inner.restore.borrow_mut() = held.clone();
         let start = source.start();
         self.inner.at.set(0);
         self.inner.rows.set(Vec::new());
         self.inner.counts.set((0, 0));
         self.inner.query.set(start.clone());
         self.inner.source.set(Some(source.clone()));
+        // The theme picker opens on the theme in force rather than on the first name in the list.
+        // Opening it is not choosing anything, and a picker that previewed something else the
+        // moment it appeared would change the colours of the very screen somebody opened it to
+        // look at.
+        *self.inner.land.borrow_mut() = held;
         self.gather(&source, &start);
     }
 
@@ -83,6 +89,23 @@ impl Picker {
         }
     }
 
+    /// Puts the caret on the row [`Picker::open`] asked to land on, when the ranking has one.
+    ///
+    /// Called once per opening, from the first ranking. A name that matched nothing — a theme that
+    /// has since been deleted from the configuration directory — leaves the caret at the top.
+    pub(super) fn land_caret(&self) {
+        let Some(wanted) = self.inner.land.borrow_mut().take() else {
+            return;
+        };
+        let at = self.inner.rows.with_untracked(|rows| {
+            rows.iter()
+                .position(|row| matches!(&row.target, Target::Theme(name) if *name == wanted))
+        });
+        if let Some(at) = at {
+            self.inner.at.set(at);
+        }
+    }
+
     /// Shows what the row under the caret would do, for the sources where showing *is* the answer.
     ///
     /// Only the themes so far. A theme read as a name is a name; a theme applied is a theme, and
@@ -94,6 +117,15 @@ impl Picker {
         let Some(Target::Theme(name)) = self.selected().map(|row| row.target) else {
             return;
         };
+        // The theme the caret lands on is usually the one already in force, and applying a theme
+        // that is already applied would rebuild every style for nothing.
+        if self
+            .inner
+            .settings
+            .with_untracked(|config| config.ui.theme == name)
+        {
+            return;
+        }
         self.inner
             .settings
             .update(|config| config.ui.theme.clone_from(&name));

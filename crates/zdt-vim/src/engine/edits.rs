@@ -6,7 +6,7 @@ impl Engine {
     /// The commands that change text without being an operator and a motion.
     pub(super) fn edit(&mut self, action: &Action, count: u32, cx: &Context<'_>) -> Step {
         let rope = cx.rope;
-        let at = cx.cursor();
+        let at = self.caret(cx);
 
         match action.leaf() {
             "undo" => Step::Consumed(vec![Effect::Undo, Effect::Scroll(Scroll::EnsureVisible)]),
@@ -59,9 +59,9 @@ impl Engine {
                 let last = rope.len_lines().saturating_sub(1);
                 let to = (line + count.max(1) as usize - 1).min(last);
                 let range = text::linewise_range(rope, line, to);
-                let taken = rope.byte_slice(range).to_string();
+                let taken = rope.byte_slice(range.clone()).to_string();
                 self.registers.yank(register, Contents::linewise(taken));
-                Step::nothing()
+                Step::one(Effect::Flash(vec![range]))
             }
             "replace_char" => {
                 self.awaiting = Some(Awaiting::ReplaceChar { count });
@@ -148,7 +148,7 @@ impl Engine {
     /// `p` and `P`.
     pub(super) fn paste(&mut self, action: &Action, count: u32, cx: &Context<'_>) -> Step {
         let rope = cx.rope;
-        let at = cx.cursor();
+        let at = self.caret(cx);
         let before = action.args.flag("before");
         let register = self.take_register();
 

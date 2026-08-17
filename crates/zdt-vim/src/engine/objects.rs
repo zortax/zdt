@@ -6,7 +6,7 @@ impl Engine {
     /// What a text object selects, and what to do with it.
     pub(super) fn text_object(&mut self, action: &Action, _count: u32, cx: &Context<'_>) -> Step {
         let rope = cx.rope;
-        let at = cx.cursor();
+        let at = self.caret(cx);
         let args = &action.args;
         let around = args.flag("around");
 
@@ -36,7 +36,8 @@ impl Engine {
         if self.mode.is_visual() {
             self.visual_anchor = range.start;
             self.visual_head = text::prev_grapheme(rope, range.end);
-            return Step::one(Effect::Select(self.selections_for(self.visual_head, cx)));
+            self.leave_visual();
+            return Step::Consumed(self.place(self.visual_head, cx));
         }
         Step::nothing()
     }

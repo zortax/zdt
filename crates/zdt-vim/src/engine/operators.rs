@@ -8,6 +8,7 @@ impl Engine {
         if self.mode.is_visual() {
             let (ranges, linewise) = self.visual_ranges(cx);
             self.mode = Mode::Normal;
+            self.leave_visual();
             return self.apply_ranges(action, ranges, linewise, cx);
         }
 
@@ -87,6 +88,9 @@ impl Engine {
         match action.leaf() {
             "yank" => {
                 self.registers.yank(register, contents);
+                // A yank leaves the text as it was, so lighting what it took is the only sign
+                // that it took anything.
+                effects.push(Effect::Flash(ranges.clone()));
                 if register.is_clipboard() {
                     effects.push(Effect::SetClipboard {
                         text: taken,

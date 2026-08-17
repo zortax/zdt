@@ -2,6 +2,37 @@
 
 use super::*;
 
+/// How long a yank stays lit.
+const FLASH: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// The decoration layer a flash is drawn in.
+const FLASH_LAYER: &str = "vim-flash";
+
+/// What the editor paints for a visual selection.
+///
+/// The caret goes where vim puts it, inside what is selected rather than after it. A block also
+/// hands over its rectangle, because the bytes on a line too short to reach the right edge do not
+/// describe the shape the person is drawing.
+fn overlay(visual: &Option<Visual>) -> Overlay {
+    let Some(visual) = visual else {
+        return Overlay::default();
+    };
+    Overlay {
+        bands: visual
+            .lines
+            .clone()
+            .map(|line| Band {
+                line,
+                columns: visual.columns.start as u32..visual.columns.end as u32,
+            })
+            .collect(),
+        carets: vec![Caret {
+            line: visual.line,
+            column: visual.column as u32,
+        }],
+    }
+}
+
 impl Vim {
     /// One key, without publishing what changed.
     pub(super) fn step(&self, chord: Chord, handle: &EditorHandle) -> Step {
@@ -69,6 +100,10 @@ impl Vim {
                         });
                     }
                 }
+                Effect::Visual(visual) => {
+                    handle.set_overlay(overlay(&visual));
+                }
+                Effect::Flash(ranges) => self.flash(ranges, handle),
                 Effect::Replace(replacements) => {
                     handle.command(Command::ReplaceRanges(replacements));
                 }
@@ -81,7 +116,13 @@ impl Vim {
                     Scroll::Lines(lines) => ScrollCmd::Lines(f64::from(lines)),
                     Scroll::EnsureVisible => ScrollCmd::EnsureCursorVisible,
                 })),
-                Effect::Mode(mode) => self.enter(mode, handle),
+                Effect::Mode(mode) => {
+                    if !mode.is_visual() {
+                        // Nothing is selected any more, so the selections paint themselves again.
+                        handle.set_overlay(Overlay::default());
+                    }
+                    self.enter(mode, handle);
+                }
                 Effect::SetClipboard { primary, .. } => {
                     // The editor holds the clipboards and already copies what is selected, so
                     // the engine's own copy stays where it is.
@@ -111,6 +152,29 @@ impl Vim {
                 Effect::Complain(text) => self.inner.workspace.complain(text),
             }
         }
+    }
+
+    /// Lights `ranges` in the selection colour, and puts them out again a moment later.
+    ///
+    /// The handle for the timer is kept, so a second yank inside the moment cancels the first
+    /// one's clearing rather than being cut short by it.
+    fn flash(&self, ranges: Vec<std::ops::Range<usize>>, handle: &EditorHandle) {
+        let decorations: Vec<Decoration> = ranges
+            .into_iter()
+            .filter(|range| !range.is_empty())
+            .map(|range| Decoration::background(range, "editor-selection"))
+            .collect();
+        if decorations.is_empty() {
+            return;
+        }
+        handle.set_decorations(FLASH_LAYER, decorations);
+
+        let Some(timers) = zgui::view::time::Timers::current() else {
+            return;
+        };
+        let editor = handle.clone();
+        let waiting = timers.set_timeout(FLASH, move || editor.clear_decorations(FLASH_LAYER));
+        *self.inner.flash.borrow_mut() = Some(waiting);
     }
 
     /// What the editor looks like in `mode`.

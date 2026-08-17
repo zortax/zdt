@@ -42,8 +42,8 @@ impl ThemeSource {
 ///
 /// A theme with a light and a dark file is written `"name" => "Label"`. One that exists on a
 /// single surface is written `"name" => "Label", dark only`, and asking for it on a light surface
-/// answers the dark one. Vesper publishes no light variant, and inventing one would put words in
-/// its author's mouth.
+/// answers the dark one. Vesper, Nord, Sonokai and the rest of the dark-only ones publish no light
+/// variant, and inventing one would put words in their authors' mouths.
 macro_rules! builtins {
     ($($file:literal => $label:literal $(, $only:ident only)? ;)*) => {
         /// Every built-in theme, as it is written in the configuration file.
@@ -94,6 +94,31 @@ builtins! {
     "catppuccin" => "Catppuccin";
     "tokyonight" => "Tokyo Night", dark only;
     "gruvbox" => "Gruvbox";
+    "ayu" => "Ayu";
+    "dracula" => "Dracula";
+    "edge" => "Edge";
+    "everforest" => "Everforest";
+    "flexoki" => "Flexoki";
+    "github" => "GitHub";
+    "gruvbox-material" => "Gruvbox Material";
+    "iceberg" => "Iceberg";
+    "kanagawa" => "Kanagawa";
+    "material" => "Material";
+    "melange" => "Melange";
+    "modus" => "Modus";
+    "monokai-pro" => "Monokai Pro";
+    "moonfly" => "Moonfly", dark only;
+    "night-owl" => "Night Owl";
+    "nightfly" => "Nightfly", dark only;
+    "nightfox" => "Nightfox";
+    "nord" => "Nord", dark only;
+    "one" => "One";
+    "oxocarbon" => "Oxocarbon";
+    "papercolor" => "PaperColor";
+    "poimandres" => "Poimandres", dark only;
+    "solarized" => "Solarized";
+    "sonokai" => "Sonokai", dark only;
+    "vitesse" => "Vitesse";
 }
 
 /// The name and label of every built-in theme, in the order they are offered.
