@@ -42,7 +42,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "app" => self::app::run(workspace, leaf),
         "editor" => self::leap::editor(handle, leaf),
         "leap" => self::leap::run(workspace, vim, leaf, handle),
-        "tree" => self::tree::run(workspace, leaf, args),
+        "tree" => self::tree::run(workspace, vim, leaf, args),
         "picker" => self::picker::run(workspace, leaf, args, handle),
         "terminal" => self::terminal::run(workspace, vim, leaf, args),
         "lsp" => lsp::run(workspace, leaf, handle),

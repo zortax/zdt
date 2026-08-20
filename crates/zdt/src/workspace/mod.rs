@@ -15,11 +15,12 @@
 pub mod pane;
 pub mod panes;
 
-mod buffer;
+pub mod buffer;
 mod buffers;
 mod editors;
 mod layout;
 mod read;
+mod restore;
 mod say;
 mod windows;
 
@@ -35,6 +36,7 @@ use zgui::reactive::{LocalStorage, RwSignal};
 
 pub use crate::workspace::buffer::{Buffer, BufferId, BufferKind};
 pub use crate::workspace::layout::{Axis, Direction, Layout, Shape, WindowId};
+pub use crate::workspace::restore::Restored;
 
 /// How many editors one window keeps mounted for buffers it is not showing.
 ///
@@ -75,7 +77,13 @@ struct Inner {
     order: RwSignal<Vec<BufferId>, LocalStorage>,
     windows: RwSignal<SlotMap<WindowId, WindowState>, LocalStorage>,
     layout: RwSignal<Layout, LocalStorage>,
-    focused: RwSignal<WindowId, LocalStorage>,
+    /// Where the keyboard is, for the whole session.
+    ///
+    /// Made here because this is what makes the first window, so the model has one to name from
+    /// the moment it exists. What it holds is more than the windows — the tree and every overlay
+    /// are in it — so everything reads it out of the context the session publishes, and this holds
+    /// it only to answer "which pane is current".
+    focus: crate::focus::Focusing,
     /// The buffer shown before the current one, which `<Leader>bp` goes back to.
     alternate: RwSignal<Option<BufferId>, LocalStorage>,
     /// What the interface is telling the user, shown in the status line until something replaces
@@ -144,7 +152,7 @@ impl Workspace {
                 order: RwSignal::new_local(vec![scratch]),
                 windows: RwSignal::new_local(windows),
                 layout: RwSignal::new_local(Layout::Leaf(window)),
-                focused: RwSignal::new_local(window),
+                focus: crate::focus::Focusing::new(window),
                 alternate: RwSignal::new_local(None),
                 message: RwSignal::new_local(None),
                 handles: RefCell::new(FxHashMap::default()),
@@ -165,6 +173,11 @@ impl Workspace {
     /// The directory everything is relative to.
     pub fn project(&self) -> &Project {
         &self.inner.project
+    }
+
+    /// Where the keyboard is.
+    pub fn focus(&self) -> &crate::focus::Focusing {
+        &self.inner.focus
     }
 }
 

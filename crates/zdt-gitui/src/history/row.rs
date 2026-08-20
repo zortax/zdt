@@ -43,7 +43,7 @@ pub(crate) fn HistoryRow(
     let press = {
         let git = git.clone();
         move |_: &mut EventCx<'_, events::PointerDown>| {
-            git.focus();
+            git.host().took_keyboard();
             git.set_list(List::History);
             git.go_to(List::History, index);
         }

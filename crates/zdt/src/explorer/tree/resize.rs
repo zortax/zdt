@@ -55,7 +55,7 @@ pub fn TreeResize() -> impl IntoView {
                 from.set(None);
                 ev.release_pointer();
                 // Dragging an edge is not asking for the keyboard.
-                workspace.focus_editor();
+                workspace.focus().reproject();
             },
             on:pointer_cancel = move |ev: &mut EventCx<'_, events::PointerCancel>| {
                 from.set(None);

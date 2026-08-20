@@ -14,7 +14,7 @@ pub fn picker(workspace: &Workspace, leaf: &str) {
     let Some(picker) = zgui::reactive::use_local_context::<Picker>() else {
         return;
     };
-    let root = workspace.project().root().to_path_buf();
+    let root = workspace.project().tooling_root().to_path_buf();
     let which = leaf.to_owned();
     let workspace = workspace.clone();
 
@@ -120,7 +120,11 @@ pub fn picker(workspace: &Workspace, leaf: &str) {
             workspace.say("nothing to show");
             return;
         }
-        picker.open(Source::Given { title, rows });
+        picker.open(Source::Given {
+            title,
+            rows,
+            typed: None,
+        });
     });
 }
 

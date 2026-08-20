@@ -15,7 +15,7 @@
 //!   reason: leaving a terminal must not need two hands.
 //! * the key that toggles the float, so that the thing that opened it can put it away.
 
-mod emulator;
+pub(crate) mod emulator;
 mod float;
 
 pub use crate::terminals::view::emulator::{Emulator, EmulatorProps};

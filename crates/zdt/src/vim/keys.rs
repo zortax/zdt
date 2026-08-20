@@ -2,6 +2,18 @@
 
 use super::*;
 
+/// What a region's key came to.
+///
+/// Decided while the keymaps are borrowed, acted on after they are not.
+enum Region {
+    /// Part of a longer sequence.
+    Waiting,
+    /// Bound to nothing, so the region does not want it.
+    Unbound,
+    /// What to run.
+    Run(Vec<zdt_vim::Action>),
+}
+
 impl Vim {
     /// Puts the engine back in normal mode, which a buffer or window switch has to do.
     ///
@@ -67,7 +79,10 @@ impl Vim {
         // A leap in progress takes every key: once it has started, each one is either a character
         // it is aiming at or a label, and a keymap that answered any of them would put some
         // letters out of reach.
-        if self.inner.leaping.is_running() {
+        //
+        // Only one over the text. A leap over the file tree's rows answers a row number, which is
+        // no place in a rope, and the tree takes its keys where its own keys arrive.
+        if self.inner.leaping.is_running_over(crate::leap::Over::Text) {
             return self.leap_key(chord, handle);
         }
 
@@ -83,9 +98,17 @@ impl Vim {
         }
     }
 
-    /// Starts a leap looking `direction`.
+    /// Starts a leap over the text, looking `direction`.
     pub fn start_leap(&self, direction: zdt_vim::leap::Direction) {
         self.inner.leaping.start(direction);
+    }
+
+    /// Starts one over something else, such as the rows of the file tree.
+    ///
+    /// Whichever region asked for it is the one that takes its keys, because a landing is a number
+    /// only that region can read.
+    pub fn start_leap_over(&self, direction: zdt_vim::leap::Direction, over: crate::leap::Over) {
+        self.inner.leaping.start_over(direction, over);
     }
 
     /// The leap layer, for the overlay that draws its labels.
@@ -134,6 +157,7 @@ impl Vim {
                         top_line: visible.start,
                         height: visible.len().max(1),
                     },
+                    owner: self.owner(),
                 };
                 self.inner.engine.borrow_mut().leap_to(byte, &context)
             });
@@ -150,7 +174,7 @@ impl Vim {
     /// The same keymap with that region's rows in front, resolved in normal mode, and with no
     /// editor to apply anything to. A region has no modes of its own. Answers whether the key was
     /// used.
-    pub fn key_in_region(&self, chord: Chord, region: &str) -> bool {
+    pub fn key_in_region(&self, chord: Chord, region: &'static str) -> bool {
         self.key_in_region_as(chord, region, Mode::Normal)
     }
 
@@ -159,41 +183,36 @@ impl Vim {
     /// For a terminal being typed into. Almost nothing is bound in terminal mode, so almost every
     /// key falls through to the program, which is the point. What *is* bound there is what vim's
     /// own `maps.t` binds, and it wins over the program on purpose.
-    pub fn key_in_region_as(&self, chord: Chord, region: &str, mode: Mode) -> bool {
-        let overlay = self.inner.overlays.borrow();
-        let map = overlay.get(region);
-        let keymap = self.inner.keymap.borrow();
-        // A region with no keymap of its own still gets the base map: a terminal in normal mode
-        // has no rows of its own, and `<Leader>ff` from inside one has to work.
-        let layered = match map {
-            Some(map) => Layered::new(map, &keymap),
-            None => Layered::plain(&keymap),
-        };
-
+    pub fn key_in_region_as(&self, chord: Chord, region: &'static str, mode: Mode) -> bool {
         // A region's keys have no grammar: no counts, no operators, nothing to hold between
         // presses but the sequence itself.
         let mut keys = self.inner.region_keys.borrow_mut();
         keys.push(chord);
+        // Which map a part-typed sequence belongs to, so which-key shows the region's rows rather
+        // than the ones underneath them.
+        self.inner.typing.set(Some(Typing { region, mode }));
 
-        match layered.resolve(mode, &keys) {
-            Resolution::Pending(_) => {
-                drop(keys);
-                self.publish_region();
-                true
+        // What to do, decided while the maps are borrowed, and done after they are not: an action
+        // can load a keymap.
+        let outcome = self.inner.keymaps.with_layered(Some(region), |layered| {
+            match layered.resolve(mode, &keys) {
+                Resolution::Pending(_) => Region::Waiting,
+                Resolution::None => Region::Unbound,
+                Resolution::Run(binding) => Region::Run(binding.actions.clone()),
             }
-            Resolution::None => {
-                keys.clear();
-                drop(keys);
-                self.publish_region();
-                false
-            }
-            Resolution::Run(binding) => {
-                let actions = binding.actions.clone();
-                keys.clear();
-                drop(keys);
-                drop(overlay);
-                drop(keymap);
-                self.publish_region();
+        });
+
+        if !matches!(outcome, Region::Waiting) {
+            keys.clear();
+            self.inner.typing.set(None);
+        }
+        drop(keys);
+        self.publish_region();
+
+        match outcome {
+            Region::Waiting => true,
+            Region::Unbound => false,
+            Region::Run(actions) => {
                 for action in &actions {
                     crate::actions::run(&self.inner.workspace, self, action, None);
                 }
@@ -208,11 +227,12 @@ impl Vim {
     /// through. Against the base map, so it follows a person's own keymap.
     #[must_use]
     pub fn chord_runs(&self, chord: Chord, action: &str) -> bool {
-        let keymap = self.inner.keymap.borrow();
-        match Layered::plain(&keymap).resolve(self.mode_untracked(), &[chord]) {
-            Resolution::Run(binding) => binding.actions.iter().any(|one| one.name == action),
-            _ => false,
-        }
+        self.inner.keymaps.with_layered(None, |layered| {
+            match layered.resolve(self.mode_untracked(), &[chord]) {
+                Resolution::Run(binding) => binding.actions.iter().any(|one| one.name == action),
+                _ => false,
+            }
+        })
     }
 
     /// Echoes what a region has typed so far, so which-key and the status line follow it too.

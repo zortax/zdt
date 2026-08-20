@@ -10,6 +10,21 @@ impl Workspace {
         self.inner.order.get()
     }
 
+    /// The same, without subscribing.
+    ///
+    /// What something writing a session down asks for: taking a snapshot must not make whatever
+    /// asked for it depend on the buffer line.
+    #[must_use]
+    pub fn order_untracked(&self) -> Vec<BufferId> {
+        self.inner.order.get_untracked()
+    }
+
+    /// What `<Leader>bp` goes back to, without subscribing.
+    #[must_use]
+    pub fn alternate_untracked(&self) -> Option<BufferId> {
+        self.inner.alternate.get_untracked()
+    }
+
     /// The arrangement of windows. Tracked.
     pub fn layout(&self) -> Layout {
         self.inner.layout.get()
@@ -25,14 +40,18 @@ impl Workspace {
         self.inner.layout.get_untracked()
     }
 
-    /// Which window has the keyboard. Tracked.
+    /// Which window is the current one. Tracked.
+    ///
+    /// The current pane, and never "where the keyboard is": the tree and every overlay take the
+    /// keyboard without changing which split is being worked in. Ask [`crate::focus::Focusing`]
+    /// for the other question.
     pub fn focused(&self) -> WindowId {
-        self.inner.focused.get()
+        self.inner.focus.window()
     }
 
-    /// Which window has the keyboard, without subscribing.
+    /// The same, without subscribing.
     pub fn focused_untracked(&self) -> WindowId {
-        self.inner.focused.get_untracked()
+        self.inner.focus.window_untracked()
     }
 
     /// What the interface is saying. Tracked.

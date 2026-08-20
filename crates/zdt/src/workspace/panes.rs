@@ -80,7 +80,7 @@ fn tree(layout: &Layout) -> AnyView {
                             view! {
                                 ResizableHandle(
                                     on:pointer_up = move |_: &mut EventCx<'_, events::PointerUp>| {
-                                        workspace.focus_editor();
+                                        workspace.focus().reproject();
                                     }
                                 )
                             }

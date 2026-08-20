@@ -81,6 +81,18 @@ impl CommandLine {
         self.inner.open.set(true);
     }
 
+    /// What was typed before, oldest first.
+    #[must_use]
+    pub fn history(&self) -> Vec<String> {
+        self.inner.history.borrow().clone()
+    }
+
+    /// Puts a history back, which restoring a session does.
+    pub fn restore_history(&self, history: Vec<String>) {
+        *self.inner.history.borrow_mut() = history;
+        *self.inner.walked.borrow_mut() = None;
+    }
+
     /// Puts `text` in it, which typing and walking the history both do.
     pub fn set_text(&self, text: &str) {
         if self.inner.text.with_untracked(|held| held != text) {
@@ -152,7 +164,6 @@ impl CommandLine {
         if self.inner.open.get_untracked() {
             self.inner.open.set(false);
             self.inner.text.set(String::new());
-            self.inner.workspace.focus_editor();
         }
     }
 }

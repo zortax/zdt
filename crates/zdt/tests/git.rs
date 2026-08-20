@@ -12,12 +12,13 @@ fn keys() -> (Window, zdt::vim::Vim) {
     let vim = window.scope.with(|| {
         let workspace = Workspace::new(Project::at("/project"));
         let settings = zdt::settings::Settings::new(zdt_core::Config::default(), None);
-        let vim = zdt::vim::Vim::new(workspace, settings);
+        let keymaps = zdt::keymaps::Keymaps::new();
         for (region, shipped, _) in zdt::assets::OVERLAYS {
-            vim.load_overlay(region, shipped, None)
+            keymaps
+                .load_overlay(region, shipped, None)
                 .unwrap_or_else(|problems| panic!("{region} did not read: {problems:?}"));
         }
-        vim
+        zdt::vim::Vim::new(workspace, settings, keymaps)
     });
     (window, vim)
 }
@@ -53,12 +54,19 @@ fn the_panel_this_editor_builds_says_when_there_is_no_repository() {
     let window = Window::open();
     let said = window.scope.with(|| {
         let workspace = Workspace::new(Project::at(&directory));
-        // In the same order as `app.rs`. The host reads the vim layer and the announcements once,
-        // when it is built, so both have to be in the scope by then.
+        // In the same order as `app.rs`. The host is handed the vim layer and the announcements,
+        // so both have to exist by the time it is built.
         let settings = zdt::settings::Settings::new(zdt_core::Config::default(), None);
         zdt::workspace::provide(workspace.clone());
-        zgui::reactive::provide_local_context(zdt::vim::Vim::new(workspace.clone(), settings));
-        let panel = zdt::git::panel(workspace.clone());
+        let vim = zdt::vim::Vim::new(workspace.clone(), settings, zdt::keymaps::Keymaps::new());
+        zgui::reactive::provide_local_context(vim.clone());
+        let status = zdt::git::Status::new(&directory, zdt_view::Clock::new());
+        let panel = zdt::git::panel(
+            workspace.clone(),
+            vim,
+            zdt::notify::Announcer::new(),
+            status,
+        );
         assert!(!panel.is_repository(), "the directory has no repository");
         panel.open();
         workspace.message().map(|message| message.text)

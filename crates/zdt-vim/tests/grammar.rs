@@ -67,6 +67,8 @@ impl Editor {
                         top_line: 0,
                         height: 10,
                     },
+                    // One buffer, which is all a grammar test has.
+                    owner: zdt_vim::Owner(1),
                 };
                 self.engine
                     .key(chord, &Layered::plain(&self.keymap), &context)
@@ -127,6 +129,8 @@ impl Editor {
                     }
                 }
                 Effect::Replace(replacements) => self.replace(replacements),
+                // Another buffer's place, which a single-buffer harness cannot show.
+                Effect::GoTo(_) => {}
                 Effect::Undo => {
                     if let Some((rope, selections)) = self.undo.pop() {
                         self.redo.push((self.rope.clone(), self.selections.clone()));

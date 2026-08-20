@@ -24,6 +24,8 @@ pub struct Config {
     pub picker: Picker,
     /// What the file tree shows.
     pub tree: Tree,
+    /// Where the sessionizer looks for projects.
+    pub sessions: Sessions,
     /// How leaping behaves.
     pub leap: Leap,
     /// Which keys are the leaders.
@@ -232,6 +234,38 @@ impl Default for Picker {
             preview_max_bytes: 2 * 1024 * 1024,
             smart_case: true,
             ignored: false,
+            hidden: false,
+        }
+    }
+}
+
+/// Where the sessionizer looks for projects.
+///
+/// The list is only what the fuzzy picker offers without being asked. Any directory at all can be
+/// opened as a session by typing its path, so this is a convenience and never a restriction.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Sessions {
+    /// The directories whose children are projects. `~` is the home directory.
+    pub paths: Vec<String>,
+    /// How far below each of them to look.
+    ///
+    /// One is "the directories in it". Two also takes their children, which is what a directory
+    /// of organisations each holding repositories wants.
+    pub depth: usize,
+    /// Whether to offer directories whose names begin with a dot.
+    pub hidden: bool,
+}
+
+impl Default for Sessions {
+    fn default() -> Self {
+        Self {
+            // The one place projects conventionally live, and nothing else: a document folder
+            // read two deep is a list of sound fonts and saved games, and a picker of eight
+            // hundred rows is worse than a picker of none. A directory that is not there is
+            // skipped rather than reported, so this costs nothing on a machine without it.
+            paths: vec!["~/Projects".to_owned()],
+            depth: 2,
             hidden: false,
         }
     }

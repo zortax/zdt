@@ -104,11 +104,6 @@ struct Inner {
     repo: RefCell<Option<Repo>>,
     /// Whether the modal is up. The tab is a buffer and is not this.
     open: RwSignal<bool, LocalStorage>,
-    /// Whether the panel has the keyboard.
-    ///
-    /// Held here, because both presentations share it. The modal claims it when it opens, and
-    /// the tab claims it when its pane is the focused one.
-    focused: RwSignal<bool, LocalStorage>,
     /// Which half is showing.
     view: RwSignal<View, LocalStorage>,
     /// Which list the keys move in.
@@ -173,7 +168,6 @@ impl GitUi {
                 host,
                 repo: RefCell::new(repo),
                 open: RwSignal::new_local(false),
-                focused: RwSignal::new_local(false),
                 view: RwSignal::new_local(View::default()),
                 list: RwSignal::new_local(List::default()),
                 entries: RwSignal::new_local(Vec::new()),

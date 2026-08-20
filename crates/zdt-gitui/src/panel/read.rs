@@ -114,29 +114,12 @@ impl GitUi {
     }
 
     /// Whether the panel has the keyboard. Tracked.
+    ///
+    /// The host's answer. Where the keyboard is belongs to the application around the panel, so
+    /// the panel asks rather than remembering.
     #[must_use]
     pub fn is_focused(&self) -> bool {
-        self.inner.focused.get()
-    }
-
-    /// The same, without subscribing.
-    #[must_use]
-    pub fn is_focused_untracked(&self) -> bool {
-        self.inner.focused.get_untracked()
-    }
-
-    /// Says the panel has the keyboard.
-    pub fn focus(&self) {
-        if !self.inner.focused.get_untracked() {
-            self.inner.focused.set(true);
-        }
-    }
-
-    /// Says it does not.
-    pub fn blur(&self) {
-        if self.inner.focused.get_untracked() {
-            self.inner.focused.set(false);
-        }
+        self.inner.host.has_keyboard()
     }
 
     /// Whether the diff is shown side by side. Tracked.

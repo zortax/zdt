@@ -1,10 +1,28 @@
 //! Making, renaming, deleting and pasting files.
 
 use crate::explorer::Explorer;
-use crate::prompt::Prompt;
+use crate::explorer::field::{About, At, Field};
 use crate::settings::Settings;
 use crate::workspace::Workspace;
 use std::path::PathBuf;
+
+/// Where a field opens: where the pointer opened the menu, or on the caret row.
+fn opening_at(explorer: &Explorer) -> At {
+    match crate::explorer::menu::taken_at() {
+        Some((x, y)) => At::Pointer(x, y),
+        None => At::Row(explorer.at_untracked()),
+    }
+}
+
+/// Says the working tree has just been written to, so the tree's marks are read again.
+///
+/// Looked up rather than passed: every caller here is already inside a task, and what it needs is
+/// one nudge on the way out.
+pub(super) fn touched() {
+    if let Some(status) = zgui::reactive::use_local_context::<crate::git::Status>() {
+        status.refresh_soon();
+    }
+}
 
 /// Changes a setting and answers what it became, when there are settings to change.
 pub(super) fn with_settings<T>(change: impl FnOnce(&mut zdt_core::Config) -> T) -> Option<T> {
@@ -17,12 +35,12 @@ pub(super) fn with_settings<T>(change: impl FnOnce(&mut zdt_core::Config) -> T) 
 /// Asks for a name, then makes one.
 pub(super) fn create(workspace: &Workspace, explorer: &Explorer, directory: bool) {
     let target = explorer.target_directory();
-    let title = if directory {
-        format!("New directory in {}", short(workspace, &target))
+    let about = if directory {
+        About::NewDirectory
     } else {
-        format!("New file in {}", short(workspace, &target))
+        About::NewFile
     };
-    ask(workspace, explorer, title, String::new(), move |name| {
+    ask(workspace, explorer, about, String::new(), move |name| {
         let path = target.join(name.trim_end_matches('/'));
         // A name ending in a separator is a directory, which is how neo-tree's `a` makes one.
         let directory = directory || name.ends_with('/');
@@ -48,10 +66,10 @@ pub(super) fn rename(workspace: &Workspace, explorer: &Explorer) {
     ask(
         workspace,
         explorer,
-        format!("Rename {}", row.entry.name),
+        About::Rename,
         row.entry.name.clone(),
         move |name| {
-            // Cloned per call: the prompt's answer is typed as callable more than once, even
+            // Cloned per call: the field's answer is typed as callable more than once, even
             // though it only ever is once.
             let from = from.clone();
             let to = parent.join(name);
@@ -65,18 +83,54 @@ pub(super) fn rename(workspace: &Workspace, explorer: &Explorer) {
     );
 }
 
+/// Asks where it should go, then moves it.
+///
+/// The field opens holding the path from the top of the project, so moving something two
+/// directories along is one edit rather than a name typed out again.
+pub(super) fn move_to(workspace: &Workspace, explorer: &Explorer) {
+    let Some(row) = explorer.selected() else {
+        return;
+    };
+    let from = row.entry.path.clone();
+    let root = explorer.root();
+    let start = workspace.project().relative(&from).into_owned();
+
+    ask(
+        workspace,
+        explorer,
+        crate::explorer::field::About::Move,
+        start,
+        move |wanted| {
+            // Cloned per call: the field's answer is typed as callable more than once, even though
+            // it only ever is once.
+            let from = from.clone();
+            let to = root.join(wanted.trim_start_matches('/'));
+            let landed = to.clone();
+            (
+                Box::new(move || {
+                    if let Some(parent) = to.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+                    zdt_core::paths::rename(&from, &to)
+                }) as Box<dyn FnOnce() -> std::io::Result<()> + Send>,
+                Some(landed),
+            )
+        },
+    );
+}
+
 /// Asks whether, then removes it.
 pub(super) fn delete(workspace: &Workspace, explorer: &Explorer) {
     let Some(row) = explorer.selected() else {
         return;
     };
     let path = row.entry.path.clone();
-    // A typed confirmation, and no dialog. The keyboard is already in the tree, and a dialog
-    // that takes it away is one people dismiss without reading.
+    // A typed confirmation, and no dialog. The keyboard is already in the tree, and a dialog that
+    // takes it away is one people dismiss without reading.
     ask(
         workspace,
         explorer,
-        format!("Delete {}? (y/n)", row.entry.name),
+        About::Delete,
         String::new(),
         move |answer| {
             let path = path.clone();
@@ -120,6 +174,7 @@ pub fn move_into(
         match done {
             Ok(landed) => {
                 explorer.refresh();
+                touched();
                 explorer.reveal(&landed);
                 workspace.say(format!("moved to {}", landed.display()));
             }
@@ -168,6 +223,7 @@ pub(super) fn paste(workspace: &Workspace, explorer: &Explorer) {
                     explorer.release();
                 }
                 explorer.refresh();
+                touched();
                 workspace.say(format!(
                     "{} {}",
                     if cut { "moved to" } else { "copied to" },
@@ -179,14 +235,14 @@ pub(super) fn paste(workspace: &Workspace, explorer: &Explorer) {
     });
 }
 
-/// The shape every tree prompt has: ask, do the work on a worker, refresh, report.
+/// The shape every tree question has: ask, do the work on a worker, refresh, report.
 ///
 /// `plan` turns the answer into the work and, when there is one, the path the caret should land
 /// on afterwards. It runs on the interface thread; only what it returns crosses to the worker.
 pub(super) fn ask<F>(
     workspace: &Workspace,
     explorer: &Explorer,
-    title: String,
+    about: About,
     start: String,
     plan: F,
 ) where
@@ -197,21 +253,23 @@ pub(super) fn ask<F>(
             Option<PathBuf>,
         ) + 'static,
 {
-    let Some(prompt) = zgui::reactive::use_local_context::<Prompt>() else {
+    let Some(field) = zgui::reactive::use_local_context::<Field>() else {
         return;
     };
+    let at = opening_at(explorer);
     let explorer = explorer.clone();
     let workspace = workspace.clone();
-    prompt.ask(title, start, move |answer| {
+    field.ask(about, start, at, move |answer| {
         let (work, landing) = plan(answer);
         let explorer = explorer.clone();
         let workspace = workspace.clone();
-        // Detached, because submitting the prompt is what closed it: a task belonging to the
-        // prompt would be cancelled before the file was ever made.
+        // Detached, because submitting the field is what closed it: a task belonging to the field
+        // would be cancelled before the file was ever made.
         zdt_view::detached(async move {
             match zgui::task::blocking(work).await {
                 Ok(()) => {
                     explorer.refresh();
+                    touched();
                     if let Some(landing) = landing {
                         explorer.reveal(&landing);
                     }
@@ -221,19 +279,4 @@ pub(super) fn ask<F>(
             explorer.focus();
         });
     });
-}
-
-/// A path as it reads in a message: relative to the project when it is under it.
-///
-/// The project root is relative to nothing, so it reads as its own name. "Relative to here"
-/// literally comes to the empty string.
-pub(super) fn short(workspace: &Workspace, path: &std::path::Path) -> String {
-    let relative = workspace.project().relative(path).into_owned();
-    if relative.is_empty() {
-        path.file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| path.display().to_string())
-    } else {
-        relative
-    }
 }

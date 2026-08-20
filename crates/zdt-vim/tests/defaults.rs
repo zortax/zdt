@@ -71,7 +71,7 @@ fn the_leader_map_is_the_one_the_hands_already_know() {
         ("<Leader>tf", "terminal.toggle"),
         ("<Leader>la", "lsp.code_action"),
         ("<Leader>lr", "lsp.rename"),
-        ("<Leader>Sl", "session.load_last"),
+        ("<Leader>Sf", "session.pick"),
     ] {
         assert_eq!(
             action(&map, Mode::Normal, sequence),

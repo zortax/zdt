@@ -17,30 +17,22 @@ pub fn Explorer() -> impl IntoView {
     let window = use_window();
     let node = NodeRef::new();
 
-    // The keyboard follows the panel. Taking it is what makes `j` walk the tree, and giving it
-    // back is what makes `<Esc>` return to the editor.
-    let claiming = {
+    // How the keyboard reaches the panel. Taking it is what makes `j` walk the tree, and the model
+    // saying the panes have it again is what makes `<Esc>` return to the editor.
+    crate::focus::claim::sink(crate::focus::Spot::Tree, crate::focus::Sink::Node(node));
+
+    // What the list can see, which is how far a half page is, which rows a leap may label, and
+    // where a row is for a field to open under.
+    let viewport = Viewport::new(NodeRef::new());
+    explorer.set_viewport(viewport);
+
+    // The caret stays on screen. `j` at the bottom edge scrolls, as it does in any list, and
+    // `<C-d>` would otherwise move a caret nobody could see.
+    let following = {
         let explorer = explorer.clone();
-        let timers = zgui::view::time::Timers::current();
-        let held: std::cell::RefCell<Option<zgui::view::time::TimeoutHandle>> =
-            std::cell::RefCell::new(None);
-        zgui::reactive::RenderEffect::new(move |_| {
-            // Read first, so that asking again for a keyboard the panel believes it already has
-            // still runs this: what the prompt borrowed has to be reclaimable.
-            let claims = explorer.claims();
-            if !explorer.is_open() || !explorer.is_focused() || claims == 0 {
-                return;
-            }
-            let Some(timers) = timers.as_ref() else {
-                return;
-            };
-            // From a timer, because the first run happens while the panel is still being built and
-            // a node that is not mounted cannot take focus.
-            *held.borrow_mut() =
-                Some(timers.set_timeout(std::time::Duration::ZERO, move || node.focus()));
-        })
+        zgui::reactive::RenderEffect::new(move |_| viewport.keep_in_view(explorer.at()))
     };
-    on_cleanup_local(move || drop(claiming));
+    on_cleanup_local(move || drop(following));
 
     let open = {
         let explorer = explorer.clone();
@@ -70,13 +62,21 @@ pub fn Explorer() -> impl IntoView {
         move |_: &mut EventCx<'_, events::FocusIn>| explorer.focus()
     };
 
-    let on_key = move |event: &mut EventCx<'_, events::KeyDown>| {
-        let Some(chord) = crate::keys::chord_of(event, event.modifiers) else {
-            return;
-        };
-        if vim.key_in_region(chord, "tree") {
-            event.prevent_default();
-            event.stop_propagation();
+    let on_key = {
+        let explorer = explorer.clone();
+        move |event: &mut EventCx<'_, events::KeyDown>| {
+            let Some(chord) = crate::keys::chord_of(event, event.modifiers) else {
+                return;
+            };
+            // A leap in progress takes every key, before the keymap sees one: once it has started,
+            // each key is a character it aims at or a label, and a binding that answered any of
+            // them would put some letters out of reach.
+            if crate::explorer::leap::key(&vim, &explorer, chord)
+                || vim.key_in_region(chord, "tree")
+            {
+                event.prevent_default();
+                event.stop_propagation();
+            }
         }
     };
 
@@ -101,6 +101,7 @@ pub fn Explorer() -> impl IntoView {
             }
             VirtualList(
                 class = "tree__rows",
+                node_ref = viewport.node(),
                 count = Signal::derive_local(count),
                 row_size = ROW,
                 row = row,
@@ -121,6 +122,7 @@ pub(crate) fn TreeRow(
     index: usize,
 ) -> impl IntoView {
     let explorer = use_explorer();
+    let vim = use_vim();
 
     let row = {
         let explorer = explorer.clone();
@@ -199,6 +201,29 @@ pub(crate) fn TreeRow(
     let name = {
         let row = row.clone();
         move || row().map_or_else(String::new, |row| row.entry.name)
+    };
+    // A dotfile, or something the ignore files leave out, shown because somebody asked for it.
+    // Drawn faintly, so the eye can tell what belongs to the project from what is merely in the
+    // directory.
+    let apart = {
+        let row = row.clone();
+        move || {
+            row()
+                .filter(|row| row.entry.standing.is_apart())
+                .map(|_| "true".to_owned())
+        }
+    };
+    // What git says about it, as one outline at the trailing edge. The name itself keeps its own
+    // colour: a tree that tints filenames by their git state has thrown away what the tint of a
+    // filename is for.
+    let mark = {
+        let (row, status) = (row.clone(), crate::git::use_status());
+        move || row().and_then(|row| status.mark(&row.entry.path))
+    };
+    // The key that leaps to this row, while one is being chosen.
+    let leap = {
+        let leaping = vim.leaping();
+        move || leaping.label_at(index).map(|key| key.to_string())
     };
 
     // A press picks the row, and a plain one opens it. What kind of press decides which. The
@@ -279,6 +304,7 @@ pub(crate) fn TreeRow(
             attr:data-cut = cut,
             attr:data-drop = dropping,
             attr:data-directory = directory,
+            attr:data-apart = apart,
             a11y:role = Role::TreeItem,
             on:pointer_down = press,
             on:pointer_up = release,
@@ -303,6 +329,32 @@ pub(crate) fn TreeRow(
             }
             label(class = "glyph", style:color = tint) {{glyph}}
             label(class = "tree__name nowrap") {{name}}
+            // Pushed to the trailing edge by the name's own growth, so neither of these covers a
+            // filename that fits.
+            {move || {
+                use zdt_view::Erase;
+                match mark() {
+                    Some(mark) => view! {
+                        box(
+                            class = "tree__git",
+                            style:color = Some(format!("var(--{})", mark.tint()))
+                        ) {
+                            Icon(icon = mark.icon(), class = "icon--xs")
+                        }
+                    }
+                    .any(),
+                    None => ().any(),
+                }
+            }}
+            // One element, always here, hidden by an attribute: a leap must create and destroy no
+            // nodes among rows the list is recycling.
+            label(
+                class = "tree__leap",
+                attr:data-on = {
+                    let leap = leap.clone();
+                    move || leap().is_some().then(|| "true".to_owned())
+                }
+            ) {{move || leap().unwrap_or_default()}}
         }
     }
 }

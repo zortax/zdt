@@ -12,14 +12,14 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zdt_view::anchor::{Anchoring, Placed, place};
+use zdt_view::anchor::{AnchorRect, Anchoring, Placed, place};
 use zgui::prelude::*;
 use zgui::view;
 use zgui_testkit_view::Window;
 
 /// Somewhere in the text for a surface to sit under.
-fn caret() -> zgui_editor::CaretRect {
-    zgui_editor::CaretRect {
+fn caret() -> AnchorRect {
+    AnchorRect {
         x: 100.0,
         y: 200.0,
         width: 2.0,

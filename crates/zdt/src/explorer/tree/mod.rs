@@ -14,9 +14,11 @@
 
 mod resize;
 mod rows;
+mod viewport;
 
 pub use crate::explorer::tree::resize::{TreeResize, TreeResizeProps};
 pub use crate::explorer::tree::rows::{Explorer, ExplorerProps};
+pub use crate::explorer::tree::viewport::Viewport;
 
 /// How tall one row is. The list is told, and measures nothing.
-const ROW: f32 = 22.0;
+pub(crate) const ROW: f32 = 22.0;

@@ -36,14 +36,18 @@ struct Inner {
     /// timer that fired late would suppress somebody *else's* change.
     stamp: RefCell<Option<String>>,
     /// What is waiting to be written, so that dragging a slider is one write.
-    pending: RefCell<Option<zgui::view::time::TimeoutHandle>>,
-    /// The window's clock, taken once where there certainly is one.
-    timers: Option<zgui::view::time::Timers>,
+    pending: RefCell<Option<zdt_view::Pending>>,
+    /// The clock the write is debounced on.
+    ///
+    /// The settings are older than any one window, so this is a clock of their own that a window
+    /// lends its engine to. See [`zdt_view::Clock`].
+    clock: zdt_view::Clock,
     /// Where a failed write is announced.
     ///
-    /// Taken once, because the write happens in a debounce timer and a context looked up there
-    /// is gone. See `tests/context.rs`.
-    notify: RefCell<Option<crate::notify::Notify>>,
+    /// An announcer, because the write happens in a debounce timer, a context looked up there is
+    /// gone, and the window that was open when the change was made may not be the one that is
+    /// open when the write fails. See `tests/context.rs`.
+    announcer: crate::notify::Announcer,
 }
 
 /// How long after the last change the settings are written.
@@ -62,10 +66,24 @@ impl Settings {
                 paths,
                 stamp: RefCell::new(None),
                 pending: RefCell::new(None),
-                timers: zgui::view::time::Timers::current(),
-                notify: RefCell::new(None),
+                clock: zdt_view::Clock::new(),
+                announcer: crate::notify::Announcer::new(),
             }),
         }
+    }
+
+    /// The clock the write debounce runs on.
+    ///
+    /// A window binds its own engine to this while it is open. See [`zdt_view::Clock`].
+    #[must_use]
+    pub fn clock(&self) -> &zdt_view::Clock {
+        &self.inner.clock
+    }
+
+    /// Where a failed write is announced.
+    #[must_use]
+    pub fn announcer(&self) -> &crate::notify::Announcer {
+        &self.inner.announcer
     }
 
     /// Reads the settings from the configuration directory, saying what went wrong.
@@ -132,12 +150,12 @@ impl Settings {
         self.inner.config.update(change);
     }
 
-    /// Says where a failed write should be announced.
+    /// Says which window's stack a failed write should be announced on.
     ///
-    /// Set from the root once the announcements exist. The settings are read before them,
-    /// because the settings say whether announcements are wanted at all.
+    /// Set from a window once its announcements exist. The settings are read before them, because
+    /// the settings say whether announcements are wanted at all.
     pub fn announce_through(&self, notify: crate::notify::Notify) {
-        *self.inner.notify.borrow_mut() = Some(notify);
+        self.inner.announcer.bind(notify);
     }
 
     /// Changes one thing and writes the file, which the settings panel does.
@@ -149,25 +167,37 @@ impl Settings {
     }
 
     /// Writes the settings out, after a pause.
+    ///
+    /// With no window lending a clock the write happens at once, because the alternative is
+    /// holding somebody's change until one opens.
     pub fn persist_soon(&self) {
-        let Some(timers) = self.inner.timers.clone() else {
-            // No clock: a test, or a window that has gone. Write now.
-            let _ = self.persist();
-            return;
-        };
         let settings = self.clone();
-        let handle = timers.set_timeout(WRITE_DEBOUNCE, move || {
+        let handle = self.inner.clock.after(WRITE_DEBOUNCE, move || {
             settings.inner.pending.borrow_mut().take();
-            if let Err(error) = settings.persist() {
-                let said = error.to_string();
-                match settings.inner.notify.borrow().as_ref() {
-                    Some(notify) => notify.fail("could not write config.toml", Some(said)),
-                    None => tracing::warn!("could not write config.toml: {said}"),
-                }
-            }
+            settings.persist_now();
         });
         // Replacing the handle cancels the one before it, which is the debounce.
         *self.inner.pending.borrow_mut() = Some(handle);
+    }
+
+    /// Writes whatever is waiting, now. What closing a window does.
+    pub fn flush(&self) {
+        if self.inner.pending.borrow_mut().take().is_some() {
+            self.persist_now();
+        }
+    }
+
+    /// Writes the settings out, saying so if it fails.
+    fn persist_now(&self) {
+        if let Err(error) = self.persist() {
+            let said = error.to_string();
+            // Logged as well as announced: a window may open long after this, and a configuration
+            // that would not write is worth finding in the log either way.
+            tracing::warn!("could not write config.toml: {said}");
+            self.inner
+                .announcer
+                .fail("could not write config.toml", Some(said));
+        }
     }
 
     /// Writes the settings out as a list of disagreements with the defaults.

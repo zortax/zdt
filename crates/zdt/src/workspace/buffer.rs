@@ -118,6 +118,27 @@ impl Fingerprint {
 }
 
 impl Buffer {
+    /// A text buffer put back the way a session had it.
+    ///
+    /// `saved` is the fingerprint of what is on disk, and that is what decides whether the buffer
+    /// is dirty. The revision cannot: a restored history is at a revision this run has never
+    /// seen, and undoing back to the file's text gives a new revision rather than the old one.
+    #[must_use]
+    pub fn restored(
+        id: BufferId,
+        path: Option<PathBuf>,
+        document: zgui_editor::Document,
+        saved: Fingerprint,
+    ) -> Self {
+        let buffer = Self::text(id, path, document);
+        buffer.saved_text.set(saved);
+        // A revision the live one can never equal, so `refresh_dirty` always falls through to the
+        // fingerprint, which is the honest answer.
+        buffer.saved_revision.set(u64::MAX);
+        buffer.refresh_dirty();
+        buffer
+    }
+
     /// A text buffer over `document`, from `path` when it came from one.
     pub fn text(id: BufferId, path: Option<PathBuf>, document: zgui_editor::Document) -> Self {
         let file_type = path

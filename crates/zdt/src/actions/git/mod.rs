@@ -100,7 +100,7 @@ pub fn run(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
             };
             let at = hunk.line;
             let staging = leaf == "stage_hunk";
-            let root = workspace.project().root().to_path_buf();
+            let root = workspace.project().tooling_root().to_path_buf();
             let path = path.clone();
             let workspace = workspace.clone();
             // Taken now: neither a context nor a notify is reachable after the await below.

@@ -19,8 +19,10 @@ use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
 mod host;
+pub mod status;
 
 pub use crate::git::host::panel;
+pub use crate::git::status::{Mark, Status, use_status};
 
 use crate::workspace::{BufferId, Workspace};
 
@@ -38,11 +40,12 @@ pub struct Git {
 
 struct Inner {
     workspace: Workspace,
-    timers: Option<zgui::view::time::Timers>,
+    /// The clock the after-save refresh is debounced on, lent by whichever window is attached.
+    clock: zdt_view::Clock,
     /// The hunks in each file.
     hunks: RefCell<FxHashMap<PathBuf, Vec<Hunk>>>,
     /// What is waiting to run a diff, by file.
-    pending: RefCell<FxHashMap<PathBuf, zgui::view::time::TimeoutHandle>>,
+    pending: RefCell<FxHashMap<PathBuf, zdt_view::Pending>>,
     /// A number that changes whenever the hunks have.
     revision: RwSignal<u64, LocalStorage>,
 }
@@ -50,11 +53,11 @@ struct Inner {
 impl Git {
     /// Nothing known yet.
     #[must_use]
-    pub fn new(workspace: Workspace) -> Self {
+    pub fn new(workspace: Workspace, clock: zdt_view::Clock) -> Self {
         Self {
             inner: Rc::new(Inner {
                 workspace,
-                timers: zgui::view::time::Timers::current(),
+                clock,
                 hunks: RefCell::new(FxHashMap::default()),
                 pending: RefCell::new(FxHashMap::default()),
                 revision: RwSignal::new_local(0),
@@ -130,14 +133,9 @@ impl Git {
         else {
             return;
         };
-        let Some(timers) = self.inner.timers.clone() else {
-            self.refresh_path(&path);
-            return;
-        };
-
         let git = self.clone();
         let waiting = path.clone();
-        let handle = timers.set_timeout(AFTER_SAVE, move || {
+        let handle = self.inner.clock.after(AFTER_SAVE, move || {
             git.inner.pending.borrow_mut().remove(&waiting);
             git.refresh_path(&waiting);
         });

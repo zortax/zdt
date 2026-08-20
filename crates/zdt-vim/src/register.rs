@@ -204,6 +204,21 @@ impl Registers {
         self.held.insert(character, contents);
     }
 
+    /// What is in the unnamed register.
+    #[must_use]
+    pub fn unnamed(&self) -> &Contents {
+        &self.unnamed
+    }
+
+    /// Puts every register back, which restoring a session does.
+    ///
+    /// Quiet: setting one the ordinary way shifts the numbered registers along, and putting a
+    /// saved set back is not a yank.
+    pub fn restore(&mut self, unnamed: Contents, held: impl IntoIterator<Item = (char, Contents)>) {
+        self.unnamed = unnamed;
+        self.held = held.into_iter().collect();
+    }
+
     /// Every register with something in it, for the picker that lists them.
     #[must_use]
     pub fn occupied(&self) -> Vec<(char, &Contents)> {

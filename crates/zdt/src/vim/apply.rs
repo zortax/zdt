@@ -37,25 +37,25 @@ impl Vim {
     /// One key, without publishing what changed.
     pub(super) fn step(&self, chord: Chord, handle: &EditorHandle) -> Step {
         let engine = &self.inner.engine;
-        let keymap = self.inner.keymap.borrow();
-        let layered = Layered::plain(&keymap);
-
-        handle.query(|snapshot| {
-            let selections: Vec<Selection> = snapshot
-                .selections()
-                .iter()
-                .map(|selection| Selection::new(selection.anchor, selection.head))
-                .collect();
-            let visible = snapshot.visible_lines();
-            let context = Context {
-                rope: snapshot.rope(),
-                selections: &selections,
-                view: View {
-                    top_line: visible.start,
-                    height: visible.len().max(1),
-                },
-            };
-            engine.borrow_mut().key(chord, &layered, &context)
+        self.inner.keymaps.with_layered(None, |layered| {
+            handle.query(|snapshot| {
+                let selections: Vec<Selection> = snapshot
+                    .selections()
+                    .iter()
+                    .map(|selection| Selection::new(selection.anchor, selection.head))
+                    .collect();
+                let visible = snapshot.visible_lines();
+                let context = Context {
+                    rope: snapshot.rope(),
+                    selections: &selections,
+                    view: View {
+                        top_line: visible.start,
+                        height: visible.len().max(1),
+                    },
+                    owner: self.owner(),
+                };
+                engine.borrow_mut().key(chord, layered, &context)
+            })
         })
     }
 
@@ -107,6 +107,7 @@ impl Vim {
                 Effect::Replace(replacements) => {
                     handle.command(Command::ReplaceRanges(replacements));
                 }
+                Effect::GoTo(place) => self.go_to(place),
                 Effect::Undo => handle.command(Command::Undo),
                 Effect::Redo => handle.command(Command::Redo),
                 Effect::Scroll(scroll) => handle.command(Command::Scroll(match scroll {

@@ -15,12 +15,15 @@
 pub mod actions;
 pub mod app;
 pub mod assets;
+pub mod cli;
 pub mod cmdline;
 pub mod completion;
 pub mod explorer;
 pub mod files;
+pub mod focus;
 pub mod git;
 pub mod hover;
+pub mod keymaps;
 pub mod keys;
 pub mod language;
 pub mod leap;

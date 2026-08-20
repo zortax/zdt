@@ -105,8 +105,8 @@ impl Picker {
             let rope = snapshot.rope();
             vim.marks()
                 .into_iter()
-                .map(|(name, byte)| {
-                    let byte = byte.min(rope.len_bytes());
+                .map(|(name, place)| {
+                    let byte = place.byte.min(rope.len_bytes());
                     let line = rope.byte_to_line(byte);
                     let text = rope
                         .line(line)

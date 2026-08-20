@@ -145,6 +145,63 @@ pub fn absolute(root: &Path, relative: &str) -> PathBuf {
     root.join(relative)
 }
 
+/// Every directory under `root`, no deeper than `depth`, stopping at each project.
+///
+/// What a sessionizer indexes: a directory of projects, and sometimes a directory of owners each
+/// holding projects. Depth one is "the directories in `root`"; depth two also takes their
+/// children.
+///
+/// A project is listed and never entered. `~/Projects/thing` is somewhere to work;
+/// `~/Projects/thing/src` and `~/Projects/thing/target` are not, and a list that held every
+/// subdirectory of every repository would be hundreds of rows of build output. So the depth is
+/// spent on the *nesting somebody arranged* — a folder of clients each holding repositories —
+/// rather than on the insides of one.
+///
+/// A plain walk rather than an ignore-aware one, because the directories being looked at are
+/// somebody's project directory and not a repository. Reading two levels of `~/Projects` is a
+/// handful of `read_dir` calls, so this is cheap, but it does block: put it on a worker.
+///
+/// `root` itself is never in the answer. Symbolic links are not followed, so a link back up does
+/// not make the walk endless.
+#[must_use]
+pub fn directories_within(root: &Path, depth: usize, hidden: bool) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut level = vec![root.to_path_buf()];
+
+    for _ in 0..depth {
+        let mut next = Vec::new();
+        for directory in &level {
+            let Ok(entries) = std::fs::read_dir(directory) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                // `file_type` on the entry does not follow the link, which is what stops a link
+                // into a parent from being walked.
+                if !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    continue;
+                }
+                let name = entry.file_name();
+                if !hidden && name.to_string_lossy().starts_with('.') {
+                    continue;
+                }
+                let path = entry.path();
+                // Listed either way; entered only when it is not itself a project.
+                if !crate::Project::is_root(&path) {
+                    next.push(path.clone());
+                }
+                found.push(path);
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+        level = next;
+    }
+
+    found.sort_unstable();
+    found
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,6 +267,68 @@ mod tests {
         let temp = Temp::new("dirs");
         let found = directories(&temp.0, Walk::default());
         assert_eq!(found, vec!["src".to_owned()]);
+    }
+
+    #[test]
+    fn a_bounded_walk_stops_at_the_depth_asked_for() {
+        let temp = Temp::new("bounded");
+        std::fs::create_dir_all(temp.0.join("src").join("deep").join("deeper"))
+            .expect("the directories are made");
+
+        let one = directories_within(&temp.0, 1, false);
+        assert!(one.contains(&temp.0.join("src")));
+        assert!(!one.contains(&temp.0.join("src/deep")), "one level only");
+
+        let two = directories_within(&temp.0, 2, false);
+        assert!(two.contains(&temp.0.join("src/deep")));
+        assert!(
+            !two.contains(&temp.0.join("src/deep/deeper")),
+            "two levels only",
+        );
+    }
+
+    #[test]
+    fn a_bounded_walk_lists_a_project_without_going_into_it() {
+        // The whole reason a sessionizer's list is usable: `~/Projects/thing` is somewhere to
+        // work, and `~/Projects/thing/src` and `~/Projects/thing/target` are not.
+        let temp = Temp::new("projects");
+        let repo = temp.0.join("thing");
+        std::fs::create_dir_all(repo.join("src")).expect("the directories are made");
+        std::fs::create_dir_all(repo.join("target")).expect("the directories are made");
+        std::fs::write(repo.join("Cargo.toml"), "").expect("it writes");
+
+        let found = directories_within(&temp.0, 2, false);
+        assert!(found.contains(&repo), "the project is offered");
+        assert!(!found.contains(&repo.join("src")), "its insides are not");
+        assert!(!found.contains(&repo.join("target")));
+    }
+
+    #[test]
+    fn a_bounded_walk_still_goes_through_a_directory_that_only_groups_projects() {
+        // A folder of clients, each holding repositories, is what the second level is for.
+        let temp = Temp::new("grouped");
+        let repo = temp.0.join("client").join("thing");
+        std::fs::create_dir_all(repo.join("src")).expect("the directories are made");
+        std::fs::write(repo.join(".git"), "").expect("it writes");
+
+        let found = directories_within(&temp.0, 2, false);
+        assert!(found.contains(&temp.0.join("client")));
+        assert!(found.contains(&repo), "the project inside it is reached");
+    }
+
+    #[test]
+    fn a_bounded_walk_leaves_out_dotted_names_unless_asked() {
+        let temp = Temp::new("dotted");
+        std::fs::create_dir_all(temp.0.join(".git")).expect("the directory is made");
+
+        assert!(!directories_within(&temp.0, 1, false).contains(&temp.0.join(".git")));
+        assert!(directories_within(&temp.0, 1, true).contains(&temp.0.join(".git")));
+    }
+
+    #[test]
+    fn a_bounded_walk_never_answers_with_its_own_root() {
+        let temp = Temp::new("selfless");
+        assert!(!directories_within(&temp.0, 2, true).contains(&temp.0));
     }
 
     #[test]

@@ -23,7 +23,7 @@ use rustc_hash::FxHashMap;
 
 use crate::action::{Action, Args};
 use crate::chord::{Chord, Named};
-use crate::effect::{Context, Effect, Scroll, Selection, Step, Visual};
+use crate::effect::{Context, Effect, Place, Scroll, Selection, Step, Visual};
 use crate::keymap::{Layered, Resolution};
 use crate::mode::Mode;
 use crate::motion::{self, FindChar, Kind, Target};
@@ -90,18 +90,18 @@ struct Repeat {
 /// Where the caret was before a jump.
 #[derive(Debug, Default)]
 struct JumpList {
-    places: Vec<usize>,
+    places: Vec<Place>,
     at: usize,
 }
 
 impl JumpList {
-    /// Remembers `byte` as somewhere to come back to.
-    fn push(&mut self, byte: usize) {
+    /// Remembers `place` as somewhere to come back to.
+    fn push(&mut self, place: Place) {
         self.places.truncate(self.at);
-        if self.places.last() == Some(&byte) {
+        if self.places.last() == Some(&place) {
             return;
         }
-        self.places.push(byte);
+        self.places.push(place);
         // A hundred is more than anybody walks back through, and is what vim keeps.
         if self.places.len() > 100 {
             self.places.remove(0);
@@ -110,7 +110,7 @@ impl JumpList {
     }
 
     /// One step back, remembering where we were so forward works.
-    fn back(&mut self, from: usize) -> Option<usize> {
+    fn back(&mut self, from: Place) -> Option<Place> {
         if self.at == 0 {
             return None;
         }
@@ -122,7 +122,7 @@ impl JumpList {
     }
 
     /// One step forward.
-    fn forward(&mut self) -> Option<usize> {
+    fn forward(&mut self) -> Option<Place> {
         if self.at + 1 >= self.places.len() {
             return None;
         }
@@ -162,7 +162,7 @@ pub struct Engine {
     /// The column a run of `j` and `k` is aiming for.
     goal_column: Option<usize>,
     registers: Registers,
-    marks: FxHashMap<char, usize>,
+    marks: FxHashMap<char, Place>,
     jumps: JumpList,
     last_find: Option<FindChar>,
     /// Everything typed since the last change started, for `.`.
@@ -241,14 +241,36 @@ impl Engine {
     ///
     /// In name order, so that `a` reads before `b` however they were set.
     #[must_use]
-    pub fn marks(&self) -> Vec<(char, usize)> {
-        let mut marks: Vec<(char, usize)> = self
+    pub fn marks(&self) -> Vec<(char, Place)> {
+        let mut marks: Vec<(char, Place)> = self
             .marks
             .iter()
-            .map(|(name, byte)| (*name, *byte))
+            .map(|(name, place)| (*name, *place))
             .collect();
-        marks.sort_unstable();
+        marks.sort_unstable_by_key(|(name, _)| *name);
         marks
+    }
+
+    /// Puts marks back, which restoring a session does.
+    pub fn set_marks(&mut self, marks: impl IntoIterator<Item = (char, Place)>) {
+        self.marks = marks.into_iter().collect();
+    }
+
+    /// Where the caret has been, oldest first, and how far back through them `<C-o>` has walked.
+    #[must_use]
+    pub fn jumps(&self) -> (Vec<Place>, usize) {
+        (self.jumps.places.clone(), self.jumps.at)
+    }
+
+    /// Puts the jump list back.
+    pub fn set_jumps(&mut self, places: Vec<Place>, at: usize) {
+        self.jumps.at = at.min(places.len());
+        self.jumps.places = places;
+    }
+
+    /// The registers, to be written into.
+    pub fn registers_mut(&mut self) -> &mut Registers {
+        &mut self.registers
     }
 
     /// Whether a macro is being recorded, and into which register.

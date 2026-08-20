@@ -151,6 +151,11 @@ impl CommandLine {
         if let Some(windows) =
             zgui::reactive::use_local_context::<zgui::runtime::windows::Windows>()
         {
+            if let Some(host) =
+                zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+            {
+                host.flush_all();
+            }
             windows.quit();
         }
     }

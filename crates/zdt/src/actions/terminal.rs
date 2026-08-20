@@ -54,7 +54,18 @@ pub(super) fn run(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::
                 terminals.start_typing(id);
             }
         }
-        "normal" => terminals.stop_typing(),
+        // Whichever terminal is being looked at: the float when one is up, and the current buffer
+        // otherwise. Being in insert is a fact about one terminal, so leaving it names one.
+        "normal" => {
+            if let Some(buffer) = terminals.showing().or_else(|| {
+                workspace
+                    .current_buffer()
+                    .filter(crate::workspace::Buffer::is_terminal)
+                    .map(|buffer| buffer.id)
+            }) {
+                terminals.stop_typing(buffer);
+            }
+        }
         "hide" => terminals.hide_float(),
         "insert" => {
             if let Some(buffer) = workspace

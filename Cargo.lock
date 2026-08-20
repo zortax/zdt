@@ -4488,6 +4488,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
+name = "rmp"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ba8be72d372b2c9b35542551678538b562e7cf86c3315773cae48dfbfe7790c"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72f81bee8c8ef9b577d1681a70ebbc962c232461e397b22c208c43c04b67a155"
+dependencies = [
+ "rmp",
+ "serde",
+]
+
+[[package]]
 name = "ropey"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4890,6 +4909,9 @@ name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -6923,6 +6945,7 @@ dependencies = [
  "lsp-types",
  "notify",
  "portable-pty",
+ "rmp-serde",
  "ropey",
  "rustc-hash 2.1.3",
  "serde",
@@ -6937,6 +6960,7 @@ dependencies = [
  "zdt-git",
  "zdt-gitui",
  "zdt-icons",
+ "zdt-ipc",
  "zdt-lsp",
  "zdt-view",
  "zdt-vim",
@@ -7007,6 +7031,16 @@ name = "zdt-icons"
 version = "0.1.0"
 dependencies = [
  "zgui",
+]
+
+[[package]]
+name = "zdt-ipc"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tracing",
 ]
 
 [[package]]
@@ -7306,6 +7340,7 @@ dependencies = [
  "flume",
  "ropey",
  "rustc-hash 2.1.3",
+ "serde",
  "smallvec",
  "streaming-iterator",
  "tree-sitter",

@@ -101,6 +101,7 @@ pub(super) fn offer_actions(
     picker.open(Source::Given {
         title: "Code actions",
         rows,
+        typed: None,
     });
 }
 

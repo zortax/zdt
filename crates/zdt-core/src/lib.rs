@@ -9,6 +9,7 @@ pub mod language;
 pub mod paths;
 pub mod project;
 pub mod search;
+pub mod state;
 pub mod theme;
 pub mod tree;
 

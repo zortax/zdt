@@ -1,96 +1,148 @@
-//! Saving a session, and restoring one.
+//! Moving between sessions.
+//!
+//! Every leaf here goes through [`crate::session::host`]. There is nothing to save and nothing to
+//! load: a session writes itself down as it is worked in and comes back when its directory is
+//! opened again, so the only things left to ask for are which session and where.
 
-use crate::settings::Settings;
 use crate::workspace::Workspace;
 use zgui_editor::EditorHandle;
 
 /// The sessions.
-///
-/// A session is the files that were open and where the caret was in each, kept under the project's
-/// own name so that "the session for this project" needs nothing remembered.
 pub(super) fn run(workspace: &Workspace, leaf: &str, handle: Option<&EditorHandle>) {
-    use crate::session::{self, Entry, Session};
-
-    let paths = zgui::reactive::use_local_context::<Settings>()
-        .and_then(|settings| settings.paths().cloned());
-    let Some(paths) = paths else {
-        workspace.complain("there is nowhere to keep sessions");
-        return;
-    };
-    let root = workspace.project().root().to_path_buf();
-
+    let _ = handle;
     match leaf {
-        "save" => {
-            let order = workspace.order();
-            let current = workspace.current_buffer().map(|buffer| buffer.id);
-            let mut files = Vec::new();
-            let mut showing = 0;
-
-            for id in order {
-                let Some(buffer) = workspace.buffer_untracked(id) else {
-                    continue;
-                };
-                let Some(path) = buffer.path.clone() else {
-                    continue;
-                };
-                if Some(id) == current {
-                    showing = files.len();
-                }
-                // The caret of the window showing it, when one is; otherwise the top.
-                let line = workspace
-                    .handle_for(workspace.focused_untracked(), id)
-                    .map_or(1, |handle| {
-                        handle.query(|snapshot| {
-                            let caret = snapshot.selections().primary().head;
-                            snapshot.rope().byte_to_line(caret) as u64 + 1
-                        })
-                    });
-                files.push(Entry {
-                    path: workspace.project().relative(&path).into_owned().into(),
-                    line,
-                });
-            }
-
-            let saved = Session {
-                root,
-                files,
-                showing,
-            };
-            match session::save(&paths, &saved) {
-                Ok(path) => workspace.say(format!("session saved to {}", path.display())),
-                Err(error) => workspace.complain(error.to_string()),
-            }
-        }
-        "load" | "load_here" => match session::load(&paths, &root) {
-            Ok(session) => restore(workspace, &session),
-            Err(error) => workspace.complain(error.to_string()),
-        },
-        "load_last" => match session::most_recent(&paths) {
-            Some(session) => restore(workspace, &session),
-            None => workspace.say("no sessions"),
-        },
-        "delete" => match session::delete(&paths, &root) {
-            Ok(()) => workspace.say("session deleted"),
-            Err(error) => workspace.complain(error.to_string()),
-        },
+        "pick" | "sessionize" => pick(workspace, crate::session::pick::Where::Here),
+        "pick_window" => pick(workspace, crate::session::pick::Where::NewWindow),
+        "next" => step(workspace, 1),
+        "prev" => step(workspace, -1),
+        "new" => new(workspace),
+        "kill" => kill(workspace),
+        "forget" => forget(workspace),
+        "detach" => detach(workspace),
         other => workspace.say(format!("session.{other} is not built yet")),
     }
-    let _ = handle;
 }
 
-/// Opens everything a session names, and shows what it was showing.
-pub(super) fn restore(workspace: &Workspace, session: &crate::session::Session) {
-    if session.files.is_empty() {
-        workspace.say("that session has nothing in it");
+/// `<Leader>Sf`: the sessionizer, showing what is chosen where `place` says.
+fn pick(workspace: &Workspace, place: crate::session::pick::Where) {
+    let Some(session) = crate::session::use_session() else {
+        workspace.complain("there is no session here");
+        return;
+    };
+    crate::session::pick::open(&session, place);
+}
+
+/// Walks to the session `by` places along, wrapping.
+///
+/// The order is the registry's, which is the order they were opened in. That is the same order
+/// `]b` walks the buffer line in, and for the same reason: a list somebody built by opening
+/// things is a list they can predict.
+fn step(workspace: &Workspace, by: isize) {
+    let Some(host) = zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+    else {
+        return;
+    };
+    let Some(session) = crate::session::use_session() else {
+        return;
+    };
+    let open = host.list_untracked();
+    if open.len() < 2 {
+        workspace.say("this is the only session");
         return;
     }
-    for entry in &session.files {
-        crate::files::open_at(workspace, session.absolute(entry), Some(entry.line));
+    let Some(at) = open.iter().position(|listed| listed.id == session.id()) else {
+        return;
+    };
+    let count = open.len() as isize;
+    let next = (at as isize + by).rem_euclid(count) as usize;
+    host.reveal(open[next].key.clone(), &[]);
+}
+
+/// `<Leader>Sn`: a session on a directory somebody types.
+fn new(workspace: &Workspace) {
+    let Some(prompt) = zgui::reactive::use_local_context::<crate::prompt::Prompt>() else {
+        return;
+    };
+    let Some(host) = zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+    else {
+        return;
+    };
+    let workspace = workspace.clone();
+    prompt.ask("Session in", "", move |typed| {
+        let path = zdt_core::config::expand_home(typed);
+        match crate::session::SessionKey::of(&path) {
+            Some(key) => {
+                host.reveal(key, &[]);
+            }
+            None => workspace.complain(format!("{} is not a directory", path.display())),
+        }
+    });
+}
+
+/// `<Leader>Sk`: takes this session away, stopping its servers and its programs.
+fn kill(workspace: &Workspace) {
+    let Some(host) = zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+    else {
+        return;
+    };
+    let Some(session) = crate::session::use_session() else {
+        return;
+    };
+    // Somewhere to go first: killing what is on screen with nothing to replace it would leave a
+    // window drawing nothing.
+    let open = host.list_untracked();
+    let Some(other) = open.iter().find(|listed| listed.id != session.id()) else {
+        workspace.say("this is the only session");
+        return;
+    };
+    let name = session.name();
+    let key = other.key.clone();
+    let id = session.id();
+    host.reveal(key, &[]);
+    if host.kill(id) {
+        workspace.say(format!("killed {name}"));
     }
-    // The one that was showing goes last, so it is the one left on screen. Every open before it
-    // showed itself on the way past.
-    if let Some(entry) = session.files.get(session.showing) {
-        crate::files::open_at(workspace, session.absolute(entry), Some(entry.line));
+}
+
+/// `<Leader>SD`: closes this window and leaves its sessions running.
+///
+/// tmux's word. The sessions keep their servers, their programs and their buffers, and the next
+/// window to show one finds all three.
+fn detach(workspace: &Workspace) {
+    let Some(host) = zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+    else {
+        return;
+    };
+    let Some(client) = zgui::reactive::use_local_context::<crate::session::client::Client>() else {
+        return;
+    };
+
+    // The last window cannot be detached from: closing it stops the application, which is
+    // quitting and not detaching, and there is a key for that already.
+    if host.clients().len() < 2 {
+        workspace.say("this is the only window; <Leader>qq quits");
+        return;
     }
-    workspace.say(format!("{} files", session.files.len()));
+    if let Some(handle) = client.handle() {
+        handle.close();
+    }
+}
+
+/// `<Leader>Sd`: forgets what this session wrote down, leaving it running.
+///
+/// The live session is untouched: what goes is the copy on disk, so opening this directory again
+/// starts from nothing rather than from where somebody left it. Distinct from `session.kill`,
+/// which stops the session but leaves what it wrote for the next time.
+fn forget(workspace: &Workspace) {
+    let Some(session) = crate::session::use_session() else {
+        return;
+    };
+    let Some(state) = session.state() else {
+        workspace.complain("there is nowhere sessions are kept");
+        return;
+    };
+    match crate::session::store::delete(&state, session.project().root()) {
+        Ok(()) => workspace.say(format!("forgot what {} had saved", session.name())),
+        Err(error) => workspace.complain(error.to_string()),
+    }
 }

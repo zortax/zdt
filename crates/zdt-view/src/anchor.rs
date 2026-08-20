@@ -1,19 +1,19 @@
-//! Putting a surface beside the caret.
+//! Putting a surface beside something that is no element.
 //!
-//! Four things in this editor are anchored to a place in the text: the documentation panel, the
-//! completion popup, the panel of documentation beside it, and the signature help. None of them
-//! can use the component library's [`Popover`]. A popover is anchored to its own trigger, and a
-//! caret is no element, so there is nothing with a handle to point at.
+//! Several things in this editor are anchored to a place rather than to a box: the documentation
+//! panel, the completion popup, the panel of documentation beside it, the signature help, the
+//! rename box, and the file tree's own field. None of them can use the component library's
+//! [`Popover`]. A popover is anchored to its own trigger, and a caret is no element, so there is
+//! nothing with a handle to point at.
 //!
 //! What they can use is the solver underneath it. [`zgui_ui_primitives::popper::solve`] is a pure
-//! function over three rectangles, so the caret's rectangle serves as the anchor. Everything a
-//! popover gets comes with it: flipping to the other side when there is no room, sliding along the
-//! edge to stay inside the window, and a `data-side` for the style sheet to select the animation
-//! on.
+//! function over three rectangles, so an [`AnchorRect`] serves as the anchor. Everything a popover
+//! gets comes with it: flipping to the other side when there is no room, sliding along the edge to
+//! stay inside the window, and a `data-side` for the style sheet to select the animation on.
 //!
-//! Writing it out by hand would be four copies of the same arithmetic. The first one to go wrong
-//! would put a panel of documentation off the bottom of a maximised window, where nobody testing
-//! on a small one would ever see it.
+//! Writing it out by hand would be several copies of the same arithmetic. The first one to go
+//! wrong would put a panel of documentation off the bottom of a maximised window, where nobody
+//! testing on a small one would ever see it.
 
 use zgui::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
@@ -28,14 +28,16 @@ use zgui_ui_primitives::popper::{Placement, PopperOptions, WindowRect, solve};
 /// stays invisible until somebody opens the window on a denser output. There, a panel four hundred
 /// pixels down the file opens a hundred pixels below where it belongs.
 ///
-/// The library has this type and keeps it to itself, so here are the same eight lines.
+/// The library has this type and keeps it to itself, so here are the same eight lines. Public,
+/// because anything else that measures a box and answers an inline length needs the same guard.
 #[derive(Clone, Copy)]
-struct Density(f32);
+pub struct Density(f32);
 
 impl Density {
     /// The density an element reports, made safe to divide by: a density of nothing would divide a
     /// placement into infinity and put the surface nowhere.
-    fn reported(scale: f32) -> Self {
+    #[must_use]
+    pub fn reported(scale: f32) -> Self {
         Self(if scale.is_finite() && scale > 0.01 {
             scale
         } else {
@@ -44,13 +46,58 @@ impl Density {
     }
 
     /// `css` CSS pixels as device pixels, which is the space a placement is solved in.
-    fn device(self, css: f32) -> f32 {
+    #[must_use]
+    pub fn device(self, css: f32) -> f32 {
         css * self.0
     }
 
     /// `device` device pixels as CSS pixels, which is the space an inline length is read in.
-    fn css(self, device: f32) -> f32 {
+    #[must_use]
+    pub fn css(self, device: f32) -> f32 {
         device / self.0
+    }
+}
+
+/// A rectangle to place a surface against, in CSS pixels.
+///
+/// The caret is one. A row in a list is another, and so is the point a pointer went down at. The
+/// solver cares about the rectangle and never about what it is a rectangle of.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct AnchorRect {
+    /// The left edge.
+    pub x: f32,
+    /// The top edge.
+    pub y: f32,
+    /// How wide it is.
+    pub width: f32,
+    /// How tall it is.
+    pub height: f32,
+}
+
+impl AnchorRect {
+    /// A point, which is what a pointer position anchors to.
+    ///
+    /// The solver reads a rectangle of no size as the point at its corner, which is what a menu
+    /// opened where the hand already is wants.
+    #[must_use]
+    pub const fn point(x: f32, y: f32) -> Self {
+        Self {
+            x,
+            y,
+            width: 0.0,
+            height: 0.0,
+        }
+    }
+}
+
+impl From<zgui_editor::CaretRect> for AnchorRect {
+    fn from(caret: zgui_editor::CaretRect) -> Self {
+        Self {
+            x: caret.x,
+            y: caret.y,
+            width: caret.width,
+            height: caret.height,
+        }
     }
 }
 
@@ -61,7 +108,7 @@ pub struct Placed {
     pub left: Signal<Option<f32>, LocalStorage>,
     /// Its top edge.
     pub top: Signal<Option<f32>, LocalStorage>,
-    /// Which side of the caret it went on, for the style sheet to animate from.
+    /// Which side of the anchor it went on, for the style sheet to animate from.
     pub side: Signal<Option<String>, LocalStorage>,
     /// Whether it has been placed at all.
     ///
@@ -71,12 +118,12 @@ pub struct Placed {
     pub settled: Signal<bool, LocalStorage>,
 }
 
-/// How a surface should sit against the caret.
+/// How a surface should sit against its anchor.
 #[derive(Clone, Copy)]
 pub struct Anchoring {
     /// Where it is asked to go.
     pub placement: Placement,
-    /// How far off the caret it sits, in CSS pixels.
+    /// How far off the anchor it sits, in CSS pixels.
     pub offset: f32,
     /// How close to the window's edge it may come.
     pub padding: f32,
@@ -86,8 +133,8 @@ impl Default for Anchoring {
     fn default() -> Self {
         Self {
             placement: Placement::BOTTOM,
-            // Two pixels: enough that the surface is not touching the character it is about,
-            // little enough that the two still read as one thing.
+            // Two pixels: enough that the surface is not touching what it is about, little
+            // enough that the two still read as one thing.
             offset: 2.0,
             padding: 6.0,
         }
@@ -112,17 +159,17 @@ impl Anchoring {
     }
 }
 
-/// Places `surface` against `caret`, and keeps it placed.
+/// Places `surface` against `anchor`, and keeps it placed.
 ///
-/// `caret` is read inside the tracked closure. A surface that follows a moving caret passes a
-/// signal and stays mounted.
+/// `anchor` is read inside the tracked closure. A surface that follows a moving caret, or a row
+/// that scrolls, passes a signal and stays mounted.
 ///
 /// The measurements are the surface's own border box and the window's. Both are observed, and
 /// neither is read once. A panel whose text arrives a frame later changes size, and one placed
 /// against its first size would hang off the bottom of the window from then on.
 pub fn place(
     surface: NodeRef,
-    caret: impl Fn() -> Option<zgui_editor::CaretRect> + 'static,
+    anchor: impl Fn() -> Option<AnchorRect> + 'static,
     anchoring: Anchoring,
 ) -> Placed {
     // The window's rectangle, which is what "inside the window" is measured against. Acquired from
@@ -153,13 +200,13 @@ pub fn place(
     let measured = surface.observe_border_box();
 
     // Stored, because both the solver and the fallback below read it.
-    let caret_of = Signal::derive_local(caret);
+    let anchor_of = Signal::derive_local(anchor);
 
     let solution = Signal::derive_local(move || {
-        let caret = caret_of.get()?;
+        let anchor = anchor_of.get()?;
         let floating = measured.get()?.size;
         // Before the first measurement the surface has no size, and a solution computed from
-        // nothing places it against the caret and then moves it.
+        // nothing places it against the anchor and then moves it.
         if floating.width.0 <= 0.0 && floating.height.0 <= 0.0 {
             return None;
         }
@@ -167,23 +214,23 @@ pub fn place(
         // in the middle of a teardown cannot unwind.
         let viewport = viewport.get()?.try_get()??;
 
-        // The caret's rectangle comes from the editor in CSS pixels; the other two measurements
-        // are in device pixels. Everything is converted into device space, which is the space the
-        // answer is wanted in.
+        // The anchor's rectangle is given in CSS pixels; the other two measurements are in device
+        // pixels. Everything is converted into device space, which is the space the answer is
+        // wanted in.
         let density = Density::reported(surface.scale());
-        let anchor = WindowRect::new(
+        let against = WindowRect::new(
             zgui::geom::Point::new(
-                zgui::geom::DevicePx(density.device(caret.x)),
-                zgui::geom::DevicePx(density.device(caret.y)),
+                zgui::geom::DevicePx(density.device(anchor.x)),
+                zgui::geom::DevicePx(density.device(anchor.y)),
             ),
             zgui::geom::Size::new(
-                zgui::geom::DevicePx(density.device(caret.width)),
-                zgui::geom::DevicePx(density.device(caret.height)),
+                zgui::geom::DevicePx(density.device(anchor.width)),
+                zgui::geom::DevicePx(density.device(anchor.height)),
             ),
         );
 
         Some(solve(
-            anchor,
+            against,
             floating,
             viewport,
             &PopperOptions {
@@ -199,20 +246,20 @@ pub fn place(
     // Back into CSS pixels, snapped to a whole device pixel. An edge that falls between two
     // pixels has a soft border and blurred text on one side of it.
     //
-    // A surface that cannot be solved yet is placed *anyway*, under the caret. That is the
+    // A surface that cannot be solved yet is placed *anyway*, under the anchor. That is the
     // difference between a panel that jumps once on the frame it opens and a panel that never
     // appears at all. The solver needs three measurements. If any of them never arrives, such as
     // a window whose root reports no box or a surface measured as nothing, a placement that waits
     // for all three waits for ever and invisibly. A rough answer beats no answer, and that is the
     // whole of this fallback.
     let placed = Signal::derive_local(move || {
-        let caret = caret_of.get()?;
+        let anchor = anchor_of.get()?;
         let density = Density::reported(surface.scale());
 
         let Some(solved) = solution.get() else {
             return Some((
-                caret.x,
-                caret.y + caret.height + anchoring.offset,
+                anchor.x,
+                anchor.y + anchor.height + anchoring.offset,
                 anchoring.placement.side.name().to_owned(),
                 false,
             ));
@@ -252,7 +299,7 @@ impl Placed {
     /// what decides where it goes. This keeps the box and its layout, and takes it out of the
     /// paint.
     ///
-    /// It does not wait for a solved placement. A surface with a caret to sit under is shown at
+    /// It does not wait for a solved placement. A surface with an anchor to sit under is shown at
     /// once, roughly placed, and moved when the measurements arrive.
     pub fn visibility(self) -> impl Fn() -> Option<String> + Clone + 'static {
         let settled = self.settled;

@@ -65,7 +65,7 @@ pub(crate) fn Panel(
     // the line it is about uncovered. The solver flips it below and slides it left at the edges.
     let placed = place(
         surface,
-        move || showing.get().map(|what| what.caret),
+        move || showing.get().map(|what| what.caret.into()),
         Anchoring::on(Placement::new(Side::Top, Align::Start)),
     );
 

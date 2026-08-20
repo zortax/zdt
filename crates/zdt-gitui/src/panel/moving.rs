@@ -12,12 +12,14 @@ impl GitUi {
             return;
         }
         self.inner.open.set(true);
-        self.focus();
         self.refresh();
         self.watch();
     }
 
-    /// Puts the modal away, and gives the keyboard back to the editor.
+    /// Puts the modal away.
+    ///
+    /// Nothing here hands the keyboard back. The modal holds it while it is up, and whatever was
+    /// underneath takes it again when the claim goes.
     pub fn close(&self) {
         if self.inner.open.get_untracked() {
             self.inner.open.set(false);
@@ -25,8 +27,6 @@ impl GitUi {
         if self.inner.message.get_untracked().is_some() {
             self.inner.message.set(None);
         }
-        self.blur();
-        self.inner.host.release_keyboard();
     }
 
     /// Opens it as a tab instead.

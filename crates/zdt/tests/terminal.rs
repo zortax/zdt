@@ -50,7 +50,9 @@ fn a_terminal_is_a_buffer_on_the_buffer_line() {
 }
 
 #[test]
-fn the_program_is_handed_over_once() {
+fn the_program_outlives_the_view_that_draws_it() {
+    // The whole reason a terminal is held here rather than by its view: a session taken off
+    // screen, or a window somebody closed, must not be a shell that was killed.
     let window = Window::open();
     let (terminals, _) = mount(&window);
 
@@ -59,16 +61,19 @@ fn the_program_is_handed_over_once() {
         .with(|| terminals.open(&waiting()))
         .expect("cat starts");
 
-    assert!(
-        terminals.take_pending(id).is_some(),
-        "the view that draws it takes the program"
-    );
-    assert!(
-        terminals.take_pending(id).is_none(),
-        "and a second view gets nothing, so no second program starts"
-    );
+    let first = terminals.running(id).expect("a view can draw it");
+    let second = terminals.running(id).expect("and so can the next one");
+    assert!(!first.is_drawn(), "nothing is drawing it in this harness");
+    // Two handles onto one program, and never two programs.
+    drop(first);
+    assert!(terminals.running(id).is_some(), "it is still running");
+    drop(second);
 
     terminals.close(id);
+    assert!(
+        terminals.running(id).is_none(),
+        "closing it is what stops it",
+    );
 }
 
 #[test]
@@ -153,10 +158,10 @@ fn showing_a_float_gives_it_the_keys() {
         .scope
         .with(|| terminals.toggle_float("default", &waiting()));
     let id = terminals.showing().expect("it is showing");
-    assert_eq!(terminals.typing(), Some(id), "and the keys go to it");
+    assert!(terminals.is_inserting(id), "and the keys go to it");
 
-    terminals.stop_typing();
-    assert_eq!(terminals.typing(), None, "`<C-\\><C-n>` takes them back");
+    terminals.stop_typing(id);
+    assert!(!terminals.is_inserting(id), "`<C-\\><C-n>` takes them back");
     assert_eq!(
         terminals.showing(),
         Some(id),
@@ -194,8 +199,8 @@ fn closing_one_forgets_everything_about_it() {
     terminals.close(id);
     assert!(terminals.floats().is_empty());
     assert_eq!(terminals.showing(), None);
-    assert_eq!(terminals.typing(), None);
-    assert!(terminals.take_pending(id).is_none());
+    assert!(!terminals.is_inserting(id));
+    assert!(terminals.running(id).is_none());
 }
 
 #[test]

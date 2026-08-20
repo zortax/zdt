@@ -7,8 +7,6 @@
 //! walk what was typed before. That history lives as long as the window and no longer, which makes
 //! it useful and leaves nothing to manage.
 
-use std::time::Duration;
-
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_ui::prelude::*;
@@ -25,6 +23,9 @@ pub fn CommandLine() -> impl IntoView {
         let cmdline = cmdline.clone();
         Signal::derive_local(move || cmdline.is_open())
     };
+
+    // It has the keys while it is open, and the region underneath takes them back when it closes.
+    crate::focus::claim::claim(crate::focus::Overlay::CommandLine, present);
 
     view! {
         Presence(present = present, surface = surface) {
@@ -44,9 +45,11 @@ fn Typing(
     let field = NodeRef::new();
     let value = RwSignal::new_local(cmdline.text());
 
-    let claim = zgui::view::time::Timers::current()
-        .map(|timers| timers.set_timeout(Duration::ZERO, move || field.focus()));
-    on_cleanup_local(move || drop(claim));
+    // Where the keyboard lands while this is the thing in front.
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::CommandLine),
+        crate::focus::Sink::Node(field),
+    );
 
     // What is typed reaches the command line as it is typed, so the history walk can put
     // something else there and the field follows.

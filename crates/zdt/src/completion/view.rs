@@ -68,7 +68,7 @@ pub fn CompletionPopup() -> impl IntoView {
 
     let placed = place(
         surface,
-        move || showing.get().map(|open| open.caret),
+        move || showing.get().map(|open| open.caret.into()),
         Anchoring::on(Placement::new(Side::Bottom, Align::Start)),
     );
 
@@ -80,7 +80,7 @@ pub fn CompletionPopup() -> impl IntoView {
         move || {
             let left = placed.left.get()?;
             let top = placed.top.get()?;
-            Some(zgui_editor::CaretRect {
+            Some(zdt_view::anchor::AnchorRect {
                 x: left,
                 y: top,
                 width: POPUP_WIDTH,

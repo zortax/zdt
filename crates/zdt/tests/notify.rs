@@ -175,7 +175,13 @@ fn language(window: &Window) -> (zdt::language::Language, Notify) {
         zdt::notify::provide(notify.clone());
 
         let workspace = zdt::workspace::Workspace::new(zdt_core::Project::at("/project"));
-        let language = zdt::language::Language::new(workspace, settings);
+        // The clock and the stack the servers announce through, both lent by this window.
+        let clock = zdt_view::Clock::new();
+        clock.bind_here();
+        let announcer = zdt::notify::Announcer::new();
+        announcer.bind(notify.clone());
+
+        let language = zdt::language::Language::new(workspace, settings, clock, announcer);
         language.listen();
         (language, notify)
     })

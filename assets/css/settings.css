@@ -188,6 +188,19 @@
     border-radius: calc(var(--zui-radius-base) - 2px);
 }
 
+/* A list of directories, one per line. Wider and taller than a one-line field, because a path is
+ * long and a list of them is worth seeing several of at once. */
+.config .zui-field.config__paths {
+    width: 260px;
+    height: auto;
+    min-height: 76px;
+    padding: calc(var(--zui-space-base)) calc(var(--zui-space-base) * 2);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    line-height: 18px;
+    resize: none;
+}
+
 /* The mark inside a chooser, and the room kept clear for it. */
 .config .zui-native-select.config__select {
     padding-right: 18px;

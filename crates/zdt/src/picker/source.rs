@@ -49,6 +49,11 @@ pub enum Source {
         title: &'static str,
         /// What to choose from.
         rows: Vec<Row>,
+        /// What to do with text that matched nothing, when this list takes such a thing.
+        ///
+        /// A sessionizer is the reason it exists: the configured directories are a convenience,
+        /// and any path at all must still be openable by typing it.
+        typed: Option<Typed>,
     },
     /// Everything in the project whose name matches what is typed.
     ///
@@ -140,6 +145,15 @@ impl Source {
         }
     }
 
+    /// What this list does with text that matched nothing, when it does anything.
+    #[must_use]
+    pub fn typed(&self) -> Option<&Typed> {
+        match self {
+            Self::Given { typed, .. } => typed.as_ref(),
+            _ => None,
+        }
+    }
+
     /// What the query starts out as.
     #[must_use]
     pub fn start(&self) -> String {
@@ -221,6 +235,39 @@ impl Deed {
     /// Does it.
     pub fn run(&self) {
         (self.0)();
+    }
+}
+
+/// What a picker does with what was typed, when nothing in the list matched it.
+///
+/// A `Deed` that is handed the query. Kept apart from `Deed` because the two are asked at
+/// different moments: a deed belongs to a row, and this belongs to the list.
+#[derive(Clone)]
+pub struct Typed(std::rc::Rc<dyn Fn(&str)>);
+
+impl Typed {
+    /// A handler that runs `work` on whatever was typed.
+    #[must_use]
+    pub fn new(work: impl Fn(&str) + 'static) -> Self {
+        Self(std::rc::Rc::new(work))
+    }
+
+    /// Does it.
+    pub fn run(&self, query: &str) {
+        (self.0)(query);
+    }
+}
+
+/// The same rule as [`Deed`]: two are the same when they are the same closure.
+impl PartialEq for Typed {
+    fn eq(&self, other: &Self) -> bool {
+        std::rc::Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl std::fmt::Debug for Typed {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("Typed")
     }
 }
 

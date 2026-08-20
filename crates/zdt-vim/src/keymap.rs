@@ -258,6 +258,41 @@ impl<'a> Layered<'a> {
         }
         self.base.resolve(mode, keys)
     }
+
+    /// Every binding a person could reach, with the overlay's rows in front of the base's.
+    ///
+    /// A base binding is left out when the overlay runs something at its keys or at a prefix of
+    /// them: those are keys a person can never finish typing here.
+    ///
+    /// For a menu that shows which key runs each of its rows, so the menu can never drift from the
+    /// keymap.
+    #[must_use]
+    pub fn bindings(&self, mode: Mode) -> Vec<(Vec<Chord>, &'a Binding)> {
+        let Some(overlay) = self.overlay else {
+            return self.base.bindings(mode);
+        };
+        let mut found = overlay.bindings(mode);
+        found.extend(
+            self.base
+                .bindings(mode)
+                .into_iter()
+                .filter(|(keys, _)| reaches_base(overlay, mode, keys)),
+        );
+        found
+    }
+}
+
+/// Whether `keys` still reaches the base map through `overlay`.
+///
+/// False as soon as the overlay runs something at any prefix of them, because typing that prefix
+/// is what happens instead. False too when the overlay answers the whole sequence itself.
+fn reaches_base(overlay: &Keymap, mode: Mode, keys: &[Chord]) -> bool {
+    for upto in 1..keys.len() {
+        if matches!(overlay.resolve(mode, &keys[..upto]), Resolution::Run(_)) {
+            return false;
+        }
+    }
+    matches!(overlay.resolve(mode, keys), Resolution::None)
 }
 
 /// Every mode, for iterating the tries.

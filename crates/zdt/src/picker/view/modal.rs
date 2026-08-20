@@ -2,7 +2,6 @@
 
 use crate::picker::use_picker;
 use crate::picker::view::{MatchesProps, PreviewProps};
-use std::time::Duration;
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_ui::prelude::*;
@@ -32,6 +31,9 @@ pub fn Picker() -> impl IntoView {
         let picker = picker.clone();
         Signal::derive_local(move || picker.source().is_some())
     };
+
+    // It has the keys while it is open, and the region underneath takes them back when it closes.
+    crate::focus::claim::claim(crate::focus::Overlay::Picker, present);
 
     view! {
         Presence(present = present, surface = surface) {
@@ -72,10 +74,11 @@ pub(crate) fn Open(
     let field = NodeRef::new();
     let query = RwSignal::new_local(picker.query());
 
-    // From a timer, because a node that is not mounted cannot take focus.
-    let claim = zgui::view::time::Timers::current()
-        .map(|timers| timers.set_timeout(Duration::ZERO, move || field.focus()));
-    on_cleanup_local(move || drop(claim));
+    // Where the keyboard lands while this is the thing in front.
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::Picker),
+        crate::focus::Sink::Node(field),
+    );
 
     // What is typed reaches the picker through here, and not through the field's own binding, so
     // the search starts on the keystroke and not on the frame after it.
@@ -173,6 +176,9 @@ fn handle(picker: &crate::picker::Picker, event: &EventCx<'_, events::KeyDown>) 
             "d" => picker.move_by(10),
             "u" => picker.move_by(-10),
             "c" => picker.close(),
+            // Exactly what was typed, whether or not it matched. What opens a session on a
+            // directory the sessionizer has never been told about.
+            "x" => picker.activate_typed(),
             _ => return false,
         },
         _ => return false,

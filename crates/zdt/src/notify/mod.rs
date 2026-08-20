@@ -21,6 +21,15 @@
 //!
 //! The queue has no update-in-place. Replacing is dismissing and pushing, so the identifiers are
 //! held here. Working them out from what is on screen would need a queue that can be read.
+//!
+//! # Announcing from outside a window
+//!
+//! A `Notify` belongs to the window whose toaster it was taken from. Anything that outlives a
+//! window holds an [`Announcer`] instead.
+
+mod announcer;
+
+pub use crate::notify::announcer::Announcer;
 
 use std::cell::RefCell;
 use std::rc::Rc;

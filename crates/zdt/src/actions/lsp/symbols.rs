@@ -36,6 +36,7 @@ pub(super) fn outline(workspace: &Workspace, language: &Language, handle: Option
                     picker.open(crate::picker::Source::Given {
                         title: "Symbols",
                         rows,
+                        typed: None,
                     });
                 }
             }
@@ -160,6 +161,7 @@ pub(super) fn diagnostics_picker(workspace: &Workspace, language: &Language) {
     picker.open(crate::picker::Source::Given {
         title: "Diagnostics",
         rows,
+        typed: None,
     });
 }
 
@@ -180,5 +182,9 @@ pub(super) fn show_locations(
         workspace.say("nowhere a file can be opened");
         return;
     }
-    picker.open(crate::picker::Source::Given { title, rows });
+    picker.open(crate::picker::Source::Given {
+        title,
+        rows,
+        typed: None,
+    });
 }

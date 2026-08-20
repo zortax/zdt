@@ -53,7 +53,7 @@ pub(crate) fn FileRow(
     let press = {
         let git = git.clone();
         move |_: &mut EventCx<'_, events::PointerDown>| {
-            git.focus();
+            git.host().took_keyboard();
             git.set_list(which);
             git.go_to(which, index);
         }

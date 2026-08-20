@@ -133,7 +133,7 @@ impl Engine {
         }
 
         if target.jump {
-            self.jumps.push(self.caret(cx));
+            self.jumps.push(cx.place());
         }
 
         let byte = text::clamp_normal(cx.rope, target.byte);

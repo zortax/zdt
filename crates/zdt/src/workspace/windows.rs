@@ -31,7 +31,9 @@ impl Workspace {
             });
             return None;
         }
-        self.inner.focused.set(new);
+        // The keyboard goes into the new split, wherever it was. Splitting from the tree is asking
+        // for the split.
+        self.inner.focus.enter_window(new);
         Some(new)
     }
 
@@ -50,7 +52,7 @@ impl Workspace {
             windows.remove(focused);
         });
         if let Some(next) = self.inner.layout.get_untracked().windows().first().copied() {
-            self.inner.focused.set(next);
+            self.inner.focus.enter_window(next);
         }
         true
     }
@@ -73,29 +75,29 @@ impl Workspace {
         if self.focused_untracked() == window
             && let Some(next) = self.inner.layout.get_untracked().windows().first().copied()
         {
-            self.inner.focused.set(next);
+            // The current pane moves and the keyboard stays where it is: closing a split from the
+            // tree must not pull somebody out of the tree.
+            self.inner.focus.set_window(next);
         }
         true
     }
 
     /// Gives the keyboard to `window`.
     pub fn focus_window(&self, window: WindowId) {
-        if self.inner.focused.get_untracked() != window {
-            self.inner.focused.set(window);
-        }
+        self.inner.focus.enter_window(window);
     }
 
     /// Gives the keyboard to the next window in the walking order.
     pub fn cycle_window(&self, forward: bool) {
         let layout = self.inner.layout.get_untracked();
-        let focused = self.inner.focused.get_untracked();
+        let focused = self.focused_untracked();
         let next = if forward {
             layout.next_after(focused)
         } else {
             layout.previous_before(focused)
         };
         if let Some(next) = next {
-            self.inner.focused.set(next);
+            self.inner.focus.enter_window(next);
         }
     }
 

@@ -33,8 +33,8 @@ pub trait Host {
     /// Shows the panel as a tab, when there is anywhere to put one.
     fn open_as_tab(&self);
 
-    /// Gives the keyboard back to whatever had it before the panel took it.
-    fn release_keyboard(&self);
+    /// Says the panel has just taken the keyboard, which a click on a row does.
+    fn took_keyboard(&self);
 
     /// Answers `event` from the panel's keymap region. `true` if the key was used.
     ///
@@ -42,12 +42,19 @@ pub trait Host {
     /// whether to let the key through.
     fn key(&self, event: &KeyEvent, modifiers: Modifiers) -> bool;
 
-    /// Whether the panel's own pane is the one being looked at.
+    /// Whether the keyboard is in the panel. Tracked.
     ///
-    /// Read inside a render effect. An implementation must read *tracked*: an answer that is
-    /// cached, or read untracked, is a panel that never takes the keyboard when its tab becomes
-    /// the current one.
-    fn is_in_front(&self) -> bool;
+    /// The host answers, because where the keyboard is belongs to the application around the panel
+    /// and never to the panel. An implementation must read *tracked*: an answer that is cached, or
+    /// read untracked, is a panel that never notices it has been left.
+    fn has_keyboard(&self) -> bool;
+
+    /// Says the repository has just been written to.
+    ///
+    /// The panel reads itself again on its own. This is for whatever else in the application shows
+    /// the same facts. Discarding a change writes only the working tree, so a watch on `.git`
+    /// would miss it.
+    fn changed(&self);
 }
 
 /// A host that is not anywhere.
@@ -65,13 +72,15 @@ impl Host for Nowhere {
 
     fn open_as_tab(&self) {}
 
-    fn release_keyboard(&self) {}
+    fn took_keyboard(&self) {}
 
     fn key(&self, _event: &KeyEvent, _modifiers: Modifiers) -> bool {
         false
     }
 
-    fn is_in_front(&self) -> bool {
+    fn has_keyboard(&self) -> bool {
         false
     }
+
+    fn changed(&self) {}
 }

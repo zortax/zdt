@@ -134,7 +134,12 @@ impl Workspace {
         true
     }
 
-    /// Gives the keyboard back to the editor, wherever it went.
+    /// Gives the keyboard straight to the current editor.
+    ///
+    /// For the one place that means *the editor* rather than "wherever the keyboard belongs": a
+    /// leap ends by putting the caret back where it can be typed at. Everything else asks the model
+    /// through [`crate::focus::Focusing::reproject`], which has an answer for a window holding a
+    /// terminal or a panel too.
     pub fn focus_editor(&self) {
         if let Some(handle) = self.current_handle() {
             handle.focus();

@@ -29,6 +29,9 @@ pub fn Prompt() -> impl IntoView {
 
     let present = Signal::derive_local(move || prompt.pending().is_some());
 
+    // It has the keys while it is open, and the region underneath takes them back when it closes.
+    crate::focus::claim::claim(crate::focus::Overlay::Prompt, present);
+
     view! {
         Presence(present = present, surface = surface) {
             {move || {
@@ -63,10 +66,11 @@ fn Asking(
     let node = NodeRef::new();
     let value = RwSignal::new_local(start.clone());
 
-    // From a timer for the same reason the tree's is: nothing unmounted takes focus.
-    let claim = zgui::view::time::Timers::current()
-        .map(|timers| timers.set_timeout(std::time::Duration::ZERO, move || node.focus()));
-    on_cleanup_local(move || drop(claim));
+    // Where the keyboard lands while this is the thing in front.
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::Prompt),
+        crate::focus::Sink::Node(node),
+    );
 
     let on_key = move |event: &mut EventCx<'_, events::KeyDown>| {
         match &event.key {

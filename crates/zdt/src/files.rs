@@ -190,6 +190,11 @@ pub fn save_as(
                 if let Some(git) = zgui::reactive::use_local_context::<crate::git::Git>() {
                     git.refresh_soon(buffer);
                 }
+                // And the tree's marks, because a first write to a new file is what makes it
+                // untracked rather than absent.
+                if let Some(status) = zgui::reactive::use_local_context::<crate::git::Status>() {
+                    status.refresh_soon();
+                }
                 workspace.say(format!("{} written", path.display()));
             }
             Err(error) => workspace.complain(error.to_string()),

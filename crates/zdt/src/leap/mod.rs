@@ -19,12 +19,25 @@
 
 pub mod view;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use zdt_vim::leap::{ALPHABET, Direction, Landing, Leap, Phase};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
+
+/// What a leap is over.
+///
+/// A landing is a number, and what the number counts depends on this. One layer holds every leap,
+/// so the two readers say which one theirs is and leave the other alone.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Over {
+    /// The text in the editor with the keyboard. A byte offset.
+    #[default]
+    Text,
+    /// The rows of the file tree. A row index.
+    Tree,
+}
 
 /// A leap in progress, and the labels the interface draws.
 #[derive(Clone)]
@@ -35,6 +48,8 @@ pub struct Leaping {
 struct Inner {
     /// What is in progress, when anything is.
     state: RefCell<Option<Leap>>,
+    /// What the leap in progress is over.
+    over: Cell<Over>,
     /// The labels, for drawing. A signal because the overlay follows them.
     labels: RwSignal<Vec<Landing>, LocalStorage>,
     /// What has been typed, echoed in the status line the way a pending key sequence is.
@@ -63,6 +78,7 @@ impl Leaping {
         Self {
             inner: Rc::new(Inner {
                 state: RefCell::new(None),
+                over: Cell::new(Over::Text),
                 labels: RwSignal::new_local(Vec::new()),
                 typed: RwSignal::new_local(String::new()),
                 alphabet: RefCell::new(ALPHABET.to_owned()),
@@ -104,13 +120,45 @@ impl Leaping {
         self.inner.typed.get()
     }
 
-    /// Starts one looking `direction`.
+    /// Starts one over the text, looking `direction`.
     pub fn start(&self, direction: Direction) {
+        self.start_over(direction, Over::Text);
+    }
+
+    /// Starts one over `over`, looking `direction`.
+    pub fn start_over(&self, direction: Direction, over: Over) {
         *self.inner.state.borrow_mut() = Some(Leap::new(direction));
+        self.inner.over.set(over);
         self.inner.labels.set(Vec::new());
         // A space, so the status line shows that something is waiting even before a character has
         // been typed. An empty echo would look like nothing had happened.
         self.inner.typed.set(" ".to_owned());
+    }
+
+    /// What the leap in progress is over.
+    #[must_use]
+    pub fn over(&self) -> Over {
+        self.inner.over.get()
+    }
+
+    /// Whether one is running over `over`, without subscribing.
+    #[must_use]
+    pub fn is_running_over(&self, over: Over) -> bool {
+        self.is_running() && self.over() == over
+    }
+
+    /// The label on `at`, when a leap put one there. Tracked.
+    ///
+    /// Narrower than reading them all, which matters because a recycled row asks this once per
+    /// redraw.
+    #[must_use]
+    pub fn label_at(&self, at: usize) -> Option<char> {
+        self.inner.labels.with(|labels| {
+            labels
+                .iter()
+                .find(|landing| landing.at == at)
+                .map(|landing| landing.label)
+        })
     }
 
     /// Ends it, drawing nothing.

@@ -9,21 +9,24 @@
 //! A keystroke is the hottest path there is, and the mode, the pending count, the registers and
 //! the macro recorder change on almost every one. They live in a plain `RefCell`. Only the three
 //! things the status line shows are signals, so typing wakes the mode block and nothing else.
+//!
+//! # What is here and what is not
+//!
+//! What is being typed is here, and belongs to one session. What the keys *mean* is
+//! [`crate::keymaps`], and is the same everywhere.
 
 pub mod whichkey;
 
 mod apply;
-mod keymap;
 mod keys;
 mod read;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zdt_vim::config::merge;
 use zdt_vim::effect::{Context, Effect, Scroll, Selection, Step, Visual};
 use zdt_vim::engine::Engine;
-use zdt_vim::keymap::{Keymap, Layered, Resolution};
+use zdt_vim::keymap::Resolution;
 use zdt_vim::motion::View;
 use zdt_vim::notation::{Leaders, parse};
 use zdt_vim::{Chord, Mode};
@@ -33,16 +36,26 @@ use zgui_editor::{
     Band, Caret, Clipboard, Command, Decoration, EditorHandle, InsertPoint, Overlay, ScrollCmd,
 };
 
+use crate::keymaps::Keymaps;
 use crate::workspace::Workspace;
-
-/// The keymap the editor ships with.
-use crate::assets::KEYMAP as DEFAULTS;
 
 /// How deep a replay may go before it is refused.
 ///
 /// A macro that plays itself is the one way a key can never come back, so it is bounded here as
 /// well as in the engine.
 const REPLAY_DEPTH: u32 = 64;
+
+/// A region part-way through one of its own sequences.
+///
+/// The region is a `&'static str` because every caller passes a literal or a constant, which makes
+/// this `Copy` and costs nothing to keep.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct Typing {
+    /// The region, as the keymaps hold it.
+    region: &'static str,
+    /// The mode its keys resolve in.
+    mode: Mode,
+}
 
 /// One way a part-typed sequence could carry on, as which-key shows it.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -66,11 +79,15 @@ pub struct Vim {
 
 struct Inner {
     engine: RefCell<Engine>,
-    keymap: RefCell<Keymap>,
-    /// Each region's own keys, in front of the base map: the tree, a picker, a terminal.
-    overlays: RefCell<rustc_hash::FxHashMap<String, Keymap>>,
+    /// What every key means. Shared with every other session.
+    keymaps: Keymaps,
     /// What a region has typed toward one of its own sequences.
     region_keys: RefCell<Vec<Chord>>,
+    /// Which region is part-way through a sequence of its own, and in which mode.
+    ///
+    /// What which-key resolves against. A region's keys have no grammar and are no business of the
+    /// engine's, so the engine's pending keys say nothing about them.
+    typing: std::cell::Cell<Option<Typing>>,
     /// A leap in progress, which takes every key while it is running.
     leaping: crate::leap::Leaping,
     workspace: Workspace,
@@ -86,24 +103,18 @@ struct Inner {
 }
 
 impl Vim {
-    /// The modal layer over `workspace`, with the shipped keymap.
-    ///
-    /// A keymap that does not read is a bug in the editor, and not in anybody's configuration.
-    /// It is reported, and the editor carries on with whatever did read.
-    pub fn new(workspace: Workspace, settings: crate::settings::Settings) -> Self {
-        let mut keymap = Keymap::new();
-        if let Err(problems) = merge(&mut keymap, DEFAULTS, Leaders::default()) {
-            for problem in problems {
-                tracing::error!("the shipped keymap: {problem}");
-            }
-        }
-
+    /// The modal layer over `workspace`, reading `keymaps`.
+    pub fn new(
+        workspace: Workspace,
+        settings: crate::settings::Settings,
+        keymaps: Keymaps,
+    ) -> Self {
         Self {
             inner: Rc::new(Inner {
                 engine: RefCell::new(Engine::new()),
-                keymap: RefCell::new(keymap),
-                overlays: RefCell::new(rustc_hash::FxHashMap::default()),
+                keymaps,
                 region_keys: RefCell::new(Vec::new()),
+                typing: std::cell::Cell::new(None),
                 leaping: crate::leap::Leaping::new(),
                 workspace,
                 settings,
@@ -114,6 +125,12 @@ impl Vim {
                 recording: RwSignal::new_local(None),
             }),
         }
+    }
+
+    /// What every key means.
+    #[must_use]
+    pub fn keymaps(&self) -> &Keymaps {
+        &self.inner.keymaps
     }
 }
 

@@ -88,20 +88,14 @@ pub fn StatusLine() -> impl IntoView {
         move || workspace.message()
     };
 
-    // A terminal being typed into is a mode the engine knows nothing about: it is not answering
-    // while a program is, so what mode the editor is in says nothing about where the keys go.
+    // Derived from where the keyboard is, and read from the same function the key filter routes on,
+    // so what is shown and where a key goes cannot disagree. A terminal in a split nobody is looking
+    // at names no mode at all.
     let mode = {
-        let vim = vim.clone();
+        let (vim, workspace) = (vim.clone(), workspace.clone());
+        let focus = crate::focus::use_focus();
         let terminals = zgui::reactive::use_local_context::<crate::terminals::Terminals>();
-        move || {
-            if terminals
-                .as_ref()
-                .is_some_and(|terminals| terminals.typing().is_some())
-            {
-                return zdt_vim::Mode::Terminal;
-            }
-            vim.mode()
-        }
+        move || focus.mode(&vim, terminals.as_ref(), &workspace)
     };
     let pending = {
         let vim = vim.clone();

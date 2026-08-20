@@ -106,11 +106,11 @@ struct Inner {
     settings: Settings,
     /// Where a server's news goes.
     ///
-    /// Taken once at construction. Most of what is announced here happens inside a task's
-    /// continuation or a timer's callback, and neither runs inside the scope that has one.
-    notify: Option<crate::notify::Notify>,
-    /// The window's clock, taken once where there certainly is one.
-    timers: Option<zgui::view::time::Timers>,
+    /// An announcer, because most of what is said here happens inside a task's continuation or a
+    /// timer's callback, and because the servers outlive any one window.
+    announcer: crate::notify::Announcer,
+    /// The clock the debounces run on, lent by whichever window is attached.
+    clock: zdt_view::Clock,
 
     /// Every client, running or on its way.
     pool: RefCell<Pool>,
@@ -125,9 +125,9 @@ struct Inner {
     notices: Sender<Notice>,
     inbox: RefCell<Option<Receiver<Notice>>>,
     /// What is draining it, held so that dropping this stops the draining.
-    draining: RefCell<Option<zgui::view::time::IntervalHandle>>,
+    draining: RefCell<Option<zdt_view::Job>>,
     /// What is waiting to tell a server what changed, by file.
-    pending: RefCell<FxHashMap<PathBuf, zgui::view::time::TimeoutHandle>>,
+    pending: RefCell<FxHashMap<PathBuf, zdt_view::Pending>>,
 
     /// A number that changes whenever anything a view draws has changed.
     ///
@@ -143,7 +143,12 @@ struct Inner {
 impl Language {
     /// No servers yet.
     #[must_use]
-    pub fn new(workspace: Workspace, settings: Settings) -> Self {
+    pub fn new(
+        workspace: Workspace,
+        settings: Settings,
+        clock: zdt_view::Clock,
+        announcer: crate::notify::Announcer,
+    ) -> Self {
         let (notices, inbox) = std::sync::mpsc::channel();
         let enabled = settings.with_untracked(|config| config.lsp.enabled);
 
@@ -151,8 +156,8 @@ impl Language {
             inner: Rc::new(Inner {
                 workspace,
                 settings,
-                notify: crate::notify::use_notify(),
-                timers: zgui::view::time::Timers::current(),
+                announcer,
+                clock,
                 pool: RefCell::new(Pool::new()),
                 store: RefCell::new(Store::new()),
                 files: RefCell::new(FxHashMap::default()),
@@ -181,14 +186,13 @@ impl Language {
     ///
     /// Called once, from the root. Until it is, nothing a server says is drawn.
     pub fn listen(&self) {
-        let Some(timers) = self.inner.timers.clone() else {
-            return;
-        };
         let Some(inbox) = self.inner.inbox.borrow_mut().take() else {
             return;
         };
         let language = self.clone();
-        let handle = timers.set_interval(DRAIN, move || {
+        // A durable job: it is armed again whenever a window lends its clock, so a window closing
+        // pauses the draining rather than ending it.
+        let handle = self.inner.clock.every(DRAIN, move || {
             let mut moved = false;
             for notice in inbox.try_iter() {
                 moved |= language.absorb(notice);

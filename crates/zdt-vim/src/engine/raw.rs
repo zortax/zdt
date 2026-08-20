@@ -64,23 +64,28 @@ impl Engine {
                 let Some(character) = chord.inserted() else {
                     return Step::nothing();
                 };
-                self.marks.insert(character, self.caret(cx));
+                self.marks.insert(character, cx.place());
                 Step::nothing()
             }
             Awaiting::JumpMark { line } => {
                 let Some(character) = chord.inserted() else {
                     return Step::nothing();
                 };
-                let Some(byte) = self.marks.get(&character).copied() else {
+                let Some(place) = self.marks.get(&character).copied() else {
                     return Step::one(Effect::Complain(format!("no mark {character}")));
                 };
-                let byte = byte.min(cx.rope.len_bytes());
+                self.jumps.push(cx.place());
+                // Another buffer's mark is another buffer's business: only the application can
+                // show a buffer, so it is handed the place and does both halves.
+                if place.owner != cx.owner {
+                    return Step::one(Effect::GoTo(place));
+                }
+                let byte = place.byte.min(cx.rope.len_bytes());
                 let byte = if line {
                     text::first_non_blank(cx.rope, text::line_of(cx.rope, byte))
                 } else {
                     byte
                 };
-                self.jumps.push(self.caret(cx));
                 Step::Consumed(vec![
                     Effect::Select(vec![Selection::caret(text::clamp_normal(cx.rope, byte))]),
                     Effect::Scroll(Scroll::EnsureVisible),

@@ -10,9 +10,14 @@ use crate::panel::GitPanelProps;
 
 /// The modal.
 #[component]
-pub fn GitModal() -> impl IntoView {
+pub fn GitModal(
+    /// Where to record the panel's own element, so the embedder can say where the keyboard lands.
+    #[prop(optional)]
+    element_ref: Option<NodeRef>,
+) -> impl IntoView {
     let git = use_gitui();
     let surface = NodeRef::new();
+    let panel = element_ref.unwrap_or_default();
     let present = {
         let git = git.clone();
         Signal::derive_local(move || git.is_open())
@@ -21,7 +26,7 @@ pub fn GitModal() -> impl IntoView {
     view! {
         Presence(present = present, surface = surface) {
             box(class = "git__scrim") {}
-            Floating(surface = surface)
+            Floating(surface = surface, panel = panel)
         }
     }
 }
@@ -35,6 +40,8 @@ pub fn GitModal() -> impl IntoView {
 pub(crate) fn Floating(
     /// The box itself, whose exit animation says when it may be taken away.
     surface: NodeRef,
+    /// Where the panel records its own element.
+    panel: NodeRef,
 ) -> impl IntoView {
     let leaving = use_presence();
 
@@ -46,7 +53,7 @@ pub(crate) fn Floating(
             a11y:role = Role::Dialog,
             a11y:label = "Git"
         ) {
-            GitPanel()
+            GitPanel(element_ref = panel)
         }
     }
 }

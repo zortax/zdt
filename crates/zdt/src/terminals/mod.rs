@@ -42,16 +42,27 @@ pub struct Terminals {
 struct Inner {
     workspace: Workspace,
     settings: crate::settings::Settings,
-    /// Programs that have been started and not yet drawn, waiting for a view to take them.
-    pending: RefCell<FxHashMap<BufferId, Pty>>,
+    /// Every running program, whether or not anything is drawing it.
+    ///
+    /// The emulator belongs here rather than to a view, so a session taken off screen — hidden,
+    /// evicted, or in a window somebody closed — keeps its shells running. See
+    /// [`zgui_terminal::TerminalSession`].
+    sessions: RefCell<FxHashMap<BufferId, zgui_terminal::TerminalSession>>,
     /// The handle of each terminal that is on screen.
     handles: RefCell<FxHashMap<BufferId, TerminalHandle>>,
     /// The floating terminals, by the name they are asked for.
     floats: RefCell<FxHashMap<String, BufferId>>,
+    /// What each terminal was started as, so a session can start it again.
+    programs: RefCell<FxHashMap<BufferId, Program>>,
     /// Which float is being shown, when one is.
     showing: RwSignal<Option<BufferId>, LocalStorage>,
-    /// Which terminal has the keyboard, and is therefore taking keys away from the keymap.
-    typing: RwSignal<Option<BufferId>, LocalStorage>,
+    /// Every terminal that is taking keys away from the keymap.
+    ///
+    /// A set, and never one answer for the session: being in insert is a fact about a terminal, the
+    /// way it is in vim. Walking out of a split and back finds the terminal as it was left, and a
+    /// terminal nobody is looking at names no mode at all. Which of these has the keyboard is
+    /// [`crate::focus`]'s question.
+    inserting: RwSignal<rustc_hash::FxHashSet<BufferId>, LocalStorage>,
     /// The window a terminal was given a split of its own for, when it was.
     ///
     /// A terminal opened with `<Leader>tv` gets a window made for it, and that window has nothing
@@ -116,11 +127,12 @@ impl Terminals {
             inner: Rc::new(Inner {
                 workspace,
                 settings,
-                pending: RefCell::new(FxHashMap::default()),
+                sessions: RefCell::new(FxHashMap::default()),
                 handles: RefCell::new(FxHashMap::default()),
                 floats: RefCell::new(FxHashMap::default()),
+                programs: RefCell::new(FxHashMap::default()),
                 showing: RwSignal::new_local(None),
-                typing: RwSignal::new_local(None),
+                inserting: RwSignal::new_local(rustc_hash::FxHashSet::default()),
                 owned_windows: RefCell::new(FxHashMap::default()),
                 escaping: std::cell::Cell::new(false),
             }),
@@ -152,10 +164,70 @@ impl Terminals {
                 return None;
             }
         };
+        // A size the first frame corrects. The program is told the real one as soon as anything
+        // measures a cell, and until then eighty by twenty-four is what every terminal assumes.
+        let started = zgui_terminal::TerminalSession::start(
+            Box::new(pty),
+            self.config(),
+            zgui_terminal::transport::TerminalSize {
+                columns: 80,
+                lines: 24,
+                cell_width: 8,
+                cell_height: 16,
+            },
+        );
+        let running = match started {
+            Ok(running) => running,
+            Err(error) => {
+                self.inner
+                    .workspace
+                    .complain(format!("cannot start {}: {error}", program.name()));
+                return None;
+            }
+        };
 
         let id = self.inner.workspace.open_terminal(&program.name(), listed);
-        self.inner.pending.borrow_mut().insert(id, pty);
+        self.inner.sessions.borrow_mut().insert(id, running);
+        // Remembered so a session can start the same thing again. The contents cannot come back,
+        // but what was being run and where can.
+        self.inner.programs.borrow_mut().insert(id, program.clone());
         Some(id)
+    }
+
+    /// What `buffer` was started as, and which float it is, for a session to write down.
+    #[must_use]
+    pub fn spec_for(&self, buffer: BufferId) -> Option<(Program, Option<String>)> {
+        let program = self.inner.programs.borrow().get(&buffer).cloned()?;
+        let float = self
+            .inner
+            .floats
+            .borrow()
+            .iter()
+            .find(|(_, held)| **held == buffer)
+            .map(|(name, _)| name.clone());
+        Some((program, float))
+    }
+
+    /// Starts `program` again for a session being restored, without showing it.
+    ///
+    /// The buffer it makes takes the place the session had it in. A float is registered under the
+    /// name it had, so the key that toggles it finds it again.
+    pub fn restore(
+        &self,
+        program: &Program,
+        listed: bool,
+        float: Option<&str>,
+    ) -> Option<BufferId> {
+        let id = self.spawn(program, listed)?;
+        if let Some(name) = float {
+            self.inner.floats.borrow_mut().insert(name.to_owned(), id);
+        }
+        Some(id)
+    }
+
+    /// How a terminal is drawn, as the settings say.
+    fn config(&self) -> zgui_terminal::TerminalConfig {
+        crate::terminals::view::emulator::terminal_config(Some(&self.inner.settings))
     }
 
     /// The command a program comes to, with the environment a terminal is expected to have.
@@ -193,12 +265,13 @@ impl Terminals {
         std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned())
     }
 
-    /// Takes the program waiting for `buffer`, if one is.
+    /// The program running behind `buffer`, if one is.
     ///
-    /// Called once, by the view that is about to draw it. A second call answers nothing, which is
-    /// what stops a remount from starting a second shell.
-    pub fn take_pending(&self, buffer: BufferId) -> Option<Pty> {
-        self.inner.pending.borrow_mut().remove(&buffer)
+    /// Borrowed rather than taken: a view mounting again draws the same program, which is what
+    /// makes a terminal survive being taken off screen and put back.
+    #[must_use]
+    pub fn running(&self, buffer: BufferId) -> Option<zgui_terminal::TerminalSession> {
+        self.inner.sessions.borrow().get(&buffer).cloned()
     }
 
     // ---- Driving them -------------------------------------------------------------------------
@@ -243,7 +316,8 @@ impl Terminals {
         if let Some(handle) = self.inner.handles.borrow_mut().remove(&buffer) {
             handle.shutdown();
         }
-        self.inner.pending.borrow_mut().remove(&buffer);
+        // The last handle to the program goes, which is what stops it.
+        self.inner.sessions.borrow_mut().remove(&buffer);
         self.inner.owned_windows.borrow_mut().remove(&buffer);
         self.inner
             .floats
@@ -252,9 +326,7 @@ impl Terminals {
         if self.inner.showing.get_untracked() == Some(buffer) {
             self.inner.showing.set(None);
         }
-        if self.inner.typing.get_untracked() == Some(buffer) {
-            self.inner.typing.set(None);
-        }
+        self.stop_typing(buffer);
     }
 
     // ---- The floating ones ----------------------------------------------------------------------
@@ -270,7 +342,7 @@ impl Terminals {
                 self.hide_float();
             } else {
                 self.inner.showing.set(Some(id));
-                self.inner.typing.set(Some(id));
+                self.start_typing(id);
             }
             return;
         }
@@ -280,17 +352,16 @@ impl Terminals {
         };
         self.inner.floats.borrow_mut().insert(name.to_owned(), id);
         self.inner.showing.set(Some(id));
-        self.inner.typing.set(Some(id));
+        self.start_typing(id);
     }
 
     /// Puts the float away, leaving the program running.
+    ///
+    /// Nothing here hands the keyboard back. The float is an overlay, so it holds the keys while it
+    /// is shown and the region underneath gets them when it goes. See [`crate::focus`].
     pub fn hide_float(&self) {
         if self.inner.showing.get_untracked().is_some() {
             self.inner.showing.set(None);
-        }
-        if self.inner.typing.get_untracked().is_some() {
-            self.inner.typing.set(None);
-            self.inner.workspace.focus_editor();
         }
     }
 
@@ -314,24 +385,28 @@ impl Terminals {
         found
     }
 
-    // ---- Who has the keyboard ---------------------------------------------------------------
+    // ---- Which terminals are taking keys -------------------------------------------------------
 
-    /// Which terminal the keys are going to. Tracked.
+    /// Whether the program in `buffer` is being typed into. Tracked.
     #[must_use]
-    pub fn typing(&self) -> Option<BufferId> {
-        self.inner.typing.get()
+    pub fn is_inserting(&self, buffer: BufferId) -> bool {
+        self.inner.inserting.with(|held| held.contains(&buffer))
     }
 
     /// The same, without subscribing.
     #[must_use]
-    pub fn typing_untracked(&self) -> Option<BufferId> {
-        self.inner.typing.get_untracked()
+    pub fn is_inserting_untracked(&self, buffer: BufferId) -> bool {
+        self.inner
+            .inserting
+            .with_untracked(|held| held.contains(&buffer))
     }
 
     /// Gives the keys to the terminal in `buffer`. This is vim's terminal mode.
     pub fn start_typing(&self, buffer: BufferId) {
-        if self.inner.typing.get_untracked() != Some(buffer) {
-            self.inner.typing.set(Some(buffer));
+        if !self.is_inserting_untracked(buffer) {
+            self.inner.inserting.update(|held| {
+                held.insert(buffer);
+            });
         }
     }
 
@@ -351,13 +426,16 @@ impl Terminals {
         self.inner.escaping.set(false);
     }
 
-    /// Takes them back, which is what `<C-\><C-n>` does.
+    /// Takes them back from the terminal in `buffer`, which is what `<C-\><C-n>` does.
     ///
     /// The terminal stays where it is and the program keeps running; what changes is that the
-    /// keymap answers again, so the scrollback can be walked with vim's own motions.
-    pub fn stop_typing(&self) {
-        if self.inner.typing.get_untracked().is_some() {
-            self.inner.typing.set(None);
+    /// keymap answers again, so the scrollback can be walked with vim's own motions. Remembered
+    /// per terminal, so coming back to this one finds it as it was left.
+    pub fn stop_typing(&self, buffer: BufferId) {
+        if self.is_inserting_untracked(buffer) {
+            self.inner.inserting.update(|held| {
+                held.remove(&buffer);
+            });
         }
     }
 }

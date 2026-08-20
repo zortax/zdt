@@ -54,10 +54,17 @@ pub(crate) fn Tree() -> impl IntoView {
 
         SettingsGroup {
             SettingsGroupLabel {"What it shows"}
-            SettingsItem(label = "Files beginning with a dot") {
+            SettingsItem(
+                label = "Files beginning with a dot",
+                description = "Shown faintly, so what belongs to the project still stands out."
+            ) {
                 Switch(class = "config__switch", checked = hidden, {..use_settings_item_attrs()})
             }
-            SettingsItem(label = "Files git ignores") {
+            SettingsItem(
+                label = "Files git ignores",
+                description = "The same, for a build directory. Shift-H in the tree turns both on \
+                               at once."
+            ) {
                 Switch(class = "config__switch", checked = ignored, {..use_settings_item_attrs()})
             }
         }

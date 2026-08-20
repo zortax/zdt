@@ -154,6 +154,11 @@ pub enum Effect {
     },
     /// Something the application owns: a picker, a language server, a window.
     App(Action),
+    /// Show the buffer this place is in, and put the caret there.
+    ///
+    /// What a mark or a jump in another buffer answers with. The engine has never heard of a
+    /// buffer, so it hands the number back and the application does the showing.
+    GoTo(Place),
     /// Something to say in the status line.
     Say(String),
     /// Something that went wrong.
@@ -168,9 +173,49 @@ pub struct Context<'a> {
     pub selections: &'a [Selection],
     /// What the view is showing.
     pub view: View,
+    /// Which buffer this is, as the application names them.
+    ///
+    /// Opaque here on purpose: the engine has never heard of a buffer and does not want to. It
+    /// carries the number so that a mark and a jump can say *where* as well as *how far in*, and
+    /// hands it back unchanged.
+    pub owner: Owner,
+}
+
+/// Which buffer a place is in, as the application names them.
+///
+/// A number the engine never interprets. Zero is "the caller did not say", which is what a test
+/// and an old session both mean.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
+pub struct Owner(pub u64);
+
+/// A place in a buffer: which one, and how far in.
+///
+/// The buffer as well as the offset, because a bare offset from a previous run names a place in a
+/// file something else may have edited, and `'a` landing three functions away is worse than `'a`
+/// doing nothing.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Place {
+    /// Which buffer.
+    pub owner: Owner,
+    /// How far into it, in bytes.
+    pub byte: usize,
+}
+
+impl Place {
+    /// A place in `owner` at `byte`.
+    #[must_use]
+    pub fn new(owner: Owner, byte: usize) -> Self {
+        Self { owner, byte }
+    }
 }
 
 impl Context<'_> {
+    /// Where the primary caret is, buffer and all.
+    #[must_use]
+    pub fn place(&self) -> Place {
+        Place::new(self.owner, self.cursor())
+    }
+
     /// The primary caret's head.
     #[must_use]
     pub fn cursor(&self) -> usize {

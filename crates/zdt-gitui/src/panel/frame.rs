@@ -1,11 +1,6 @@
 //! The panel's frame, and the tabs that choose a half.
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use zgui::prelude::*;
-use zgui::reactive::RenderEffect;
-use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 use zgui_ui::prelude::*;
 
@@ -22,9 +17,17 @@ use zdt_icons::{self as icons, IconProps};
 
 /// The panel itself.
 #[component]
-pub fn GitPanel() -> impl IntoView {
+pub fn GitPanel(
+    /// Where to record the panel's own element.
+    ///
+    /// The embedder registers it wherever the keyboard should land: a tab is the contents of a
+    /// window, and the modal is a layer over whatever had the keyboard. The panel cannot tell which
+    /// of the two it is, so it does not guess.
+    #[prop(optional)]
+    element_ref: Option<NodeRef>,
+) -> impl IntoView {
     let git = use_gitui();
-    let node = NodeRef::new();
+    let node = element_ref.unwrap_or_default();
 
     // The keys. Everything the panel answers goes through the host's keymap, so `s` and `q` are
     // rows in a file somebody can change and not characters written into a match.
@@ -39,56 +42,17 @@ pub fn GitPanel() -> impl IntoView {
         }
     };
 
-    // The panel takes the keyboard when it is shown. From a timer for the same reason the tree's
-    // is: a node that has not been mounted cannot take focus, and this effect's first run happens
-    // while the element is still being built.
-    let claim: Rc<RefCell<Option<TimeoutHandle>>> = Rc::new(RefCell::new(None));
-    let focusing = {
-        let (git, held) = (git.clone(), Rc::clone(&claim));
-        RenderEffect::new(move |_| {
-            if !git.is_focused() {
-                return;
-            }
-            if let Some(timers) = Timers::current() {
-                *held.borrow_mut() =
-                    Some(timers.set_timeout(std::time::Duration::ZERO, move || node.focus()));
-            }
-        })
-    };
-    on_cleanup_local(move || {
-        drop(focusing);
-        drop(claim);
-    });
-
-    // As a tab there is nothing to hand the keyboard over to, so the panel takes it whenever its
-    // own pane is the one being looked at.
-    let following = {
-        let (git, host) = (git.clone(), git.host());
-        RenderEffect::new(move |_| {
-            if host.is_in_front() {
-                git.focus();
-            }
-        })
-    };
-    on_cleanup_local(move || drop(following));
-
-    let (head, view, working, problem, focused, taking) = (
-        git.clone(),
-        git.clone(),
-        git.clone(),
-        git.clone(),
-        git.clone(),
-        git.clone(),
-    );
+    let (head, view, working, problem) = (git.clone(), git.clone(), git.clone(), git.clone());
+    let (focused, taking) = (git.host(), git.host());
 
     view! {
         column(
             class = "git__body",
             node_ref = node,
             tabindex = Focus::Programmatic,
-            attr:data-focused = move || focused.is_focused().then(|| "true".to_owned()),
+            attr:data-focused = move || focused.has_keyboard().then(|| "true".to_owned()),
             on:key_down = on_key,
-            on:focus_in = move |_: &mut EventCx<'_, events::FocusIn>| taking.focus()
+            on:focus_in = move |_: &mut EventCx<'_, events::FocusIn>| taking.took_keyboard()
         ) {
             // The strip across the top: which branch, which half, and whether anything is being
             // read. One line, because the panel is mostly list and diff and everything else has to

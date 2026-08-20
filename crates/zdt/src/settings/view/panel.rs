@@ -38,6 +38,10 @@ pub fn ConfigPanel() -> impl IntoView {
                     Icon(icon = icons::SEARCH, class = "config__page-icon")
                     "Pickers"
                 }
+                SettingsPage(value = "sessions") {
+                    Icon(icon = icons::FOLDER_TREE, class = "config__page-icon")
+                    "Sessions"
+                }
                 SettingsPage(value = "terminal") {
                     Icon(icon = icons::TERMINAL, class = "config__page-icon")
                     "Terminal"
@@ -56,6 +60,7 @@ pub fn ConfigPanel() -> impl IntoView {
             SettingsPane(value = "language") { Language() }
             SettingsPane(value = "tree") { Tree() }
             SettingsPane(value = "picker") { Pickers() }
+            SettingsPane(value = "sessions") { Sessions() }
             SettingsPane(value = "terminal") { Terminal() }
             SettingsPane(value = "keys") { Keys() }
         }

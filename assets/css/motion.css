@@ -80,7 +80,8 @@
 .cmdline,
 .completion,
 .completion__docs,
-.rename {
+.rename,
+.treefield {
     animation-name: zdt-zoom;
     animation-duration: var(--zdt-quick);
     animation-timing-function: var(--zdt-ease);
@@ -122,7 +123,8 @@
 .cmdline[data-state="closed"],
 .completion[data-state="closed"],
 .completion__docs[data-state="closed"],
-.rename[data-state="closed"] {
+.rename[data-state="closed"],
+.treefield[data-state="closed"] {
     animation-name: zdt-shrink;
     animation-duration: var(--zdt-instant);
     animation-fill-mode: forwards;
@@ -169,30 +171,15 @@
 
 /* ---- Things that change while they stay ---------------------------------------------------- */
 
-/* A tree row appearing when its directory opens. The rows below it move because the list is
- * taller, which is the animation people actually read; the new rows fading in is what says which
- * ones are new. */
-.tree__row {
-    animation-name: zdt-fade;
-    animation-duration: var(--zdt-instant);
-    animation-timing-function: var(--zdt-ease);
-    transition-property: background-color, color;
-    transition-duration: var(--zdt-instant);
-    transition-timing-function: var(--zdt-ease);
-}
-
-/* The folder glyph turning as it opens. */
-.tree__row .glyph {
-    transition-property: color;
-    transition-duration: var(--zdt-instant);
-    transition-timing-function: var(--zdt-ease);
-}
+/* The tree is left out of everything in this section. A file tree is read by scanning it, and a
+ * scan is a run of rows lighting up and going out one after another. At sixty milliseconds each
+ * that is a trail behind the caret rather than a caret. The one exception is the disclosure
+ * chevron in `tree.css`, which turns because a quarter turn is what says a directory opened. */
 
 /* A picker row lighting up under the caret, and a tab under the pointer. */
 .picker__row,
 .tab,
 .tab__close,
-.treemenu__item,
 .chrome__button,
 .wincontrol {
     transition-property: background-color, color, opacity;

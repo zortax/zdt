@@ -23,7 +23,7 @@ impl Engine {
     /// The jump list and the change list.
     pub(super) fn jump(&mut self, action: &Action, cx: &Context<'_>) -> Step {
         let target = match action.leaf() {
-            "back" => self.jumps.back(cx.cursor()),
+            "back" => self.jumps.back(cx.place()),
             "forward" => self.jumps.forward(),
             // The change list is the application's, because it is the editor that holds the
             // history the changes are in.
@@ -31,8 +31,12 @@ impl Engine {
             other => return Step::one(Effect::Complain(format!("no jump {other}"))),
         };
         match target {
-            Some(byte) => Step::Consumed(vec![
-                Effect::Select(vec![Selection::caret(text::clamp_normal(cx.rope, byte))]),
+            // Somewhere else entirely: only the application can show another buffer.
+            Some(place) if place.owner != cx.owner => Step::one(Effect::GoTo(place)),
+            Some(place) => Step::Consumed(vec![
+                Effect::Select(vec![Selection::caret(text::clamp_normal(
+                    cx.rope, place.byte,
+                ))]),
                 Effect::Scroll(Scroll::EnsureVisible),
             ]),
             None => Step::nothing(),

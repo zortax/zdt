@@ -52,7 +52,6 @@ impl Picker {
         self.inner.rows.set(Vec::new());
         self.inner.candidates.borrow_mut().clear();
         *self.inner.ranker.borrow_mut() = None;
-        self.inner.workspace.focus_editor();
     }
 
     /// Stops every worker this picker has running, without closing it.
@@ -148,8 +147,12 @@ impl Picker {
     }
 
     /// Does what the row the caret is on says, and closes.
+    ///
+    /// A list that takes what was typed falls back to that when nothing matched, which is what
+    /// lets a sessionizer open a directory that is in no index.
     pub fn activate(&self) {
         let Some(row) = self.selected() else {
+            self.activate_typed();
             return;
         };
         let workspace = self.inner.workspace.clone();
@@ -179,5 +182,26 @@ impl Picker {
             Target::Run(deed) => deed.run(),
             Target::Nothing => {}
         }
+    }
+
+    /// Uses exactly what was typed, whether or not anything matched it.
+    ///
+    /// What `<C-x>` does, and what `<CR>` falls back to on an empty list. Does nothing when the
+    /// list has no use for typed text, which is every list but the sessionizer today.
+    pub fn activate_typed(&self) {
+        let Some(typed) = self
+            .inner
+            .source
+            .with_untracked(|source| source.as_ref().and_then(|source| source.typed().cloned()))
+        else {
+            return;
+        };
+        let query = self.inner.query.get_untracked();
+        if query.trim().is_empty() {
+            return;
+        }
+        self.inner.restore.borrow_mut().take();
+        self.close();
+        typed.run(query.trim());
     }
 }

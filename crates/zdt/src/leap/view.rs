@@ -35,6 +35,11 @@ pub fn LeapLabels(
             if labels.is_empty() {
                 return Vec::new();
             }
+            // A leap over the file tree's rows labels rows, and its numbers are row indices. Read
+            // as byte offsets they would put labels somewhere in the text.
+            if leaping.over() != crate::leap::Over::Text {
+                return Vec::new();
+            }
             // Only the window with the keyboard: a leap is one caret's, and labels over the other
             // panes would be places its keys cannot reach.
             if workspace.focused() != window {

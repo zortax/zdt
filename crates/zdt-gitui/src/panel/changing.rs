@@ -194,6 +194,7 @@ impl GitUi {
                 Ok(()) => {
                     git.inner.problem.set(None);
                     git.refresh();
+                    git.inner.host.changed();
                 }
                 Err(error) => {
                     let said = error.to_string();
@@ -225,6 +226,7 @@ impl GitUi {
                 Ok(output) if output.status.success() => {
                     git.inner.problem.set(None);
                     git.refresh();
+                    git.inner.host.changed();
                 }
                 Ok(output) => {
                     let said = String::from_utf8_lossy(&output.stderr);

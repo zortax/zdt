@@ -60,7 +60,8 @@
     --editor-gutter-current-fg: var(--editor-gutter-current-fg);
 }
 
-.pane:not([data-focused="true"]) .pane__editor,
+/* The band behind the caret's line, off when somebody said so. Which window draws one is the
+ * editor's own business: it is told which view is being worked in. */
 .pane[data-cursorline="off"] .pane__editor {
     --editor-current-line: transparent;
 }

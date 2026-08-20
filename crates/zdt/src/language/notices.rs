@@ -113,7 +113,9 @@ impl Language {
 
     /// Which servers claim a file.
     pub(super) fn wanted(&self, language: &str, path: &Path) -> Vec<Wanted> {
-        let root = self.inner.workspace.project().root().to_path_buf();
+        // The tooling root: a server rooted at a subdirectory of a workspace indexes the wrong
+        // thing, and one asked about a file above its root answers about nothing.
+        let root = self.inner.workspace.project().tooling_root().to_path_buf();
         self.inner.settings.with_untracked(|config| {
             zdt_lsp::registry::wanted_for(&config.lsp.servers, language, path, &root)
         })
@@ -167,12 +169,11 @@ impl Language {
             } => {
                 // A server talking unprompted is news, so it goes to the stack. Two servers with
                 // something to say make two rows. One slot would show the last of them.
-                if let Some(notify) = self.inner.notify.as_ref() {
-                    match severity {
-                        lsp_types::MessageType::ERROR => notify.fail(server, Some(text)),
-                        lsp_types::MessageType::WARNING => notify.warn(format!("{server}: {text}")),
-                        _ => notify.say(format!("{server}: {text}")),
-                    }
+                let announcer = &self.inner.announcer;
+                match severity {
+                    lsp_types::MessageType::ERROR => announcer.fail(server, Some(text)),
+                    lsp_types::MessageType::WARNING => announcer.warn(format!("{server}: {text}")),
+                    _ => announcer.say(format!("{server}: {text}")),
                 }
                 false
             }
@@ -244,16 +245,12 @@ impl Language {
     /// Silent when nothing is listening, which is every test that mounts the language layer
     /// without a toaster over it.
     fn announce(&self, server: &str, toast: Toast) {
-        if let Some(notify) = self.inner.notify.as_ref() {
-            notify.progress(server, toast);
-        }
+        self.inner.announcer.progress(server, toast);
     }
 
     /// Gives `server`'s row back.
     pub(super) fn forget_announcement(&self, server: &str) {
-        if let Some(notify) = self.inner.notify.as_ref() {
-            notify.clear(server);
-        }
+        self.inner.announcer.clear(server);
     }
 
     /// Says that something a view draws has changed.

@@ -25,6 +25,7 @@ pub mod commit;
 pub mod diff;
 pub mod graph;
 pub mod hunks;
+pub mod ignore;
 pub mod log;
 pub mod refs;
 pub mod repo;

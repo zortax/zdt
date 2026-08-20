@@ -40,7 +40,7 @@ fn mount(text: &str) -> Modal {
         window.scope.with(|| {
             let workspace = Workspace::new(Project::at("/project"));
             let settings = zdt::settings::Settings::new(zdt_core::Config::default(), None);
-            let layer = Vim::new(workspace, settings);
+            let layer = Vim::new(workspace, settings, zdt::keymaps::Keymaps::new());
             kept.borrow_mut().replace(layer.clone());
 
             let filter: zgui_editor::KeyFilter = Box::new(

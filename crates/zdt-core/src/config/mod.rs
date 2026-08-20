@@ -23,8 +23,47 @@ mod schema;
 use std::path::{Path, PathBuf};
 
 pub use crate::config::schema::{
-    Config, Editor, Keys, Leap, LineNumbers, Lsp, Picker, Scheme, Server, Terminal, Tree, Ui,
+    Config, Editor, Keys, Leap, LineNumbers, Lsp, Picker, Scheme, Server, Sessions, Terminal, Tree,
+    Ui,
 };
+
+/// `text` as a path, with a leading `~` replaced by the home directory.
+///
+/// What a configured path is read through. A file somebody writes by hand says `~/Projects`,
+/// because that is what every other configuration file they have says.
+///
+/// Only a leading `~` on its own or before a separator. A directory really called `~stuff` is a
+/// directory really called `~stuff`, and no shell expands that either.
+#[must_use]
+pub fn expand_home(text: &str) -> PathBuf {
+    let Some(rest) = text.strip_prefix('~') else {
+        return PathBuf::from(text);
+    };
+    if !rest.is_empty() && !rest.starts_with('/') && !rest.starts_with('\\') {
+        return PathBuf::from(text);
+    }
+    let Some(home) = dirs::home_dir() else {
+        return PathBuf::from(text);
+    };
+    match rest.strip_prefix(['/', '\\']) {
+        Some(rest) => home.join(rest),
+        None => home,
+    }
+}
+
+/// `path` written with the home directory as `~`.
+///
+/// The other way round from [`expand_home`], and for the same reason: a person reads `~/Projects`
+/// faster than they read their own home directory spelled out, and a column of paths that all
+/// begin with the same twenty characters tells them apart nowhere near the start.
+#[must_use]
+pub fn shorten_home(path: &Path) -> String {
+    match dirs::home_dir().and_then(|home| path.strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_owned(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => path.display().to_string(),
+    }
+}
 
 /// Where the configuration directory is.
 ///
@@ -386,6 +425,38 @@ mod diff_tests {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_leading_tilde_becomes_the_home_directory() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        assert_eq!(super::expand_home("~/Projects"), home.join("Projects"));
+        assert_eq!(super::expand_home("~"), home);
+    }
+
+    #[test]
+    fn a_home_path_is_written_back_with_a_tilde() {
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        assert_eq!(super::shorten_home(&home.join("Projects")), "~/Projects");
+        assert_eq!(super::shorten_home(&home), "~");
+        assert_eq!(super::shorten_home(std::path::Path::new("/etc")), "/etc");
+    }
+
+    #[test]
+    fn a_tilde_that_is_part_of_a_name_is_left_alone() {
+        // No shell expands `~stuff` either, and a directory really called that must be reachable.
+        assert_eq!(
+            super::expand_home("~stuff"),
+            std::path::PathBuf::from("~stuff")
+        );
+        assert_eq!(
+            super::expand_home("/tmp/~/x"),
+            std::path::PathBuf::from("/tmp/~/x")
+        );
+    }
     use super::{Paths, load, write_default};
 
     fn temporary() -> std::path::PathBuf {

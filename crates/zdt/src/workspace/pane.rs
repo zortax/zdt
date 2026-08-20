@@ -71,8 +71,9 @@ pub fn Pane(
         box(
             class = "pane",
             attr:data-focused = move || focused().then(|| "true".to_owned()),
-            // The caret's own line is tinted unless somebody said otherwise. A class, and never
-            // a command, because it is a colour and colours belong to the sheet.
+            // Whether the caret's own line is tinted at all. The colour belongs to the sheet;
+            // which window draws one is told to the editor, because a colour that changes because
+            // an attribute changed on an ancestor reaches it on no frame at all.
             attr:data-cursorline = {
                 let settings = use_settings();
                 move || (!settings.with(|config| config.editor.cursorline)).then(|| "off".to_owned())
@@ -169,9 +170,15 @@ fn BufferView(
                 let workspace = workspace.clone();
                 let language = entry.language();
                 let mine = Rc::clone(&mine);
+                let ready = crate::session::use_session();
                 Box::new(move |handle: EditorHandle| {
                     handle.set_language(language);
                     *mine.borrow_mut() = Some(handle.clone());
+                    // Where it starts out, so a buffer nobody has touched still has a recorded
+                    // place. Everything after this comes from the editor's own events.
+                    if let Some(writer) = ready.as_ref().and_then(crate::session::Session::writer) {
+                        writer.remember_view(window, buffer, &handle);
+                    }
                     workspace.register_handle(window, buffer, handle);
                 }) as Box<dyn Fn(EditorHandle)>
             };
@@ -185,6 +192,8 @@ fn BufferView(
                     zgui::reactive::use_local_context::<crate::completion::Completion>();
                 let workspace = workspace.clone();
                 let mine = Rc::clone(&mine);
+                // Taken here, where there certainly is one: this closure runs from the editor.
+                let session = crate::session::use_session();
                 Box::new(move |event: zgui_editor::EditorEvent| {
                     match event {
                         zgui_editor::EditorEvent::Edited { ref kind, .. } => {
@@ -192,6 +201,11 @@ fn BufferView(
                             // revision: undoing back to what is on disk gives a new revision, not
                             // the old one.
                             entry.refresh_dirty();
+                            // And the session hears about it after a longer pause, so typing a
+                            // sentence is one write.
+                            if let Some(session) = session.as_ref() {
+                                session.touched_text(buffer);
+                            }
                             // The servers hear about it after a pause, so typing a word is one
                             // notification.
                             if let Some(language) = language.as_ref() {
@@ -214,8 +228,24 @@ fn BufferView(
                         // The caret moving, the view moving, the keyboard leaving: all three mean
                         // the popup is about somewhere the caret no longer is.
                         zgui_editor::EditorEvent::SelectionMoved
-                        | zgui_editor::EditorEvent::Scrolled
-                        | zgui_editor::EditorEvent::Blurred => {
+                        | zgui_editor::EditorEvent::Scrolled => {
+                            if let Some(completion) = completion.as_ref() {
+                                completion.close();
+                            }
+                            // And where this editor is looking, kept for the session. Only on
+                            // the two events that mean it *moved*: the keyboard leaving is also
+                            // what a view being taken apart reports, and an editor whose scope
+                            // is being disposed of answers a signal read by panicking.
+                            if let Some(writer) =
+                                session.as_ref().and_then(crate::session::Session::writer)
+                                && let Some(handle) = mine.borrow().as_ref()
+                            {
+                                writer.remember_view(window, buffer, handle);
+                            }
+                        }
+                        // The keyboard leaving means the popup is about somewhere the caret no
+                        // longer is, and nothing more: a blur moves no view.
+                        zgui_editor::EditorEvent::Blurred => {
                             if let Some(completion) = completion.as_ref() {
                                 completion.close();
                             }
@@ -230,6 +260,10 @@ fn BufferView(
                 let mine = Rc::clone(&mine);
                 on_cleanup_local(move || {
                     if let Some(handle) = mine.borrow().as_ref() {
+                        // Nothing here asks the editor anything. This runs while the scope is
+                        // being disposed of, where the editor's own signals are already gone,
+                        // and a panic in a destructor aborts rather than unwinds. Where it was
+                        // looking was recorded as it moved; see `on_event` above.
                         workspace.forget_handle(window, buffer, handle);
                     }
                 });
@@ -254,7 +288,17 @@ fn BufferView(
                     let current = workspace
                         .window(window)
                         .is_some_and(|state| state.current == Some(buffer));
-                    if !current || workspace.focused() != window {
+                    let active = current && workspace.focused() == window;
+
+                    // Which view is being worked in, which the caret's own line band follows. Told
+                    // to the editor, and never left to a class: the editor reads its colours off
+                    // the computed style during layout, and a colour that changes because an
+                    // attribute changed on an ancestor reaches it on no frame at all.
+                    if let Some(handle) = workspace.handle_for(window, buffer) {
+                        handle.set_active(active);
+                    }
+
+                    if !active {
                         return;
                     }
                     let Some(timers) = timers.as_ref() else {
@@ -370,9 +414,18 @@ fn BufferView(
             box(class = "pane__buffer pane__panel") { ConfigPanel() }
         }
         .any(),
-        BufferKind::Git => view! {
-            box(class = "pane__buffer pane__panel") { GitPanel() }
+        BufferKind::Git => {
+            // Where the keyboard lands for this tab. A panel is no editor, so nothing else in the
+            // workspace can answer for it.
+            let panel = zgui::prelude::NodeRef::new();
+            crate::focus::claim::sink(
+                crate::focus::Spot::Buffer(window, buffer),
+                crate::focus::Sink::Node(panel),
+            );
+            view! {
+                box(class = "pane__buffer pane__panel") { GitPanel(element_ref = panel) }
+            }
+            .any()
         }
-        .any(),
     }
 }

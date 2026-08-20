@@ -1,32 +1,33 @@
 //! What the window contains.
 //!
-//! Three rows inside the frame: the combined header, the panes, and the status line. Everything
-//! below reads the workspace, the settings and the modal layer, all of which are provided here and
-//! nowhere else.
+//! Three rows inside the frame: the combined header, the panes, and the status line.
+//!
+//! What is built here is one window's worth: the announcements, the modal surfaces, and the view
+//! tree. What the whole application shares is [`global`], built above every window. What one
+//! directory's work is made of is [`crate::session`].
 
 pub mod chrome;
 pub mod frame;
+pub mod global;
 pub mod statusline;
 pub mod theme;
+pub mod window;
 
 use std::path::PathBuf;
 
-use zdt_core::config::{Paths, Scheme};
-use zdt_core::{Project, ThemeSource};
 use zgui::prelude::*;
-use zgui::reactive::{LocalStorage, RenderEffect, RwSignal};
+use zgui::reactive::RenderEffect;
 use zgui::{component, view};
 use zgui_ui::prelude::{ToastCorner, ToasterProps};
-use zgui_ui_tokens::ColorScheme;
 
 use crate::app::chrome::ChromeProps;
 use crate::app::frame::FrameProps;
 use crate::app::statusline::StatusLineProps;
-use crate::app::theme::{ZdtThemeProps, fallback};
-use crate::cmdline::CommandLine;
+use crate::app::theme::ZdtThemeProps;
 use crate::cmdline::view::CommandLineProps;
 use crate::completion::view::CompletionPopupProps;
 use crate::explorer::Explorer;
+use crate::explorer::field::view::TreeFieldProps;
 use crate::explorer::menu::TreeMenuProps;
 use crate::explorer::tree::{ExplorerProps, TreeResizeProps};
 use crate::git::Git;
@@ -37,187 +38,224 @@ use crate::picker::view::PickerProps;
 use crate::prompt::Prompt;
 use crate::prompt::view::PromptProps;
 use crate::rename::RenameBoxProps;
+use crate::session::Session;
 use crate::settings::Settings;
 use crate::settings::view::ConfigModalProps;
 use crate::tabpick::TabPick;
-use crate::terminals::Terminals;
 use crate::terminals::view::FloatingTerminalProps;
 use crate::vim::Vim;
 use crate::vim::whichkey::WhichKeyProps;
 use crate::workspace::panes::PanesProps;
-use crate::workspace::{self, BufferId, Workspace};
+use crate::workspace::{BufferId, Workspace};
 use zdt_gitui::GitModalProps;
 
-/// The application.
+/// The application, as one window shows it.
 ///
-/// Nothing but the toaster. The queue that announcements reach is published *downwards* through
-/// the scope tree, so a workbench written beside the toaster could not find it. Everything the
-/// editor is made of therefore sits one component further in.
+/// Two components and not one. Announcements are found by looking *up* the scope tree, so
+/// anything that announces has to sit inside the toaster rather than beside it.
 #[component]
 pub fn Root(
-    /// The directory the editor was opened on.
-    project: Project,
+    /// Which session this window opens on.
+    session: Session,
     /// The files named on the command line.
     files: Vec<PathBuf>,
 ) -> impl IntoView {
+    let global = global::use_global();
+    let (theme, scheme) = (global.theme(), global.scheme());
     view! {
-        Toaster(corner = ToastCorner::BottomRight, limit = 4, label = "Notifications") {
-            Workbench(project = project, files = files)
+        ZdtTheme(theme = theme, scheme = scheme) {
+            Toaster(corner = ToastCorner::BottomRight, limit = 4, label = "Notifications") {
+                WindowBody(session = session, files = files)
+            }
         }
     }
 }
 
-/// Everything the window contains.
+/// One window: its announcements, its sheets, and the sessions it holds.
+// The list macro takes a closure by construction, so the one it is handed here is not redundant.
+#[allow(clippy::redundant_closure)]
 #[component]
-fn Workbench(
-    /// The directory the editor was opened on.
-    project: Project,
+fn WindowBody(
+    /// Which session this window opens on.
+    session: Session,
     /// The files named on the command line.
     files: Vec<PathBuf>,
 ) -> impl IntoView {
-    let paths = Paths::discover();
-    let (settings, problem) = Settings::load(paths.clone());
-    crate::settings::provide(settings.clone());
+    let mut global = global::use_global();
+    let settings = global.settings().clone();
+    let host = crate::session::host::use_host();
 
     // Before anything that might announce something, and inside the toaster, which is the only
     // place a queue can be found.
     let notify = crate::notify::Notify::new(settings.clone());
     crate::notify::provide(notify.clone());
     settings.announce_through(notify.clone());
+    settings.clock().bind_here();
 
-    let space = Workspace::new(project.clone());
-    workspace::provide(space.clone());
-    if let Some(problem) = problem {
+    // The registry's clock, and the settings', follow whichever window is open. Both outlive any
+    // one of them, so every window claims them again whenever the set of windows changes: a
+    // window closing must not leave a repeating job armed against an engine that has stopped.
+    let lending = {
+        let (settings, host) = (settings.clone(), host.clone());
+        let windows = zgui::reactive::use_local_context::<zgui::runtime::windows::Windows>();
+        RenderEffect::new(move |_| {
+            if let Some(windows) = windows.as_ref() {
+                let _ = windows.watch().get();
+            }
+            settings.clock().bind_here();
+            host.clock().bind_here();
+        })
+    };
+    on_cleanup_local(move || drop(lending));
+
+    // The two sheets that belong to a document rather than to the application.
+    global::install_window_styles(&global);
+
+    if let Some(problem) = global.take_problem() {
         notify.fail("config.toml did not read", Some(problem));
     }
 
-    let vim = Vim::new(space.clone(), settings.clone());
-    zgui::reactive::provide_local_context(vim.clone());
+    // This window, as the registry knows it. It shows the session it was opened on.
+    let client = host.register_client(zgui::runtime::windows::try_use_window());
+    client.show(session.id());
+    crate::session::client::provide(client.clone());
 
-    // The tree's own keys, in front of the base map while the keyboard is in the panel. Always
-    // loaded: without them, `j` in the tree would be the editor's `j`.
-    apply_tree_keymap(&vim, &notify, paths.as_ref());
-    // And the same for every other region that answers keys of its own.
-    apply_all_overlays(&vim, &notify, paths.as_ref());
-
-    let explorer = Explorer::new(
-        project.root().to_path_buf(),
-        settings.with(|config| zdt_core::tree::Filter {
-            hidden: config.tree.hidden,
-            ignored: config.tree.ignored,
-        }),
-    );
-    crate::explorer::provide(explorer.clone());
-    if settings.with(|config| config.tree.open) {
-        explorer.toggle();
+    for file in files {
+        crate::files::open_argument(session.workspace(), &file);
     }
 
-    crate::prompt::provide(Prompt::new());
-    crate::explorer::menu::provide();
-    crate::cmdline::provide(CommandLine::new(space.clone()));
-    crate::hover::provide(Hover::new());
-    crate::rename::provide(crate::rename::Rename::new());
-    crate::tabpick::provide(TabPick::new(space.clone()));
-    crate::picker::provide(Picker::new(space.clone(), settings.clone()));
-    crate::terminals::provide(Terminals::new(space.clone(), settings.clone()));
-
-    // The language servers. Nothing starts until a file that wants one is opened.
-    let language = Language::new(space.clone(), settings.clone());
-    language.listen();
-    crate::language::provide(language.clone());
-    let servers = follow_buffers(&language, &space);
-    on_cleanup_local(move || drop(servers));
-
-    // After the servers, because the suggestions hold one. A context looked up in a debounce
-    // timer is gone. See `tests/context.rs`.
-    crate::completion::provide(crate::completion::Completion::new(
-        settings.clone(),
-        Some(language.clone()),
-    ));
-
-    // What git says about the open files, and the panel that shows the rest of it.
-    let git = Git::new(space.clone());
-    crate::git::provide(git.clone());
-    zdt_gitui::provide(crate::git::panel(space.clone()));
-    crate::settings::view::provide(crate::settings::view::ConfigModalState::new(space.clone()));
-
-    // The keys leap labels are drawn from, and again whenever the settings change.
-    let alphabet = {
-        let (settings, vim) = (settings.clone(), vim.clone());
+    // What this window is called follows what it is showing.
+    let titling = {
+        let (host, client) = (host.clone(), client.clone());
         RenderEffect::new(move |_| {
-            let alphabet = settings.with(|config| config.leap.alphabet.clone());
-            vim.leaping().set_alphabet(&alphabet);
-        })
-    };
-    on_cleanup_local(move || drop(alphabet));
-
-    // The tree keeps up with the editor, and with the settings.
-    let following_buffer = follow_buffer(&explorer, &space, &settings);
-    on_cleanup_local(move || drop(following_buffer));
-    let following_filter = follow_filter(&explorer, &settings);
-    on_cleanup_local(move || drop(following_filter));
-
-    // A person's own keymap, read after the shipped one so a row in it replaces the shipped row
-    // for the same keys.
-    if let Some(paths) = paths.as_ref() {
-        apply_keymap(&vim, &notify, paths, &settings);
-    }
-
-    // The theme follows the settings, and both follow the files on disk.
-    let theme: RwSignal<ThemeSource, LocalStorage> = RwSignal::new_local(read_theme(&settings));
-    let following = {
-        let settings = settings.clone();
-        RenderEffect::new(move |_| {
-            let next = read_theme(&settings);
-            if theme.with_untracked(|held| held.name != next.name) {
-                theme.set(next);
+            let Some(showing) = client.showing() else {
+                return;
+            };
+            if let Some(session) = host.session(showing) {
+                client.set_title(&window::title_for(&session.name()));
             }
         })
     };
-    on_cleanup_local(move || drop(following));
+    on_cleanup_local(move || drop(titling));
 
-    let scheme = {
-        let settings = settings.clone();
-        Signal::derive_local(move || match settings.with(|config| config.ui.scheme) {
-            Scheme::Light => ColorScheme::Light,
-            Scheme::Dark => ColorScheme::Dark,
-            Scheme::System => ColorScheme::System,
+    // What a window closing does: every session it held is written down before its clock goes.
+    let closing = {
+        let host = host.clone();
+        zgui::runtime::windows::on_close_request(move || {
+            host.flush_all();
+            zgui::runtime::CloseResponse::Close
         })
     };
+    on_cleanup_local(move || drop(closing));
 
-    // The settings that are style, in the cascade between the theme and a person's own sheet.
-    let styling = {
-        let settings = settings.clone();
-        RenderEffect::new(move |_| {
-            let css = settings.with(crate::app::theme::settings_sheet);
-            install_stylesheet(crate::app::theme::SETTINGS_SHEET, &css);
-        })
+    {
+        let (settings, host, id) = (settings.clone(), host.clone(), client.id());
+        on_cleanup_local(move || {
+            // The stack goes with this window; the clocks do not, because another window may be
+            // about to claim them. A clock with a dead engine is re-armed by the effect above.
+            settings.announcer().unbind();
+            host.forget_client(id);
+        });
+    }
+
+    // One subtree per session this window holds. All but one are taken out of the flow rather
+    // than unmounted, because unmounting a session stops its programs.
+    let shells = {
+        let (host, client) = (host.clone(), client.clone());
+        move || -> Vec<Session> {
+            client
+                .held()
+                .into_iter()
+                .filter_map(|id| host.session(id))
+                .collect()
+        }
     };
-    on_cleanup_local(move || drop(styling));
-
-    // A person's own sheet, last of the three.
-    if let Some(paths) = paths.as_ref() {
-        crate::app::theme::install_user_css(
-            zdt_core::config::read_optional(&paths.user_css()).as_deref(),
-        );
-    }
-
-    // What a change on disk does. Held for the window's life; dropping it stops the watching.
-    let watcher = paths.as_ref().and_then(|paths| {
-        let (settings, notify, vim, held) =
-            (settings.clone(), notify.clone(), vim.clone(), paths.clone());
-        crate::reload::watch(paths, move || {
-            reload(&settings, &notify, &vim, &held, theme);
-        })
-    });
-    on_cleanup_local(move || drop(watcher));
-
-    for file in files {
-        crate::files::open_argument(&space, &file);
-    }
 
     view! {
-        ZdtTheme(theme = theme, scheme = scheme) {
+        box(class = "client") {
+            for session in move || shells(), key = |session: &Session| session.id() {
+                SessionShell(session = session, notify = notify.clone())
+            }
+        }
+    }
+}
+
+/// One session, as one window draws it.
+///
+/// Everything the session owns was built long before this and is only republished here. What is
+/// built here is the window's own: the modal surfaces, which have no meaning shared between two
+/// windows over one session.
+#[component]
+fn SessionShell(
+    /// Which session this draws.
+    session: Session,
+    /// This window's announcements.
+    notify: crate::notify::Notify,
+) -> impl IntoView {
+    let global = global::use_global();
+    let settings = global.settings().clone();
+    let client = crate::session::client::use_client();
+
+    // The session borrows this window's clock and stack for as long as this subtree is mounted.
+    let attachment = session.attach(client.id(), notify);
+    on_cleanup_local(move || drop(attachment));
+
+    // Everything the session owns.
+    session.provide();
+
+    // The one thing in the application that gives a node the keyboard. Every region says how it
+    // takes it and none of them takes it for itself, so two regions cannot arm two claims in one
+    // flush and leave the later one to win.
+    let projection =
+        crate::focus::project::project(session.workspace().focus(), session.workspace());
+    on_cleanup_local(move || drop(projection));
+
+    // And everything this window owns over it.
+    crate::prompt::provide(Prompt::new());
+    crate::explorer::menu::provide();
+    crate::explorer::field::provide(crate::explorer::field::Field::new());
+    crate::hover::provide(Hover::new());
+    crate::rename::provide(crate::rename::Rename::new());
+    crate::tabpick::provide(TabPick::new(session.workspace().clone()));
+    crate::picker::provide(Picker::new(session.workspace().clone(), settings.clone()));
+    crate::completion::provide(crate::completion::Completion::new(
+        settings.clone(),
+        Some(session.language().clone()),
+    ));
+    crate::settings::view::provide(crate::settings::view::ConfigModalState::new());
+
+    if settings.with_untracked(|config| config.tree.open)
+        && let Some(explorer) = zgui::reactive::use_local_context::<Explorer>()
+        && !explorer.is_open()
+    {
+        explorer.toggle();
+    }
+
+    // The git panel, floating: an overlay over whatever had the keyboard, and where the keyboard
+    // lands while it is up.
+    let git_panel = NodeRef::new();
+    {
+        let gitui = zdt_gitui::use_gitui();
+        crate::focus::claim::claim(
+            crate::focus::Overlay::GitModal,
+            Signal::derive_local(move || gitui.is_open()),
+        );
+    }
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::GitModal),
+        crate::focus::Sink::Node(git_panel),
+    );
+
+    let showing = {
+        let (client, id) = (client.clone(), session.id());
+        move || client.showing() == Some(id)
+    };
+
+    view! {
+        box(
+            class = "session",
+            style:display = move || (!showing()).then(|| "none".to_owned())
+        ) {
             Frame {
                 // The tree runs the whole height of the window and the buffer line sits over the
                 // panes alone: a tab bar reaching across a file tree says the tabs belong to the
@@ -233,9 +271,10 @@ fn Workbench(
                 HoverPanel()
                 CompletionPopup()
                 RenameBox()
-                GitModal()
+                GitModal(element_ref = git_panel)
                 ConfigModal()
                 TreeMenu()
+                TreeField()
                 FloatingTerminal()
                 Picker()
                 Prompt()
@@ -247,22 +286,16 @@ fn Workbench(
     }
 }
 
-/// The theme the settings name, or the one the editor falls back to.
-fn read_theme(settings: &Settings) -> ThemeSource {
-    let name = settings.with(|config| config.ui.theme.clone());
-    let directory = settings.paths().map(zdt_core::config::Paths::themes);
-    zdt_core::theme::resolve_theme(directory.as_deref(), &name).unwrap_or_else(|| {
-        tracing::warn!("no theme called {name}; using the built-in one");
-        fallback()
-    })
-}
-
 /// Tells the language layer about every file that is opened.
 ///
 /// This watches the buffer list. A buffer arrives from the picker, the tree, the command line and
 /// the command line arguments. One place sees all four.
-fn follow_buffers(language: &Language, workspace: &Workspace) -> RenderEffect<Vec<BufferId>> {
-    let (language, workspace) = (language.clone(), workspace.clone());
+pub(crate) fn follow_buffers(
+    language: &Language,
+    workspace: &Workspace,
+    git: &Git,
+) -> RenderEffect<Vec<BufferId>> {
+    let (language, workspace, git) = (language.clone(), workspace.clone(), git.clone());
     RenderEffect::new(move |previous: Option<Vec<BufferId>>| {
         let order = workspace.order();
         let previous = previous.unwrap_or_default();
@@ -270,9 +303,7 @@ fn follow_buffers(language: &Language, workspace: &Workspace) -> RenderEffect<Ve
         for id in &order {
             if !previous.contains(id) {
                 language.opened(*id);
-                if let Some(git) = zgui::reactive::use_local_context::<crate::git::Git>() {
-                    git.refresh(*id);
-                }
+                git.refresh(*id);
             }
         }
         for id in &previous {
@@ -292,7 +323,11 @@ fn follow_buffers(language: &Language, workspace: &Workspace) -> RenderEffect<Ve
 ///
 /// Only while the panel is open, because opening the way to a file reads every directory along it
 /// and there is no reason to pay that for a panel nobody is looking at.
-fn follow_buffer(explorer: &Explorer, space: &Workspace, settings: &Settings) -> RenderEffect<()> {
+pub(crate) fn follow_buffer(
+    explorer: &Explorer,
+    space: &Workspace,
+    settings: &Settings,
+) -> RenderEffect<()> {
     let (explorer, space, settings) = (explorer.clone(), space.clone(), settings.clone());
     RenderEffect::new(move |_| {
         let path = space.current_buffer().and_then(|buffer| buffer.path);
@@ -311,7 +346,7 @@ fn follow_buffer(explorer: &Explorer, space: &Workspace, settings: &Settings) ->
 }
 
 /// Keeps what the tree shows in step with the settings.
-fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
+pub(crate) fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
     let (explorer, settings) = (explorer.clone(), settings.clone());
     RenderEffect::new(move |_| {
         let wanted = settings.with(|config| zdt_core::tree::Filter {
@@ -324,121 +359,20 @@ fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
     })
 }
 
-/// The file tree's keys: the shipped ones, then a person's own on top.
-fn apply_tree_keymap(vim: &Vim, notify: &crate::notify::Notify, paths: Option<&Paths>) {
-    let theirs = paths.and_then(|paths| zdt_core::config::read_optional(&paths.tree_keymap()));
-    if let Err(problems) = vim.load_overlay("tree", crate::assets::TREE_KEYMAP, theirs.as_deref()) {
-        notify.fail("keymap-tree.toml", Some(problems.join("; ")));
-    }
-}
-
-/// A region's own keys: the shipped ones, then a person's own on top.
+/// Reads what git says about the tree while the tree is open, and stops while it is closed.
 ///
-/// Every overlay has the same shape: a shipped file, and an optional one beside it in the
-/// configuration directory. So one function loads them all.
-fn apply_overlay(
-    vim: &Vim,
-    notify: &crate::notify::Notify,
-    paths: Option<&Paths>,
-    region: &str,
-    shipped: &str,
-    file: &str,
-) {
-    let theirs = paths.and_then(|paths| zdt_core::config::read_optional(&paths.root.join(file)));
-    if let Err(problems) = vim.load_overlay(region, shipped, theirs.as_deref()) {
-        notify.fail(file.to_owned(), Some(problems.join("; ")));
-    }
+/// A status reads the whole working tree. Nobody is looking at a closed panel, so nothing is read
+/// and nothing is watched until it opens.
+pub(crate) fn follow_status(explorer: &Explorer, status: &crate::git::Status) -> RenderEffect<()> {
+    let (explorer, status) = (explorer.clone(), status.clone());
+    RenderEffect::new(move |_| status.watch(explorer.is_open()))
 }
 
-/// Reads a person's keymap on top of the shipped one, saying what did not read.
-fn apply_keymap(vim: &Vim, notify: &crate::notify::Notify, paths: &Paths, settings: &Settings) {
-    let Some(text) = zdt_core::config::read_optional(&paths.keymap()) else {
-        return;
-    };
-    let leaders = leaders_from(settings);
-    if let Err(problems) = vim.merge_keymap(&text, leaders) {
-        notify.fail("keymap.toml", Some(problems.join("; ")));
-    }
-}
-
-/// What `<Leader>` and `<LocalLeader>` stand for, as the settings say.
-fn leaders_from(settings: &Settings) -> zdt_vim::Leaders {
-    let (leader, local) =
-        settings.with(|config| (config.keys.leader.clone(), config.keys.local_leader.clone()));
-    let default = zdt_vim::Leaders::default();
-    let one = |text: &str, fallback| {
-        zdt_vim::notation::parse(text, default)
-            .ok()
-            .and_then(|chords| chords.first().copied())
-            .unwrap_or(fallback)
-    };
-    zdt_vim::Leaders {
-        leader: one(&leader, default.leader),
-        local: one(&local, default.local),
-    }
-}
-
-/// Everything a change on disk brings, put where the interface reads it.
-///
-/// The files are read on a worker; only the writing happens here. A settings file that does not
-/// read leaves the old settings in place and says so, because half-applied configuration is worse
-/// than none.
-fn reload(
-    settings: &Settings,
-    notify: &crate::notify::Notify,
-    vim: &Vim,
-    paths: &Paths,
-    theme: RwSignal<ThemeSource, LocalStorage>,
-) {
-    let (settings, notify, vim, paths) =
-        (settings.clone(), notify.clone(), vim.clone(), paths.clone());
-
-    let task = zgui::task::spawn_local(async move {
-        let reading = paths.clone();
-        let reloaded = zgui::task::blocking(move || crate::reload::read(&reading)).await;
-
-        // What this editor wrote itself, coming back around through the watcher. Applying it
-        // would be applying what is already applied, and saying so would be announcing somebody's
-        // own keystroke back at them.
-        if settings.wrote(reloaded.config_text.as_deref()) {
-            return;
-        }
-
-        for problem in &reloaded.problems {
-            notify.fail("configuration", Some(problem.clone()));
-        }
-        if let Some(config) = reloaded.config {
-            settings.replace(config);
-        }
-
-        // The keymap is rebuilt from the shipped one, and never layered onto what is already
-        // there. A row somebody took out of their file has to come back.
-        vim.reset_keymap();
-        if let Some(text) = reloaded.keymap
-            && let Err(problems) = vim.merge_keymap(&text, leaders_from(&settings))
-        {
-            notify.fail("keymap.toml", Some(problems.join("; ")));
-        }
-
-        apply_tree_keymap(&vim, &notify, Some(&paths));
-        apply_all_overlays(&vim, &notify, Some(&paths));
-        theme.set(read_theme(&settings));
-        crate::app::theme::install_user_css(reloaded.user_css.as_deref());
-
-        if reloaded.problems.is_empty() {
-            notify.say("configuration reloaded");
-        }
-    });
-    // The task belongs to the root's owner and is cancelled with the window.
-    std::mem::forget(task);
-}
-
-/// Every region's keymap overlay, loaded.
-///
-/// One call site for all of them, so a region added later is one row here. Three places that have
-/// to agree would be three places to forget.
-fn apply_all_overlays(vim: &Vim, notify: &crate::notify::Notify, paths: Option<&Paths>) {
-    for (region, shipped, file) in crate::assets::OVERLAYS {
-        apply_overlay(vim, notify, paths, region, shipped, file);
-    }
+/// The keys leap labels are drawn from, and again whenever the settings change.
+pub(crate) fn follow_alphabet(vim: &Vim, settings: &Settings) -> RenderEffect<()> {
+    let (vim, settings) = (vim.clone(), settings.clone());
+    RenderEffect::new(move |_| {
+        let alphabet = settings.with(|config| config.leap.alphabet.clone());
+        vim.leaping().set_alphabet(&alphabet);
+    })
 }

@@ -7,6 +7,8 @@
 //! Reading a directory is blocking, so every operation that reads one goes through a worker and
 //! writes the answer back on the interface thread.
 
+pub mod field;
+pub mod leap;
 pub mod menu;
 pub mod tree;
 
@@ -34,21 +36,22 @@ pub struct Explorer {
 }
 
 struct Inner {
+    /// Where the keyboard is, for the whole session.
+    ///
+    /// Held rather than looked up, because `is_focused` is asked from timers and from tasks, and a
+    /// context asked for there is a context that answers nothing.
+    focus: crate::focus::Focusing,
     tree: RefCell<Tree>,
     /// The rows, as the list draws them.
     rows: RwSignal<Vec<Row>, LocalStorage>,
     /// Which row the caret is on.
     at: RwSignal<usize, LocalStorage>,
     /// Whether the panel is shown at all.
-    open: RwSignal<bool, LocalStorage>,
-    /// Whether the keyboard is in it.
-    focused: RwSignal<bool, LocalStorage>,
-    /// How many times the keyboard has been asked for.
     ///
-    /// Separate from `focused`, because asking twice in a row is a real request: the prompt takes
-    /// the keyboard away without the panel ever saying it had lost it, so the panel has to be able
-    /// to ask for it back while still believing it has it.
-    claims: RwSignal<u64, LocalStorage>,
+    /// Whether the keyboard is *in* it is [`crate::focus`]'s answer and never a flag here. Two
+    /// places holding that fact is how a tree comes to believe it has a keyboard that is somewhere
+    /// else.
+    open: RwSignal<bool, LocalStorage>,
     /// What a cut or a copy left waiting.
     clipboard: RwSignal<Option<Clipboard>, LocalStorage>,
     /// Every row a person has picked out, beside the one the caret is on.
@@ -59,24 +62,29 @@ struct Inner {
     /// What is being dragged, and where it would land.
     dragging: RwSignal<Option<PathBuf>, LocalStorage>,
     over: RwSignal<Option<PathBuf>, LocalStorage>,
+    /// Where the rows are drawn, once a panel has drawn them.
+    ///
+    /// No signal. Nothing on screen is decided by whether there is one, and an action that asks
+    /// how far a half page is needs the answer now rather than on the next flush.
+    viewport: RefCell<Option<crate::explorer::tree::Viewport>>,
 }
 
 impl Explorer {
     /// A tree over `root`, closed.
     #[must_use]
-    pub fn new(root: impl Into<PathBuf>, filter: Filter) -> Self {
+    pub fn new(root: impl Into<PathBuf>, filter: Filter, focus: crate::focus::Focusing) -> Self {
         Self {
             inner: Rc::new(Inner {
+                focus,
                 tree: RefCell::new(Tree::new(root, filter)),
                 rows: RwSignal::new_local(Vec::new()),
                 at: RwSignal::new_local(0),
                 open: RwSignal::new_local(false),
-                focused: RwSignal::new_local(false),
-                claims: RwSignal::new_local(0),
                 clipboard: RwSignal::new_local(None),
                 marked: RwSignal::new_local(Vec::new()),
                 dragging: RwSignal::new_local(None),
                 over: RwSignal::new_local(None),
+                viewport: RefCell::new(None),
             }),
         }
     }
@@ -105,6 +113,37 @@ impl Explorer {
         self.inner.at.get()
     }
 
+    /// The row the caret is on, without subscribing.
+    #[must_use]
+    pub fn at_untracked(&self) -> usize {
+        self.inner.at.get_untracked()
+    }
+
+    /// Says where the rows are drawn.
+    ///
+    /// Registered when a panel is built and never taken back. A handle whose element has gone
+    /// measures nothing and scrolls nothing, which is the right answer for a panel that is no
+    /// longer there.
+    pub fn set_viewport(&self, viewport: crate::explorer::tree::Viewport) {
+        *self.inner.viewport.borrow_mut() = Some(viewport);
+    }
+
+    /// Where the rows are drawn, when a panel has drawn them.
+    #[must_use]
+    pub fn viewport(&self) -> Option<crate::explorer::tree::Viewport> {
+        *self.inner.viewport.borrow()
+    }
+
+    /// How far a half page is, in rows.
+    ///
+    /// Ten before anything has been drawn, which is about a screenful of a small panel and is only
+    /// ever used for a key pressed in a tree nobody can see yet.
+    #[must_use]
+    pub fn half_page(&self) -> usize {
+        self.viewport()
+            .map_or(10, crate::explorer::tree::Viewport::half_page)
+    }
+
     /// Whether the panel is shown. Tracked.
     #[must_use]
     pub fn is_open(&self) -> bool {
@@ -114,22 +153,13 @@ impl Explorer {
     /// Whether the keyboard is in it. Tracked.
     #[must_use]
     pub fn is_focused(&self) -> bool {
-        self.inner.focused.get()
-    }
-
-    /// How many times the keyboard has been asked for. Tracked.
-    ///
-    /// What the panel watches to know it should take the keyboard, so that asking again after
-    /// something else borrowed it works.
-    #[must_use]
-    pub fn claims(&self) -> u64 {
-        self.inner.claims.get()
+        self.inner.focus.in_tree()
     }
 
     /// Whether the keyboard is in it, without subscribing.
     #[must_use]
     pub fn is_focused_untracked(&self) -> bool {
-        self.inner.focused.get_untracked()
+        self.inner.focus.in_tree_untracked()
     }
 
     /// What is waiting to be pasted. Tracked.
@@ -345,20 +375,19 @@ impl Explorer {
         let open = !self.inner.open.get_untracked();
         self.inner.open.set(open);
         if open {
-            self.inner.focused.set(true);
-            self.inner.claims.update(|claims| *claims += 1);
+            self.focus();
             if self.inner.rows.with_untracked(Vec::is_empty) {
                 self.expand_root();
             }
         } else {
-            self.inner.focused.set(false);
+            self.unfocus();
         }
     }
 
     /// Hides the panel.
     pub fn close(&self) {
         self.inner.open.set(false);
-        self.inner.focused.set(false);
+        self.unfocus();
     }
 
     /// Gives the keyboard to the panel, opening it first when it is closed.
@@ -367,15 +396,12 @@ impl Explorer {
             self.toggle();
             return;
         }
-        self.inner.focused.set(true);
-        self.inner.claims.update(|claims| *claims += 1);
+        self.inner.focus.enter_tree();
     }
 
     /// Takes the keyboard away, leaving the panel where it is.
     pub fn unfocus(&self) {
-        if self.inner.focused.get_untracked() {
-            self.inner.focused.set(false);
-        }
+        self.inner.focus.enter_panes();
     }
 
     // ---- The tree itself -------------------------------------------------------------------
@@ -497,6 +523,47 @@ impl Explorer {
     /// Runs `work` against the tree on a worker, then publishes the rows.
     fn with_tree_on_a_worker(&self, work: impl FnOnce(&mut Tree) + Send + 'static) {
         self.with_tree_then(work, |_| {});
+    }
+
+    /// Whether the panel is open, without subscribing.
+    #[must_use]
+    pub fn is_open_untracked(&self) -> bool {
+        self.inner.open.get_untracked()
+    }
+
+    /// Which directories are open, and which row the caret is on, for a session to write down.
+    ///
+    /// The caret by *path* and never by index: a directory opening above it moves every index
+    /// below, so an index restored into a differently-expanded tree lands somewhere else.
+    #[must_use]
+    pub fn session_state(&self) -> (Vec<PathBuf>, Option<PathBuf>, Vec<PathBuf>) {
+        let tree = self.inner.tree.borrow();
+        let at = tree
+            .rows()
+            .get(self.inner.at.get_untracked())
+            .map(|row| row.entry.path.clone());
+        (tree.expanded(), at, self.marked())
+    }
+
+    /// Puts back what [`session_state`](Self::session_state) took.
+    ///
+    /// One worker hop for the whole set, and the caret afterwards, because where a path is in the
+    /// list depends on what was expanded before it.
+    pub fn restore_session(
+        &self,
+        expanded: Vec<PathBuf>,
+        at: Option<PathBuf>,
+        marked: Vec<PathBuf>,
+    ) {
+        self.inner.marked.set(marked);
+        self.with_tree_then(
+            move |tree| tree.restore_expanded(&expanded),
+            move |explorer| {
+                if let Some(at) = at.as_ref() {
+                    explorer.go_to_path(at);
+                }
+            },
+        );
     }
 
     /// The same, and then `after` on the interface thread once the rows are published.

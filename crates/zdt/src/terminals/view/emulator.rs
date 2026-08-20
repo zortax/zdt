@@ -3,7 +3,6 @@
 use crate::settings::Settings;
 use crate::terminals::use_terminals;
 use crate::workspace::{BufferId, WindowId, use_workspace};
-use std::time::Duration;
 use zgui::prelude::*;
 use zgui::{component, view};
 use zgui_terminal::{TerminalConfig, TerminalHandle, TerminalProps};
@@ -28,9 +27,9 @@ pub fn Emulator(
     let workspace = use_workspace();
     let settings = zgui::reactive::use_local_context::<Settings>();
 
-    // Taken, and never borrowed. A program is started once, and a second view asking for the
-    // same one is a mistake that would start a second shell.
-    let Some(transport) = terminals.take_pending(buffer) else {
+    // Borrowed, and never taken. The program belongs to the session, so this view drawing it a
+    // second time draws the same shell rather than starting another.
+    let Some(running) = terminals.running(buffer) else {
         return view! {
             box(class = "pane__buffer--pending") {
                 label(class = "muted") {"this terminal has ended"}
@@ -42,44 +41,16 @@ pub fn Emulator(
     let node = NodeRef::new();
     let config = terminal_config(settings.as_ref());
 
-    // The keyboard follows whichever terminal is being typed into, claimed from a timer for the
-    // same reason every other claim in this application is: an unmounted node cannot take focus.
-    let claiming = {
-        let terminals = terminals.clone();
-        let timers = zgui::view::time::Timers::current();
-        let held: std::cell::RefCell<Option<zgui::view::time::TimeoutHandle>> =
-            std::cell::RefCell::new(None);
-        zgui::reactive::RenderEffect::new(move |_| {
-            if terminals.typing() != Some(buffer) {
-                return;
-            }
-            let Some(timers) = timers.as_ref() else {
-                return;
-            };
-            *held.borrow_mut() = Some(timers.set_timeout(Duration::ZERO, move || node.focus()));
-        })
+    // How the keyboard reaches this terminal. A window with a terminal in it has no editor to hand
+    // it to, so without this, moving here with `<C-l>` would move the focus and leave the keys
+    // behind. A float says so as an overlay instead, because that is what it is.
+    let spot = match window {
+        Some(window) => crate::focus::Spot::Buffer(window, buffer),
+        None => crate::focus::Spot::Overlay(crate::focus::Overlay::Float(buffer)),
     };
-    on_cleanup_local(move || drop(claiming));
-
-    // A window with a terminal in it has no editor to give the keyboard to, so nothing would hand
-    // it over: moving here with `<C-l>` would move the focus and leave the keys behind. Typing
-    // starts on arrival, which is what opening one already does; `<C-\><C-n>` and `<C-h/j/k/l>`
-    // are the ways back out.
-    let following = {
-        let workspace = workspace.clone();
-        let terminals = terminals.clone();
-        zgui::reactive::RenderEffect::new(move |_| {
-            let Some(window) = window else { return };
-            if workspace.focused() == window
-                && workspace
-                    .window(window)
-                    .is_some_and(|state| state.current == Some(buffer))
-            {
-                terminals.start_typing(buffer);
-            }
-        })
-    };
-    on_cleanup_local(move || drop(following));
+    // Inside, because the focusable element with the key handlers on it is the emulator's own and
+    // this box is the place on the screen it is drawn in.
+    crate::focus::claim::sink(spot, crate::focus::Sink::Inside(node));
 
     let on_ready = {
         let terminals = terminals.clone();
@@ -117,7 +88,7 @@ pub fn Emulator(
                 if escape(&terminals, &workspace, &vim, chord, buffer, floating) {
                     return true;
                 }
-                if terminals.typing_untracked() == Some(buffer) {
+                if terminals.is_inserting_untracked(buffer) {
                     // Being typed into. The keymap is consulted in terminal mode, where almost
                     // nothing is bound, so almost every key reaches the program. What is bound
                     // there wins on purpose: `<F7>` and the rest of vim's own `maps.t`.
@@ -150,12 +121,20 @@ pub fn Emulator(
             style:display = move || (!current()).then(|| "none".to_owned()),
             on:pointer_down = {
                 let terminals = terminals.clone();
-                move |_| terminals.start_typing(buffer)
+                let focus = crate::focus::use_focus();
+                move |_| {
+                    // A terminal in a split is that split being taken up. A float is already the
+                    // overlay with the keys, so it says nothing about which split is current.
+                    if let Some(window) = window {
+                        focus.enter_window(window);
+                    }
+                    terminals.start_typing(buffer);
+                }
             }
         ) {
             Terminal(
                 class = "terminal__grid",
-                transport = transport,
+                session = running,
                 config = config,
                 on_ready = on_ready,
                 on_title = on_title,
@@ -191,10 +170,11 @@ fn escape(
     if terminals.expecting_normal() {
         terminals.clear_expectation();
         if control && chord.key == Key::Char('n') {
-            terminals.stop_typing();
+            terminals.stop_typing(buffer);
             if floating {
-                // A float with the keys taken away is a float nobody can reach: put it away and
-                // give the editor back, which is what somebody pressing this meant.
+                // A float with the keys taken away is a float nobody can reach, so it goes. The
+                // keyboard follows on its own: the float is an overlay, and the region underneath
+                // takes the keys back when it closes.
                 terminals.hide_float();
             }
             return true;
@@ -210,7 +190,7 @@ fn escape(
     // Moving out of a terminal without leaving terminal mode first, as the user's own `maps.t`
     // does.
     if control && let Key::Char(letter @ ('h' | 'j' | 'k' | 'l')) = chord.key {
-        terminals.stop_typing();
+        terminals.stop_typing(buffer);
         if floating {
             terminals.hide_float();
         } else {
@@ -224,7 +204,7 @@ fn escape(
 }
 
 /// How a terminal looks and behaves, as the settings say.
-fn terminal_config(settings: Option<&Settings>) -> TerminalConfig {
+pub(crate) fn terminal_config(settings: Option<&Settings>) -> TerminalConfig {
     let (family, size, scrollback) = settings.map_or_else(
         || ("Mononoki Nerd Font".to_owned(), 13.0, 10_000),
         |settings| {

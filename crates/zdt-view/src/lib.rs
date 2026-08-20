@@ -10,11 +10,13 @@
 
 pub mod anchor;
 
+mod clock;
 mod erase;
 mod spinner;
 mod task;
 mod watch;
 
+pub use crate::clock::{Clock, Job, Pending};
 pub use crate::erase::{Erase, leaving_state};
 pub use crate::spinner::{Spinner, SpinnerProps};
 pub use crate::task::detached;

@@ -157,6 +157,94 @@
     min-width: 0;
 }
 
+/* A dotfile, or something the ignore files leave out, shown because somebody asked to see it.
+ *
+ * Dimmer, and nothing else. It is still a file, it still opens, and the one thing worth saying
+ * about it is that it is not part of the project the way its neighbours are. */
+.tree__row[data-apart="true"] .tree__name {
+    color: var(--zui-color-muted-foreground);
+}
+
+.tree__row[data-apart="true"] .glyph {
+    opacity: 0.5;
+}
+
+/* What git says, at the trailing edge.
+ *
+ * An outline and never a tint on the name. Neo-tree colours the filename by its git state, which
+ * spends the one thing a filename's colour is already saying — what kind of file it is — on a
+ * fact that changes every time somebody saves. */
+.tree__git {
+    margin-left: auto;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding-left: calc(var(--zui-space-base) * 2);
+}
+
+/* The key that leaps to a row.
+ *
+ * Over the trailing edge rather than over the name, because the name is what the two characters
+ * were chosen from and a label covering it is a label nobody can check. */
+.tree__leap {
+    display: none;
+}
+
+.tree__leap[data-on="true"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    min-width: 14px;
+    margin-left: calc(var(--zui-space-base) * 2);
+    border-radius: var(--zui-radius-sm);
+    background-color: var(--zui-color-primary);
+    color: var(--zui-color-primary-foreground);
+    font-weight: 600;
+}
+
+/* The field a name is typed into, over the row it is about.
+ *
+ * A floating surface, so it carries the one border and the one shadow those are allowed. One line
+ * and no title: it opens on the thing it is about, which has already said which one that is. */
+.treefield {
+    position: absolute;
+    z-index: 43;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 2);
+    min-width: calc(var(--tree-width, 260px) - 16px);
+    height: 26px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    color: var(--zui-color-muted-foreground);
+    box-shadow: var(--zui-shadow-md);
+    font-size: var(--zdt-ui-size, 12px);
+}
+
+.treefield__input {
+    flex: 1 1 auto;
+    height: 22px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background-color: transparent;
+    color: var(--zui-color-popover-foreground);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size, 12px);
+}
+
+/* The component's own focus ring, taken off with a doubled class so this out-specifies the scoped
+ * sheet. The surface around it is already the thing that says where the keyboard is. */
+.treefield__input.treefield__input:focus,
+.treefield__input.treefield__input:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: transparent;
+}
+
 .glyph {
     font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
     width: 14px;
@@ -177,7 +265,7 @@
 .treemenu {
     position: absolute;
     z-index: 45;
-    min-width: 160px;
+    min-width: 220px;
     display: flex;
     flex-direction: column;
     padding: var(--zui-space-base) 0;
@@ -191,6 +279,7 @@
 .treemenu__item {
     display: flex;
     align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
     height: 22px;
     padding: 0 calc(var(--zui-space-base) * 3);
     color: var(--zui-color-popover-foreground);
@@ -198,6 +287,28 @@
 
 .treemenu__item:hover {
     background-color: var(--zui-color-accent);
+}
+
+.treemenu__label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* The key that runs the row, read from the keymap rather than written down here. A menu that
+ * taught the wrong key would be worse than one that taught none. */
+.treemenu__key {
+    flex: 0 0 auto;
+    margin-left: calc(var(--zui-space-base) * 4);
+    color: var(--zui-color-muted-foreground);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-weight: 600;
+}
+
+.treemenu__rule {
+    height: 1px;
+    flex: 0 0 auto;
+    margin: var(--zui-space-base) 0;
+    background-color: var(--zui-color-border);
 }
 
 /* The edge between the tree and the work area, widened for the pointer.

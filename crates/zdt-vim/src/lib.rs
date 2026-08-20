@@ -21,7 +21,7 @@ pub mod textobject;
 
 pub use crate::action::{Action, Args};
 pub use crate::chord::{Chord, Key, Mods, Named};
-pub use crate::effect::{Context, Effect, Scroll, Selection, Step, Visual};
+pub use crate::effect::{Context, Effect, Owner, Place, Scroll, Selection, Step, Visual};
 pub use crate::engine::Engine;
 pub use crate::keymap::{Binding, Continuation, Keymap, Layered, Resolution};
 pub use crate::mode::{Mode, ModeSet};

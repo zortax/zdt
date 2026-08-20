@@ -48,7 +48,7 @@ pub(crate) fn DiffLine(
     let press = {
         let git = git.clone();
         move |_: &mut EventCx<'_, events::PointerDown>| {
-            git.focus();
+            git.host().took_keyboard();
             git.set_list(List::Diff);
             git.go_to(List::Diff, index);
         }

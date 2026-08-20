@@ -47,9 +47,13 @@ impl Drop for Temp {
 }
 
 /// An explorer over `root`, open, with its rows read.
+///
+/// A workspace comes with it, because where the keyboard is belongs to the session and the tree
+/// reads its answer from there.
 fn open(window: &Window, root: &Path) -> Explorer {
     let explorer = window.scope.with(|| {
-        let explorer = Explorer::new(root, Filter::default());
+        let workspace = zdt::workspace::Workspace::new(zdt_core::Project::at(root));
+        let explorer = Explorer::new(root, Filter::default(), workspace.focus().clone());
         explorer.toggle();
         explorer
     });

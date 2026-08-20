@@ -1,6 +1,7 @@
 //! The window commands: splitting, closing, and moving between them.
 
 use crate::explorer::Explorer;
+use crate::focus::Focus;
 use crate::vim::Vim;
 use crate::workspace::{Axis, Direction, Workspace};
 
@@ -35,33 +36,34 @@ pub(super) fn run(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::
             };
 
             let explorer = zgui::reactive::use_local_context::<Explorer>();
+            let focus = workspace.focus();
 
-            // Out of the tree first: it is not a window, so no amount of walking the layout
-            // finds it, and a person in it pressing `<C-l>` means the editor.
-            if let Some(explorer) = explorer.as_ref()
-                && explorer.is_focused_untracked()
-            {
-                if direction != Direction::Left {
-                    explorer.unfocus();
-                    workspace.focus_editor();
-                    vim.reset();
+            // A match and no ladder: a place that takes the keyboard added later fails to build
+            // here, rather than being silently walked past.
+            match focus.current_untracked() {
+                // The tree is no window, so no amount of walking the layout finds it, and a person
+                // in it pressing `<C-l>` means the panes.
+                Focus::Tree => {
+                    if direction != Direction::Left {
+                        focus.enter_panes();
+                        vim.reset();
+                    }
                 }
-                return;
-            }
-
-            if workspace.focus_direction(direction) {
-                vim.reset();
-                return;
-            }
-
-            // Nothing that way among the windows. To the left that is the tree, the one thing
-            // beside them that takes the keyboard.
-            if direction == Direction::Left
-                && let Some(explorer) = explorer
-                && explorer.is_open()
-            {
-                explorer.focus();
-                vim.reset();
+                Focus::Window(_) => {
+                    if workspace.focus_direction(direction) {
+                        vim.reset();
+                    } else if direction == Direction::Left
+                        && let Some(explorer) = explorer
+                        && explorer.is_open()
+                    {
+                        // Nothing that way among the windows. To the left that is the tree, the one
+                        // thing beside them that takes the keyboard.
+                        focus.enter_tree();
+                        vim.reset();
+                    }
+                }
+                // Something over the panes has the keys, so a window command never runs from here.
+                Focus::Overlay(_) => {}
             }
         }
         "zoom" => {

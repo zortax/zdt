@@ -51,6 +51,33 @@ pub fn unstage_file(repo: &Repo, path: &str) -> Result<(), Error> {
     write_entry(repo, path, committed.as_deref())
 }
 
+/// Takes `path`, and everything under it, out of the index and leaves it on disk.
+///
+/// What `git rm --cached` does. The file stays where it is and becomes untracked, and its removal
+/// is what the next commit records.
+///
+/// One signature for a file and for a directory, because the tree acts on rows and a row is
+/// either.
+///
+/// Different from [`unstage_file`], which puts back what the last commit holds. This says the file
+/// should stop being tracked at all.
+///
+/// # Errors
+///
+/// When the index cannot be written.
+pub fn untrack(repo: &Repo, path: &str) -> Result<(), Error> {
+    let mut index = repo.git().open_index().map_err(Error::git)?;
+    let name = path.as_bytes().to_owned();
+    let under = format!("{path}/").into_bytes();
+    index.remove_entries(|_, entry_path, _| {
+        entry_path == name.as_slice() || entry_path.starts_with(under.as_slice())
+    });
+    index
+        .write(gix::index::write::Options::default())
+        .map_err(Error::git)?;
+    Ok(())
+}
+
 /// Puts just these hunks of `path` into the index.
 ///
 /// The hunks come from the *unstaged* diff, which is the working tree against the index. Applying
@@ -299,7 +326,7 @@ fn executable(repo: &Repo, path: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::{
-        discard_file, discard_hunks, stage_file, stage_hunks, unstage_file, unstage_hunks,
+        discard_file, discard_hunks, stage_file, stage_hunks, unstage_file, unstage_hunks, untrack,
     };
     use crate::diff;
     use crate::repo::testing::Temp;
@@ -359,6 +386,62 @@ mod tests {
             "git calls it untracked: {}",
             temp.run(&["status", "--porcelain"])
         );
+    }
+
+    #[test]
+    fn untracking_a_file_leaves_it_on_disk() {
+        let temp = Temp::new("untrack-file");
+        temp.commit("a.txt", "one\n", "first");
+
+        untrack(&temp.repo(), "a.txt").expect("it untracks");
+
+        assert!(temp.path("a.txt").exists(), "the file is still there");
+        let status = temp.run(&["status", "--porcelain"]);
+        assert!(
+            status.contains("D  a.txt") && status.contains("?? a.txt"),
+            "git records the removal and calls the file untracked: {status}"
+        );
+    }
+
+    #[test]
+    fn untracking_a_directory_takes_everything_under_it() {
+        let temp = Temp::new("untrack-directory");
+        temp.commit("keep.txt", "one\n", "first");
+        std::fs::create_dir_all(temp.path("out")).expect("made");
+        temp.write("out/a.txt", "one\n");
+        temp.write("out/b.txt", "two\n");
+        temp.run(&["add", "out"]);
+        temp.run(&["commit", "-m", "second"]);
+
+        untrack(&temp.repo(), "out").expect("it untracks");
+
+        let tracked = temp.run(&["ls-files"]);
+        assert!(
+            !tracked.contains("out/"),
+            "nothing under it is left: {tracked}"
+        );
+        assert!(
+            tracked.contains("keep.txt"),
+            "and its neighbour is untouched"
+        );
+    }
+
+    #[test]
+    fn untracking_leaves_a_neighbour_with_the_same_prefix_alone() {
+        // `out` and `outside` share a prefix, and only the directory was named.
+        let temp = Temp::new("untrack-prefix");
+        std::fs::create_dir_all(temp.path("out")).expect("made");
+        std::fs::create_dir_all(temp.path("outside")).expect("made");
+        temp.write("out/a.txt", "one\n");
+        temp.write("outside/b.txt", "two\n");
+        temp.run(&["add", "."]);
+        temp.run(&["commit", "-m", "first"]);
+
+        untrack(&temp.repo(), "out").expect("it untracks");
+
+        let tracked = temp.run(&["ls-files"]);
+        assert!(!tracked.contains("out/a.txt"));
+        assert!(tracked.contains("outside/b.txt"), "{tracked}");
     }
 
     #[test]

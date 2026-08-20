@@ -44,6 +44,12 @@ pub fn RenameBox() -> impl IntoView {
     });
     on_cleanup_local(move || drop(banding));
 
+    // It has the keys while it is open, and the region underneath takes them back when it closes.
+    crate::focus::claim::claim(
+        crate::focus::Overlay::Rename,
+        Signal::derive_local(move || rename.asking().is_some()),
+    );
+
     view! {
         Presence(
             present = Signal::derive_local(move || rename.asking().is_some()),
@@ -84,14 +90,15 @@ pub(crate) fn Box(
     let caret = asking.caret;
     let placed = place(
         surface,
-        move || Some(caret),
+        move || Some(caret.into()),
         Anchoring::default().offset(4.0),
     );
 
-    // From a timer for the same reason the prompt's is: nothing unmounted takes focus.
-    let claim = zgui::view::time::Timers::current()
-        .map(|timers| timers.set_timeout(std::time::Duration::ZERO, move || node.focus()));
-    on_cleanup_local(move || drop(claim));
+    // Where the keyboard lands while this is the thing in front.
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::Rename),
+        crate::focus::Sink::Node(node),
+    );
 
     let on_key = move |event: &mut EventCx<'_, events::KeyDown>| {
         match &event.key {

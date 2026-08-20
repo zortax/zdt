@@ -28,6 +28,7 @@ mod modal;
 mod number;
 mod panel;
 mod pickers;
+mod sessions;
 mod terminal;
 mod tree;
 
@@ -40,6 +41,7 @@ pub(crate) use crate::settings::view::keys::KeysProps;
 pub(crate) use crate::settings::view::language::LanguageProps;
 pub(crate) use crate::settings::view::number::NumberProps;
 pub(crate) use crate::settings::view::pickers::PickersProps;
+pub(crate) use crate::settings::view::sessions::SessionsProps;
 pub(crate) use crate::settings::view::terminal::TerminalProps;
 pub(crate) use crate::settings::view::tree::TreeProps;
 
@@ -93,17 +95,20 @@ where
 #[derive(Clone)]
 pub struct ConfigModalState {
     open: zgui::reactive::RwSignal<bool, zgui::reactive::LocalStorage>,
-    /// Whose keyboard it borrows, so that closing can give it back.
-    workspace: crate::workspace::Workspace,
+}
+
+impl Default for ConfigModalState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ConfigModalState {
     /// Closed.
     #[must_use]
-    pub fn new(workspace: crate::workspace::Workspace) -> Self {
+    pub fn new() -> Self {
         Self {
             open: zgui::reactive::RwSignal::new_local(false),
-            workspace,
         }
     }
 
@@ -126,16 +131,14 @@ impl ConfigModalState {
         }
     }
 
-    /// Puts it away, and gives the keyboard back to the editor.
+    /// Puts it away.
     ///
-    /// The panel takes focus while it is up, because `Escape` has to reach it. Something has to
-    /// hand it back, or the window is left with the keyboard nowhere and the next motion goes
-    /// unheard.
+    /// Nothing here hands the keyboard back. The panel takes it while it is up, because `Escape`
+    /// has to reach it, and the region underneath takes it back when the claim goes.
     pub fn close(&self) {
         if self.open.get_untracked() {
             self.open.set(false);
         }
-        self.workspace.focus_editor();
     }
 }
 

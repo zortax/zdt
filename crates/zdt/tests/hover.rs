@@ -191,12 +191,13 @@ fn keys() -> (Window, zdt::vim::Vim) {
     let vim = window.scope.with(|| {
         let workspace = zdt::workspace::Workspace::new(zdt_core::Project::at("/project"));
         let settings = zdt::settings::Settings::new(zdt_core::Config::default(), None);
-        let vim = zdt::vim::Vim::new(workspace, settings);
+        let keymaps = zdt::keymaps::Keymaps::new();
         for (region, shipped, _) in zdt::assets::OVERLAYS {
-            vim.load_overlay(region, shipped, None)
+            keymaps
+                .load_overlay(region, shipped, None)
                 .unwrap_or_else(|problems| panic!("{region} did not read: {problems:?}"));
         }
-        vim
+        zdt::vim::Vim::new(workspace, settings, keymaps)
     });
     (window, vim)
 }

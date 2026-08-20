@@ -31,6 +31,15 @@ pub fn FloatingTerminal() -> impl IntoView {
         Signal::derive_local(move || terminals.showing().is_some())
     };
 
+    // The float has the keys while it is up, and the region underneath takes them back when it
+    // goes. There is no handing back to forget: the claim follows what is shown.
+    {
+        let terminals = terminals.clone();
+        crate::focus::claim::claim_named(Signal::derive_local(move || {
+            terminals.showing().map(crate::focus::Overlay::Float)
+        }));
+    }
+
     view! {
         Presence(present = present, surface = surface) {
             {move || {

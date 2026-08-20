@@ -21,6 +21,9 @@ pub fn ConfigModal() -> impl IntoView {
         Signal::derive_local(move || state.is_open())
     };
 
+    // It has the keys while it is open, and the region underneath takes them back when it closes.
+    crate::focus::claim::claim(crate::focus::Overlay::Settings, present);
+
     view! {
         Presence(
             present = present,
@@ -53,9 +56,10 @@ pub(crate) fn ConfigFloating(
     let node = NodeRef::new();
 
     // Escape closes it, which means the panel has to hold the keyboard.
-    let claim = zgui::view::time::Timers::current()
-        .map(|timers| timers.set_timeout(std::time::Duration::ZERO, move || node.focus()));
-    on_cleanup_local(move || drop(claim));
+    crate::focus::claim::sink(
+        crate::focus::Spot::Overlay(crate::focus::Overlay::Settings),
+        crate::focus::Sink::Node(node),
+    );
 
     let on_key = move |event: &mut EventCx<'_, events::KeyDown>| {
         if matches!(event.key, Key::Named(NamedKey::Escape)) {

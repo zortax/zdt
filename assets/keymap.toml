@@ -1264,6 +1264,12 @@ desc = "Find git files"
 
 [[map]]
 mode = ["n"]
+keys = "<Leader>fp"
+action = "session.pick"
+desc = "Find projects"
+
+[[map]]
+mode = ["n"]
 keys = "<Leader>fT"
 action = "picker.todo"
 desc = "Find TODO comments"
@@ -1642,36 +1648,57 @@ action = "list.location"
 desc = "Location list"
 
 # ---- Sessions ------------------------------------------------------------------------------------
-
-[[map]]
-mode = ["n"]
-keys = "<Leader>Sl"
-action = "session.load_last"
-desc = "Load last session"
-
-[[map]]
-mode = ["n"]
-keys = "<Leader>Ss"
-action = "session.save"
-desc = "Save this session"
-
-[[map]]
-mode = ["n"]
-keys = "<Leader>Sd"
-action = "session.delete"
-desc = "Delete a session"
+#
+# A session is a directory, and it writes itself down as it is worked in. There is nothing to save
+# and nothing to load: the only things to ask for are which session, and where to show it.
 
 [[map]]
 mode = ["n"]
 keys = "<Leader>Sf"
-action = "session.load"
-desc = "Load a session"
+action = "session.pick"
+desc = "Find a session"
 
 [[map]]
 mode = ["n"]
-keys = "<Leader>S."
-action = "session.load_here"
-desc = "Load this directory's session"
+keys = "<Leader>SW"
+action = "session.pick_window"
+desc = "Find a session, in a new window"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sn"
+action = "session.new"
+desc = "Session in a directory"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>S]"
+action = "session.next"
+desc = "Next session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>S["
+action = "session.prev"
+desc = "Previous session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sk"
+action = "session.kill"
+desc = "Kill this session"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>Sd"
+action = "session.forget"
+desc = "Forget what this session saved"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>SD"
+action = "session.detach"
+desc = "Detach this window"
 
 # ---- The interface ---------------------------------------------------------------------------------
 

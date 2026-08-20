@@ -38,7 +38,7 @@ use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
 pub use crate::picker::source::{
-    Deed, Preview, Reach, Row, Source, Target, location_rows, symbol_rows,
+    Deed, Preview, Reach, Row, Source, Target, Typed, location_rows, symbol_rows,
 };
 use crate::settings::Settings;
 use crate::workspace::Workspace;

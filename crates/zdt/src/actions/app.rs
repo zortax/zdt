@@ -21,6 +21,13 @@ pub(super) fn run(workspace: &Workspace, leaf: &str) {
             } else if let Some(windows) =
                 zgui::reactive::use_local_context::<zgui::runtime::windows::Windows>()
             {
+                // Every session written down before the process goes. An explicit quit does not
+                // go through the close callbacks, so this is the only chance.
+                if let Some(host) =
+                    zgui::reactive::use_local_context::<crate::session::host::SessionHost>()
+                {
+                    host.flush_all();
+                }
                 windows.quit();
             }
         }

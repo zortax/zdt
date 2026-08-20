@@ -140,6 +140,76 @@ pub fn matches_in(
     found
 }
 
+/// Every item whose text holds `pair`, unlabelled and in list order.
+///
+/// The list-flavoured [`matches_in`]: the places are item positions, and each item's text is given
+/// rather than sliced out of a rope. What a leap over the rows of a panel needs.
+///
+/// `items` pairs each position with the text to look in, and holds only what is on screen. A leap
+/// offers what can be seen and nothing else.
+///
+/// Matching is case-insensitive when `pair` is all lower case, on the same reasoning as a search:
+/// somebody who typed no capitals did not mean to be fussy.
+#[must_use]
+pub fn list_matches(
+    items: &[(usize, &str)],
+    caret: usize,
+    pair: &str,
+    direction: Direction,
+) -> Vec<usize> {
+    if pair.is_empty() {
+        return Vec::new();
+    }
+    let insensitive = !pair.chars().any(char::is_uppercase);
+    let needle = if insensitive {
+        pair.to_lowercase()
+    } else {
+        pair.to_owned()
+    };
+
+    items
+        .iter()
+        .filter(|(at, _)| match direction {
+            Direction::Forward => *at > caret,
+            Direction::Backward => *at < caret,
+            Direction::Both => *at != caret,
+        })
+        .filter(|(_, text)| {
+            if insensitive {
+                text.to_lowercase().contains(&needle)
+            } else {
+                text.contains(&needle)
+            }
+        })
+        .map(|(at, _)| *at)
+        .collect()
+}
+
+/// The same, labelled, nearest to `caret` first.
+///
+/// What [`landings`] does for text, for a list of named rows. The earliest labels are the ones
+/// under the fingers, and they go to the rows the eye is most likely already on.
+#[must_use]
+pub fn list_landings(
+    items: &[(usize, &str)],
+    caret: usize,
+    pair: &str,
+    direction: Direction,
+    alphabet: &str,
+) -> Vec<Landing> {
+    let mut found = list_matches(items, caret, pair, direction);
+
+    // A stable sort, so a tie between the row above and the row below goes to the earlier one.
+    // That is the order document order gives [`landings`] for nothing.
+    found.sort_by_key(|at| at.abs_diff(caret));
+
+    found
+        .into_iter()
+        .zip(alphabet.chars())
+        .map(|(at, label)| Landing { at, label })
+        .collect()
+}
+
 /// What a leap is waiting for.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Phase {
@@ -335,5 +405,65 @@ mod tests {
         assert!(found.is_empty(), "the only match is under the caret");
         let found = matches_in(&text, 0..text.len_bytes(), 9, "→→", Direction::Backward);
         assert_eq!(found, vec![0], "and it begins where a character does");
+    }
+
+    /// A handful of rows, as a panel would offer them.
+    fn rows() -> Vec<(usize, &'static str)> {
+        vec![
+            (0, "main.rs"),
+            (1, "lib.rs"),
+            (2, "Cargo.toml"),
+            (3, "README.md"),
+            (4, "mod.rs"),
+        ]
+    }
+
+    #[test]
+    fn a_list_offers_every_row_whose_name_holds_the_pair() {
+        let found = list_matches(&rows(), 0, "rs", Direction::Both);
+        assert_eq!(found, vec![1, 4], "and never the row under the caret");
+    }
+
+    #[test]
+    fn a_list_leap_labels_the_nearest_row_first() {
+        // `main.rs`, `lib.rs` and `mod.rs` all hold it. From row two they are two, one and two
+        // rows away, so the home-row key goes to the nearest and the tie behind it goes upwards.
+        let landings = list_landings(&rows(), 2, "rs", Direction::Both, "sfn");
+        let labelled: Vec<(usize, char)> = landings
+            .iter()
+            .map(|landing| (landing.at, landing.label))
+            .collect();
+        assert_eq!(labelled, [(1, 's'), (0, 'f'), (4, 'n')]);
+    }
+
+    #[test]
+    fn a_row_above_wins_a_tie_with_one_below() {
+        // Both are one row away, and the sort is stable, so the earlier one takes the earlier key.
+        let landings = list_landings(&rows(), 2, ".", Direction::Both, "sf");
+        assert_eq!(landings.first().map(|landing| landing.at), Some(1));
+    }
+
+    #[test]
+    fn a_direction_narrows_a_list_leap() {
+        assert_eq!(list_matches(&rows(), 2, "rs", Direction::Forward), vec![4]);
+        assert_eq!(
+            list_matches(&rows(), 2, "rs", Direction::Backward),
+            vec![0, 1]
+        );
+    }
+
+    #[test]
+    fn a_list_leap_is_fussy_only_when_a_capital_was_typed() {
+        // Somebody who typed no capitals did not mean to be fussy.
+        assert_eq!(list_matches(&rows(), 9, "ca", Direction::Both), vec![2]);
+        assert!(list_matches(&rows(), 9, "Re", Direction::Both).is_empty());
+        assert_eq!(list_matches(&rows(), 9, "RE", Direction::Both), vec![3]);
+    }
+
+    #[test]
+    fn a_list_leap_runs_out_of_labels_rather_than_handing_out_two_of_one() {
+        let many: Vec<(usize, &str)> = rows();
+        let landings = list_landings(&many, 0, ".", Direction::Both, "s");
+        assert_eq!(landings.len(), 1, "one key, one row");
     }
 }

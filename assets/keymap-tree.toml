@@ -3,7 +3,13 @@
 # Read as an overlay in front of the ordinary keymap: the tree answers first, and everything it
 # says nothing about — `<Leader>ff`, `<C-w>l` — still works while the tree has the keyboard.
 #
-# The bindings mirror neo-tree's, because those are the ones the hands already know.
+# The single keys mirror neo-tree's, because those are the ones the hands already know. What
+# neo-tree has no key for sits under a prefix, so which-key can name the group and show what is
+# under it after a pause.
+
+[groups]
+"f" = "File"
+"g" = "Git"
 
 [[map]]
 mode = ["n"]
@@ -116,13 +122,13 @@ desc = "Refresh"
 mode = ["n"]
 keys = "H"
 action = "tree.toggle_hidden"
-desc = "Toggle hidden files"
+desc = "Show everything"
 
 [[map]]
 mode = ["n"]
 keys = "I"
 action = "tree.toggle_ignored"
-desc = "Toggle ignored files"
+desc = "Show what git ignores"
 
 [[map]]
 mode = ["n"]
@@ -141,3 +147,137 @@ mode = ["n"]
 keys = "<Esc>"
 action = "tree.leave"
 desc = "Back to the editor"
+
+# Moving about, the way a buffer moves. Half a screenful is measured from the panel, so a tall
+# window goes further than a short one.
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "tree.half_down"
+desc = "Half a page down"
+
+[[map]]
+mode = ["n"]
+keys = "<C-u>"
+action = "tree.half_up"
+desc = "Half a page up"
+
+# Leap, over the names on screen. Both ways at once, because a list has an obvious nearest row
+# above and below and there is nothing for a direction to settle.
+
+[[map]]
+mode = ["n"]
+keys = "s"
+action = "tree.leap"
+desc = "Leap to a row"
+
+[[map]]
+mode = ["n"]
+keys = "S"
+action = "tree.leap"
+desc = "Leap to a row"
+
+# The file group. Every one of these has a single key above as well; the group is what makes them
+# findable by somebody who has not learnt the single key yet.
+
+[[map]]
+mode = ["n"]
+keys = "fa"
+action = "tree.create"
+desc = "New file"
+
+[[map]]
+mode = ["n"]
+keys = "fA"
+action = "tree.create"
+args = { directory = true }
+desc = "New directory"
+
+[[map]]
+mode = ["n"]
+keys = "fr"
+action = "tree.rename"
+desc = "Rename"
+
+[[map]]
+mode = ["n"]
+keys = "fm"
+action = "tree.move"
+desc = "Move"
+
+[[map]]
+mode = ["n"]
+keys = "fd"
+action = "tree.delete"
+desc = "Delete"
+
+[[map]]
+mode = ["n"]
+keys = "fy"
+action = "tree.copy"
+desc = "Copy"
+
+[[map]]
+mode = ["n"]
+keys = "fx"
+action = "tree.cut"
+desc = "Cut"
+
+[[map]]
+mode = ["n"]
+keys = "fp"
+action = "tree.paste"
+desc = "Paste"
+
+[[map]]
+mode = ["n"]
+keys = "fc"
+action = "tree.copy_path"
+desc = "Copy the path"
+
+# The git group. `gg` is first, and stays where it is: a binding may sit inside a group.
+
+[[map]]
+mode = ["n"]
+keys = "gs"
+action = "tree.stage"
+desc = "Stage"
+
+[[map]]
+mode = ["n"]
+keys = "gu"
+action = "tree.unstage"
+desc = "Unstage"
+
+[[map]]
+mode = ["n"]
+keys = "gd"
+action = "tree.discard"
+desc = "Discard the changes"
+
+[[map]]
+mode = ["n"]
+keys = "gi"
+action = "tree.ignore"
+desc = "Add to .gitignore"
+
+[[map]]
+mode = ["n"]
+keys = "gx"
+action = "tree.untrack"
+desc = "Stop tracking"
+
+[[map]]
+mode = ["n"]
+keys = "gr"
+action = "tree.revert"
+desc = "Put back what is committed"
+
+# A move has no single key of its own, so it takes one here as well as under the group.
+
+[[map]]
+mode = ["n"]
+keys = "m"
+action = "tree.move"
+desc = "Move"

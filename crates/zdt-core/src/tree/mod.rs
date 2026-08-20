@@ -8,11 +8,37 @@
 //! Directories are read when they are opened and remembered afterwards, so closing and reopening
 //! one costs nothing. What `.gitignore` hides is hidden unless asked for, because a file tree that
 //! shows `target/` is a file tree nobody can find anything in.
+//!
+//! Every entry carries what sets it apart, and [`Filter`] decides from that what is shown. Asked
+//! for, a dotfile and an ignored directory come back with the rest and the interface draws them
+//! faintly.
+
+pub mod read;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use crate::language::{self, FileType};
+pub use crate::tree::read::{Ignores, read, read_with};
+
+/// What sets an entry apart from an ordinary one.
+///
+/// Two independent facts. A dotfile that git also leaves out is both.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct Standing {
+    /// Whether its name begins with a dot.
+    pub hidden: bool,
+    /// Whether the ignore files leave it out.
+    pub ignored: bool,
+}
+
+impl Standing {
+    /// Whether anything sets it apart at all.
+    #[must_use]
+    pub const fn is_apart(self) -> bool {
+        self.hidden || self.ignored
+    }
+}
 
 /// One thing in a directory.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -23,6 +49,8 @@ pub struct Entry {
     pub name: String,
     /// Whether it is a directory.
     pub directory: bool,
+    /// What sets it apart.
+    pub standing: Standing,
 }
 
 impl Entry {
@@ -57,6 +85,17 @@ pub struct Filter {
     pub ignored: bool,
 }
 
+impl Filter {
+    /// Whether an entry with this standing is shown.
+    ///
+    /// Each thing that sets an entry apart needs its own permission, so a dotfile that git also
+    /// leaves out appears once both are asked for.
+    #[must_use]
+    pub const fn keeps(self, standing: Standing) -> bool {
+        (self.hidden || !standing.hidden) && (self.ignored || !standing.ignored)
+    }
+}
+
 /// The tree.
 #[derive(Debug)]
 pub struct Tree {
@@ -66,14 +105,18 @@ pub struct Tree {
     expanded: BTreeSet<PathBuf>,
     /// What is in each directory that has been read.
     children: BTreeMap<PathBuf, Vec<Entry>>,
+    /// The ignore files over the whole tree, read once and kept.
+    ignores: Ignores,
 }
 
 impl Tree {
     /// A tree over `root`, with nothing open yet.
     #[must_use]
     pub fn new(root: impl Into<PathBuf>, filter: Filter) -> Self {
+        let root = root.into();
         Self {
-            root: root.into(),
+            ignores: Ignores::new(&root),
+            root,
             filter,
             expanded: BTreeSet::new(),
             children: BTreeMap::new(),
@@ -93,6 +136,8 @@ impl Tree {
     }
 
     /// Changes what it shows, and forgets everything read under the old rule.
+    ///
+    /// The ignore files are kept: what they say did not change, only what is done about it.
     pub fn set_filter(&mut self, filter: Filter) {
         if self.filter != filter {
             self.filter = filter;
@@ -133,10 +178,31 @@ impl Tree {
         if !path.is_dir() {
             return;
         }
-        self.children
-            .entry(path.to_path_buf())
-            .or_insert_with(|| read(path, self.filter));
+        if !self.children.contains_key(path) {
+            let entries = read_with(path, self.filter, &mut self.ignores);
+            self.children.insert(path.to_path_buf(), entries);
+        }
         self.expanded.insert(path.to_path_buf());
+    }
+
+    /// Every directory that is open, parents before children.
+    ///
+    /// A `BTreeSet` underneath, so the order is already the one [`expand`](Self::expand) needs:
+    /// it only reads a directory it can already see.
+    #[must_use]
+    pub fn expanded(&self) -> Vec<PathBuf> {
+        self.expanded.iter().cloned().collect()
+    }
+
+    /// Opens each of `paths`, in the order given.
+    ///
+    /// Blocking, and one hop rather than one per directory: expanding reads a directory, and
+    /// forty of those on the interface thread is a frame nobody sees the end of. Paths that are
+    /// no longer directories are skipped.
+    pub fn restore_expanded(&mut self, paths: &[PathBuf]) {
+        for path in paths {
+            self.expand(path);
+        }
     }
 
     /// Closes `path`. What was read stays read.
@@ -155,13 +221,18 @@ impl Tree {
 
     /// Forgets what was read, keeping what is open, and reads it again.
     ///
+    /// The ignore files are read again too, so a `.gitignore` that has just been written is the
+    /// one that decides what shows.
+    ///
     /// Blocking.
     pub fn refresh(&mut self) {
+        self.ignores = Ignores::new(&self.root);
         self.children.clear();
         let open: Vec<PathBuf> = self.expanded.iter().cloned().collect();
         for path in open {
             if path.is_dir() {
-                self.children.insert(path.clone(), read(&path, self.filter));
+                let entries = read_with(&path, self.filter, &mut self.ignores);
+                self.children.insert(path, entries);
             } else {
                 // It was a directory when it was opened and is not one now.
                 self.expanded.remove(&path);
@@ -220,67 +291,15 @@ impl Tree {
     }
 }
 
-/// What is directly inside `path`, in the order a tree shows it.
-///
-/// Directories first, then files, each sorted by name and ignoring case. Every file tree uses
-/// that order, and it is the only one that can be scanned.
-///
-/// Blocking.
-#[must_use]
-pub fn read(path: &Path, filter: Filter) -> Vec<Entry> {
-    let mut walk = ignore::WalkBuilder::new(path);
-    walk.max_depth(Some(1))
-        .hidden(!filter.hidden)
-        .git_ignore(!filter.ignored)
-        .git_global(!filter.ignored)
-        .git_exclude(!filter.ignored)
-        .ignore(!filter.ignored)
-        .parents(!filter.ignored)
-        // A `.gitignore` says what to leave out whether or not there is a `.git` beside it. A
-        // directory somebody is editing may not be a repository yet, and the file still means
-        // what it says.
-        .require_git(false)
-        // The tree reads one directory at a time, so there is nothing for threads to do but
-        // contend.
-        .follow_links(false);
-
-    let mut entries: Vec<Entry> = walk
-        .build()
-        .filter_map(Result::ok)
-        // The first entry a walk yields is the directory itself.
-        .filter(|found| found.path() != path)
-        .filter_map(|found| {
-            let name = found.file_name().to_str()?.to_owned();
-            Some(Entry {
-                directory: found.file_type().is_some_and(|kind| kind.is_dir()),
-                path: found.into_path(),
-                name,
-            })
-        })
-        .collect();
-
-    entries.sort_by(|one, two| {
-        two.directory
-            .cmp(&one.directory)
-            .then_with(|| one.name.to_lowercase().cmp(&two.name.to_lowercase()))
-            .then_with(|| one.name.cmp(&two.name))
-    });
-    entries
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::{Filter, Tree, read};
+    use super::{Filter, Standing, Tree};
 
     /// A small tree on disk: two directories, three files, one hidden, one ignored.
-    fn sample() -> PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "zdt-tree-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
-        ));
+    fn sample(name: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!("zdt-tree-{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("src")).expect("made");
         std::fs::create_dir_all(root.join("target")).expect("made");
@@ -293,38 +312,38 @@ mod tests {
     }
 
     #[test]
-    fn directories_come_first_and_then_names_in_order() {
-        // The only order a tree can be scanned in.
-        let root = sample();
-        let entries = read(&root, Filter::default());
-        let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
-        assert_eq!(names, ["src", "Cargo.toml"]);
-        assert!(entries[0].directory);
-        let _ = std::fs::remove_dir_all(&root);
-    }
+    fn each_thing_that_sets_an_entry_apart_needs_its_own_permission() {
+        let apart = Standing {
+            hidden: true,
+            ignored: true,
+        };
+        let hidden = Standing {
+            hidden: true,
+            ignored: false,
+        };
+        let plain = Standing::default();
 
-    #[test]
-    fn what_git_ignores_is_hidden_unless_asked_for() {
-        // A tree that shows `target/` is a tree nobody can find anything in.
-        let root = sample();
-        let plain = read(&root, Filter::default());
-        assert!(!plain.iter().any(|entry| entry.name == "target"));
-
-        let everything = read(
-            &root,
+        assert!(Filter::default().keeps(plain));
+        assert!(!Filter::default().keeps(hidden));
+        assert!(
+            !Filter {
+                hidden: true,
+                ignored: false
+            }
+            .keeps(apart)
+        );
+        assert!(
             Filter {
                 hidden: true,
-                ignored: true,
-            },
+                ignored: true
+            }
+            .keeps(apart)
         );
-        assert!(everything.iter().any(|entry| entry.name == "target"));
-        assert!(everything.iter().any(|entry| entry.name == ".gitignore"));
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
     fn a_closed_tree_has_only_what_is_open() {
-        let root = sample();
+        let root = sample("closed");
         let mut tree = Tree::new(&root, Filter::default());
         assert!(tree.rows().is_empty(), "nothing has been opened");
 
@@ -336,7 +355,7 @@ mod tests {
 
     #[test]
     fn opening_a_directory_puts_its_children_under_it() {
-        let root = sample();
+        let root = sample("children");
         let mut tree = Tree::new(&root, Filter::default());
         tree.expand(&root);
         tree.expand(&root.join("src"));
@@ -360,7 +379,7 @@ mod tests {
 
     #[test]
     fn closing_a_directory_hides_its_children_and_keeps_what_was_read() {
-        let root = sample();
+        let root = sample("closing");
         let mut tree = Tree::new(&root, Filter::default());
         tree.expand(&root);
         tree.expand(&root.join("src"));
@@ -376,7 +395,7 @@ mod tests {
 
     #[test]
     fn revealing_a_file_opens_the_way_to_it() {
-        let root = sample();
+        let root = sample("reveal");
         let mut tree = Tree::new(&root, Filter::default());
         tree.reveal(&root.join("src/main.rs"));
 
@@ -390,7 +409,7 @@ mod tests {
 
     #[test]
     fn revealing_something_outside_the_project_does_nothing() {
-        let root = sample();
+        let root = sample("outside");
         let mut tree = Tree::new(&root, Filter::default());
         tree.reveal(std::path::Path::new("/etc/hosts"));
         assert!(tree.rows().is_empty());
@@ -399,7 +418,7 @@ mod tests {
 
     #[test]
     fn changing_what_is_shown_reads_everything_again() {
-        let root = sample();
+        let root = sample("filter");
         let mut tree = Tree::new(&root, Filter::default());
         tree.expand(&root);
         assert_eq!(tree.rows().len(), 2);
@@ -416,7 +435,7 @@ mod tests {
 
     #[test]
     fn a_directory_that_has_become_a_file_stops_being_open() {
-        let root = sample();
+        let root = sample("became");
         let mut tree = Tree::new(&root, Filter::default());
         tree.expand(&root);
         tree.expand(&root.join("src"));
@@ -426,6 +445,21 @@ mod tests {
         tree.refresh();
 
         assert!(!tree.is_expanded(&root.join("src")));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_rule_written_after_the_tree_was_read_decides_what_shows() {
+        // What `tree.ignore` leans on: the rules are read again, so the row it named greys out.
+        let root = sample("rewritten");
+        let mut tree = Tree::new(&root, Filter::default());
+        tree.expand(&root);
+        assert!(tree.rows().iter().any(|row| row.entry.name == "src"));
+
+        std::fs::write(root.join(".gitignore"), "target\nsrc\n").expect("written");
+        tree.refresh();
+
+        assert!(!tree.rows().iter().any(|row| row.entry.name == "src"));
         let _ = std::fs::remove_dir_all(&root);
     }
 }

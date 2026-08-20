@@ -56,13 +56,9 @@ impl Language {
         let Some((path, _, _)) = self.about(buffer) else {
             return;
         };
-        let Some(timers) = self.inner.timers.clone() else {
-            return;
-        };
-
         let language = self.clone();
         let waiting = path.clone();
-        let handle = timers.set_timeout(SYNC_DEBOUNCE, move || {
+        let handle = self.inner.clock.after(SYNC_DEBOUNCE, move || {
             language.inner.pending.borrow_mut().remove(&waiting);
             language.send_change(buffer);
         });
