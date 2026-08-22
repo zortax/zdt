@@ -23,7 +23,7 @@ mod tree;
 mod window;
 
 // The file tree's drag-and-drop reaches for this. A drag is not a key, so it has no action name.
-pub use crate::actions::files::move_into;
+pub use crate::actions::files::move_all;
 
 use zdt_vim::Action;
 use zgui_editor::EditorHandle;

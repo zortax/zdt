@@ -8,13 +8,28 @@
 
 use std::ops::Range;
 
-use zgui::geom::{Device, DevicePx, Point, Rect};
+use zgui::geom::{Css, CssPx, Device, DevicePx, Point, Rect};
 use zgui::prelude::*;
 use zgui::reactive::LocalStorage;
 use zgui::view::{ScrollBehavior, ScrollPosition, ScrollTarget};
 
 use super::ROW;
 use zdt_view::anchor::{AnchorRect, Density};
+
+/// How fast a drag at the very edge of the list scrolls it, in CSS pixels per tick.
+///
+/// A little under one row per tick at sixty ticks a second, so the list moves quickly enough to
+/// reach a distant directory and slowly enough that the row wanted can be stopped on.
+const PULL: f32 = 12.0;
+
+/// Which row a point falls on, given where the list starts and how far it is scrolled.
+///
+/// [`Viewport::row_rect`] read backwards. A free function, so the rounding can be tested without a
+/// laid-out window.
+fn row_of(top: f32, offset: f32, y: f32) -> Option<usize> {
+    let within = y - top + offset;
+    (within >= 0.0).then(|| (within / ROW).floor() as usize)
+}
 
 /// The list's scroll container, and what it can answer about the rows in it.
 ///
@@ -102,6 +117,70 @@ impl Viewport {
         })
     }
 
+    /// Which row is under `point`, in CSS pixels from the window's top-left corner. Tracked.
+    ///
+    /// `None` when the point is outside the list, or past the last of `count` rows. A drag asks
+    /// this on every pointer move, so it is arithmetic over the one measured box rather than a
+    /// walk of the rows.
+    #[must_use]
+    pub fn row_at(self, point: Point<CssPx, Css>, count: usize) -> Option<usize> {
+        if !self.holds(point) {
+            return None;
+        }
+        let top = self.top()?;
+        row_of(top, self.offset(), point.y.0).filter(|at| *at < count)
+    }
+
+    /// Whether `point` is inside the list. Tracked.
+    #[must_use]
+    pub fn holds(self, point: Point<CssPx, Css>) -> bool {
+        let Some(box_) = self.window_box() else {
+            return false;
+        };
+        point.x.0 >= box_.x
+            && point.x.0 < box_.x + box_.width
+            && point.y.0 >= box_.y
+            && point.y.0 < box_.y + box_.height
+    }
+
+    /// How hard the list should scroll while a drag sits near one of its edges, in CSS pixels per
+    /// tick. Tracked.
+    ///
+    /// Zero away from the edges, negative at the top. One row of margin, so the pull starts while
+    /// there is still list under the pointer to aim at.
+    #[must_use]
+    pub fn pull(self, point: Point<CssPx, Css>) -> f32 {
+        let Some(box_) = self.window_box() else {
+            return 0.0;
+        };
+        // Outside sideways is still a pull: a pointer that has wandered off the panel is one that
+        // is being dragged somewhere, and the list under it should keep moving.
+        let above = box_.y + ROW - point.y.0;
+        let below = point.y.0 - (box_.y + box_.height - ROW);
+        if above > 0.0 {
+            -PULL * (above / ROW).min(1.0)
+        } else if below > 0.0 {
+            PULL * (below / ROW).min(1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Scrolls by `dy` CSS pixels, stopping at the ends.
+    pub fn nudge(self, dy: f32) {
+        let density = Density::reported(self.node.scale());
+        let position = self.node.scroll_position();
+        let wanted = density.css(position.offset.y.0) + dy;
+        let furthest = density.css(position.content_size.height.0 - position.scrollport.height.0);
+        self.node.scroll_to(
+            ScrollTarget::Offset(Point::new(
+                position.offset.x,
+                DevicePx(density.device(wanted.clamp(0.0, furthest.max(0.0)))),
+            )),
+            ScrollBehavior::Instant,
+        );
+    }
+
     /// Brings row `at` into view, moving as little as it can.
     ///
     /// In one frame, and never smoothly. A key held down against a smooth scroll leaves the caret
@@ -135,6 +214,24 @@ impl Viewport {
         );
     }
 
+    /// The list's box on the window, in CSS pixels. Tracked.
+    fn window_box(self) -> Option<AnchorRect> {
+        let _ = self.measured.get();
+        let bounds = self.node.window_bounds()?;
+        let density = Density::reported(self.node.scale());
+        Some(AnchorRect {
+            x: density.css(bounds.origin.x.0),
+            y: density.css(bounds.origin.y.0),
+            width: density.css(bounds.size.width.0),
+            height: density.css(bounds.size.height.0),
+        })
+    }
+
+    /// Where the first row would start, on the window. Tracked.
+    fn top(self) -> Option<f32> {
+        self.window_box().map(|box_| box_.y)
+    }
+
     /// How tall the visible part is, in CSS pixels. Tracked.
     fn port(self) -> f32 {
         let position = self.scroll.get();
@@ -145,5 +242,34 @@ impl Viewport {
     fn offset(self) -> f32 {
         let position = self.scroll.get();
         Density::reported(self.node.scale()).css(position.offset.y.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ROW, row_of};
+
+    #[test]
+    fn a_point_above_the_first_row_is_on_no_row() {
+        assert_eq!(row_of(100.0, 0.0, 99.0), None);
+    }
+
+    #[test]
+    fn the_boundary_between_two_rows_belongs_to_the_lower_one() {
+        assert_eq!(row_of(100.0, 0.0, 100.0), Some(0));
+        assert_eq!(row_of(100.0, 0.0, 100.0 + ROW - 0.1), Some(0));
+        assert_eq!(row_of(100.0, 0.0, 100.0 + ROW), Some(1));
+    }
+
+    #[test]
+    fn a_scrolled_list_answers_the_row_under_the_pointer() {
+        // Three rows scrolled away, so the row drawn at the top of the list is the fourth.
+        assert_eq!(row_of(100.0, ROW * 3.0, 100.0), Some(3));
+        assert_eq!(row_of(100.0, ROW * 3.0, 100.0 + ROW * 2.0), Some(5));
+    }
+
+    #[test]
+    fn a_point_above_a_list_scrolled_to_its_start_is_still_on_no_row() {
+        assert_eq!(row_of(100.0, 0.0, 80.0), None);
     }
 }

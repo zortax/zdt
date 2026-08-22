@@ -31,6 +31,22 @@ impl Vim {
     ///
     /// This is what an editor's key filter is: `true` means the key is used up.
     pub fn key(&self, chord: Chord, handle: &EditorHandle) -> bool {
+        // A drag in the file tree takes Escape, wherever the keyboard is. Pressing a file row opens
+        // it, which sends the keyboard to the editor — so the panel's own handler is not where the
+        // key arrives, and a gesture that holds the pointer must have a way out from here as well.
+        if let Some(explorer) = zgui::reactive::use_local_context::<crate::explorer::Explorer>()
+            && explorer.drag().is_lifted_untracked()
+        {
+            if chord == Chord::named(zdt_vim::chord::Named::Escape) {
+                explorer
+                    .drag()
+                    .spring_back(crate::explorer::drag::home(&explorer));
+            }
+            // Every other key falls through: a drag is held by the pointer, and the keyboard is
+            // still whoever's it was.
+            return chord == Chord::named(zdt_vim::chord::Named::Escape);
+        }
+
         // Documentation has two states, and they take keys differently.
         //
         // Focused, which a second `K` does, it takes every key it has a row for. Somebody who

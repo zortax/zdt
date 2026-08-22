@@ -27,6 +27,7 @@ use crate::app::theme::ZdtThemeProps;
 use crate::cmdline::view::CommandLineProps;
 use crate::completion::view::CompletionPopupProps;
 use crate::explorer::Explorer;
+use crate::explorer::drag::ghost::TreeGhostProps;
 use crate::explorer::field::view::TreeFieldProps;
 use crate::explorer::menu::TreeMenuProps;
 use crate::explorer::tree::{ExplorerProps, TreeResizeProps};
@@ -275,6 +276,7 @@ fn SessionShell(
                 ConfigModal()
                 TreeMenu()
                 TreeField()
+                TreeGhost()
                 FloatingTerminal()
                 Picker()
                 Prompt()

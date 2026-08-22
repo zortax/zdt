@@ -1,13 +1,25 @@
 //! The panel, and the rows in it.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
+
 use super::*;
+use crate::explorer::drag::{Landing, landing_for};
 use crate::explorer::use_explorer;
 use crate::vim::use_vim;
 use crate::workspace::use_workspace;
 use zdt_icons::{self as icons, IconProps};
 use zgui::prelude::*;
+use zgui::view::time::{IntervalHandle, set_interval};
 use zgui::{component, view};
 use zgui_ui::prelude::*;
+
+/// How often the list is pulled while a drag sits at one of its edges.
+///
+/// One frame at sixty a second. A pull that ticked more slowly would move the list in steps that
+/// are visible as steps.
+const PULL_TICK: Duration = Duration::from_millis(16);
 
 /// The panel.
 #[component]
@@ -62,9 +74,157 @@ pub fn Explorer() -> impl IntoView {
         move |_: &mut EventCx<'_, events::FocusIn>| explorer.focus()
     };
 
+    // ---- The pointer gesture -------------------------------------------------------------------
+    //
+    // On the panel and never on a row, for two reasons. A capture cuts the hit chain at the
+    // capturing element, so no other row would hear the pointer once one held it — and the virtual
+    // list destroys a row's element the moment it scrolls out of view, which is exactly what the
+    // pull below makes happen. The panel is here for the whole gesture.
+    let drag = explorer.drag();
+
+    // Where a drop would land, from where the pointer is. Worked out rather than heard, because a
+    // capture is what stops a row hearing that the pointer arrived over it.
+    let landing = {
+        let explorer = explorer.clone();
+        move |at: zgui::geom::Point<zgui::geom::CssPx, zgui::geom::Css>| {
+            let Some(held) = drag.carrying_untracked() else {
+                return Landing::Nowhere;
+            };
+            if !viewport.holds(at) {
+                return Landing::Nowhere;
+            }
+            let under = viewport
+                .row_at(at, explorer.len())
+                .and_then(|at| explorer.row_at(at));
+            landing_for(under.as_ref(), &held.paths, &explorer.root())
+        }
+    };
+
+    // The pointer is taken on the press, once a row has said the press could become a drag.
+    //
+    // Not on the move that passes the threshold, which is where a control with something clickable
+    // inside it would take it. A row holds nothing to press, so there is nothing to steal a release
+    // from — and waiting means a pointer that leaves the panel before it has travelled four pixels
+    // is never heard from again, which is a drag that silently never starts.
+    let take_pointer = move |event: &mut EventCx<'_, events::PointerDown>| {
+        if drag.is_armed_untracked() {
+            event.capture_pointer();
+        }
+    };
+
+    let follow = {
+        let landing = landing.clone();
+        move |event: &mut EventCx<'_, events::PointerMove>| {
+            let at = event.position;
+            drag.moved(at, landing(at));
+        }
+    };
+
+    // A point on the window, for the ghost to fly to.
+    let corner = |rect: zdt_view::anchor::AnchorRect| {
+        zgui::geom::Point::new(zgui::geom::CssPx(rect.x), zgui::geom::CssPx(rect.y))
+    };
+    let let_go = {
+        let explorer = explorer.clone();
+        let workspace = use_workspace();
+        move |event: &mut EventCx<'_, events::PointerUp>| {
+            if event.button == Some(PointerButton::Secondary) {
+                return;
+            }
+            event.release_pointer();
+            if drag.is_lifted_untracked() {
+                // Where the ghost is let go: onto the row that receives it when there is one, and
+                // back to the row it came from when there is not. Both are read before the drop,
+                // which is what clears the landing.
+                let source = crate::explorer::drag::home(&explorer);
+                let target = match drag.landing() {
+                    Landing::Into(path) => explorer
+                        .index_of(&path)
+                        .and_then(|at| viewport.row_rect(at))
+                        .map(corner),
+                    // The root is the head rather than a row, and the first row is what sits under
+                    // it.
+                    Landing::Root => viewport.row_rect(0).map(corner),
+                    Landing::Nowhere => None,
+                };
+                match drag.land(
+                    target.or(source).unwrap_or(event.position),
+                    &explorer.root(),
+                ) {
+                    Some((what, into)) => {
+                        crate::actions::move_all(&workspace, &explorer, what, &into);
+                    }
+                    None => drag.spring_back(source),
+                }
+                return;
+            }
+            // A press that never travelled. A file already opened on the way down; a directory
+            // waited for this, because expanding one moves every row below the pointer and a drag
+            // about to start needs that ground still.
+            if let Some(at) = drag.disarm()
+                && explorer.row_at(at).is_some_and(|row| row.entry.directory)
+            {
+                explorer.go_to(at);
+                explorer.toggle_selected();
+            }
+        }
+    };
+
+    let taken_over = {
+        let explorer = explorer.clone();
+        move |event: &mut EventCx<'_, events::PointerCancel>| {
+            event.release_pointer();
+            drag.spring_back(crate::explorer::drag::home(&explorer));
+        }
+    };
+
+    // The list follows the pointer to its own edges. A capture stops every other element hearing
+    // the pointer, so nothing else can scroll while something is in flight.
+    let pulling: Rc<RefCell<Option<IntervalHandle>>> = Rc::new(RefCell::new(None));
+    let pulls = {
+        let pulling = Rc::clone(&pulling);
+        let landing = landing.clone();
+        zgui::reactive::RenderEffect::new(move |_| {
+            let lifted = drag.is_lifted();
+            let mut held = pulling.borrow_mut();
+            *held = lifted.then(|| {
+                let landing = landing.clone();
+                set_interval(PULL_TICK, move || {
+                    let at = drag.at_untracked();
+                    let pull = viewport.pull(at);
+                    if pull != 0.0 {
+                        viewport.nudge(pull);
+                        // The rows moved under a pointer that did not, so what a drop would land on
+                        // is a different row now.
+                        drag.moved(at, landing(at));
+                    }
+                })
+            });
+        })
+    };
+    on_cleanup_local(move || drop((pulls, pulling)));
+
+    let dragging = move || drag.is_lifted().then(|| "true".to_owned());
+    let refused =
+        move || (drag.is_lifted() && !drag.landing().accepts()).then(|| "true".to_owned());
+    let root_drop = move || (drag.landing() == Landing::Root).then(|| "root".to_owned());
+
     let on_key = {
         let explorer = explorer.clone();
         move |event: &mut EventCx<'_, events::KeyDown>| {
+            // A drag in progress takes Escape before anything else sees it, which is the one way
+            // out of a gesture whose pointer is captured. The editor's own filter carries the same
+            // rung, because a press that opened a file sends the keyboard there.
+            if matches!(event.key, Key::Named(NamedKey::Escape))
+                && explorer.drag().is_lifted_untracked()
+            {
+                explorer
+                    .drag()
+                    .spring_back(crate::explorer::drag::home(&explorer));
+                event.prevent_default();
+                event.stop_propagation();
+                return;
+            }
             let Some(chord) = crate::keys::chord_of(event, event.modifiers) else {
                 return;
             };
@@ -87,15 +247,25 @@ pub fn Explorer() -> impl IntoView {
             tabindex = Focus::Programmatic,
             attr:data-open = open,
             attr:data-focused = focused,
+            attr:data-dragging = dragging,
+            attr:data-refused = refused,
             a11y:role = Role::Tree,
             a11y:label = "Files",
             on:key_down = on_key,
-            on:focus_in = take_focus
+            on:focus_in = take_focus,
+            on:pointer_down = take_pointer,
+            on:pointer_move = follow,
+            on:pointer_up = let_go,
+            on:pointer_cancel = taken_over
         ) {
             // The strip above the tree lines up with the buffer line beside it, and the two
             // together are the whole width of the window's top edge. A title bar that stopped
             // where the tree began would be one a person had to aim at.
-            row(class = "tree__head", on:pointer_down = window.move_drag_handler()) {
+            row(
+                class = "tree__head",
+                attr:data-drop = root_drop,
+                on:pointer_down = window.move_drag_handler()
+            ) {
                 Icon(icon = icons::LIST_TREE, class = "icon--sm")
                 label(class = "tree__root nowrap") {{root_name}}
             }
@@ -149,12 +319,28 @@ pub(crate) fn TreeRow(
             (held.cut && held.path == row.entry.path).then(|| "true".to_owned())
         }
     };
+    // Where a drop would land. The band is on the *directory that receives it* — over a file, that
+    // is the directory holding it, because that is where the file would go. Its contents take the
+    // quieter tone, so the extent of the destination is readable without a second colour.
     let dropping = {
-        let (explorer, row) = (explorer.clone(), row.clone());
+        let (drag, row) = (explorer.drag(), row.clone());
         move || {
             let row = row()?;
-            (explorer.drop_target()? == row.entry.path).then(|| "into".to_owned())
+            let landing = drag.landing();
+            let into = landing.path()?;
+            if row.entry.path == into {
+                Some("into".to_owned())
+            } else if row.entry.path.starts_with(into) {
+                Some("inside".to_owned())
+            } else {
+                None
+            }
         }
+    };
+    // What this row is carrying, while it is in flight.
+    let lifted = {
+        let (drag, row) = (explorer.drag(), row.clone());
+        move || drag.carries(&row()?.entry.path).then(|| "true".to_owned())
     };
     let is_directory = {
         let row = row.clone();
@@ -226,14 +412,17 @@ pub(crate) fn TreeRow(
         move || leaping.label_at(index).map(|key| key.to_string())
     };
 
-    // A press picks the row, and a plain one opens it. What kind of press decides which. The
+    // A press picks the row and arms a drag; what kind of press decides what else it means. The
     // secondary button is the menu and nothing else, the middle button is nothing at all, and a
     // modifier turns the gesture into one about the *set*.
     //
-    // On the press, and not the release, because that is the moment the gesture is understood. The
-    // buffer line selects a tab on the way down for the same reason. Opening a file is cheap and
-    // undoing it is one keystroke, so waiting for the button to come back up buys nothing and
-    // costs the impression that the tree is answering.
+    // A file opens on the press, and not on the release, because that is the moment the gesture is
+    // understood. The buffer line selects a tab on the way down for the same reason. Opening a file
+    // is cheap, undoing it is one keystroke, and it moves no row — so waiting for the button to come
+    // back up buys nothing and costs the impression that the tree is answering.
+    //
+    // A directory waits. Expanding one moves every row below the pointer, and a press that turned
+    // out to be a drag would then be a drag over ground that had just shifted.
     let press = {
         let explorer = explorer.clone();
         let workspace = use_workspace();
@@ -261,39 +450,28 @@ pub(crate) fn TreeRow(
 
             if event.modifiers.control() {
                 explorer.toggle_mark(index);
-            } else if event.modifiers.shift() {
-                explorer.mark_through(index);
-            } else {
-                explorer.clear_marks();
-                explorer.go_to(index);
-                explorer.start_drag(index);
-                // Both ways, the way the keyboard's `<CR>` is: it opens a closed directory and
-                // closes an open one.
-                if let Some(path) = explorer.toggle_selected() {
-                    crate::files::open(&workspace, path);
-                }
-            }
-        }
-    };
-
-    // What the release is left with is the drop: a press that travelled to another row is a move,
-    // and one that went nowhere has already done everything it was going to do.
-    let release = {
-        let explorer = explorer.clone();
-        let workspace = use_workspace();
-        move |event: &mut EventCx<'_, events::PointerUp>| {
-            if event.button == Some(PointerButton::Secondary) {
                 return;
             }
-            if let Some((from, into)) = explorer.finish_drag() {
-                crate::actions::move_into(&workspace, &explorer, &from, &into);
+            if event.modifiers.shift() {
+                explorer.mark_through(index);
+                return;
+            }
+
+            let carried = explorer.carried_from(index);
+            explorer.go_to(index);
+            // Where the row's own top edge is, so the ghost hangs from the row rather than jumping
+            // its corner to the pointer. Asked of the viewport, whose arithmetic is already in CSS
+            // pixels — the box an event carries is in device pixels.
+            let top = explorer
+                .viewport()
+                .and_then(|viewport| viewport.row_rect(index))
+                .map_or(event.position.y.0, |rect| rect.y);
+            explorer.drag().arm(carried, index, event.position, top);
+
+            if let Some(row) = explorer.row_at(index).filter(|row| !row.entry.directory) {
+                crate::files::open(&workspace, row.entry.path);
             }
         }
-    };
-
-    let over = {
-        let explorer = explorer.clone();
-        move |_: &mut EventCx<'_, events::PointerEnter>| explorer.drag_over(index)
     };
 
     view! {
@@ -303,12 +481,11 @@ pub(crate) fn TreeRow(
             attr:data-marked = marked,
             attr:data-cut = cut,
             attr:data-drop = dropping,
+            attr:data-lifted = lifted,
             attr:data-directory = directory,
             attr:data-apart = apart,
             a11y:role = Role::TreeItem,
-            on:pointer_down = press,
-            on:pointer_up = release,
-            on:pointer_enter = over
+            on:pointer_down = press
         ) {
             // One rail per level of nesting, each drawing the line that traces back to the
             // directory it belongs to.

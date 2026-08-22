@@ -4,7 +4,7 @@ use crate::explorer::Explorer;
 use crate::explorer::field::{About, At, Field};
 use crate::settings::Settings;
 use crate::workspace::Workspace;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Where a field opens: where the pointer opened the menu, or on the caret row.
 fn opening_at(explorer: &Explorer) -> At {
@@ -149,34 +149,45 @@ pub(super) fn delete(workspace: &Workspace, explorer: &Explorer) {
     );
 }
 
-/// Moves `from` into `into`, which is what a drop in the tree does.
+/// Moves everything in `from` into `into`, which is what a drop in the tree does.
 ///
 /// Public because the tree's pointer handling calls it: a drag is not a key, so it has no action
 /// name, but what it does is the same work `p` does after an `x`.
-pub fn move_into(
-    workspace: &Workspace,
-    explorer: &Explorer,
-    from: &std::path::Path,
-    into: &std::path::Path,
-) {
-    let Some(name) = from.file_name() else {
+///
+/// One worker hop for the whole set and one message at the end of it. A drag of three files that
+/// said so three times would be three toasts for one gesture.
+pub fn move_all(workspace: &Workspace, explorer: &Explorer, from: Vec<PathBuf>, into: &Path) {
+    if from.is_empty() {
         return;
-    };
-    let target = into.join(name);
-    let (from, explorer, workspace) = (from.to_path_buf(), explorer.clone(), workspace.clone());
+    }
+    let (into, explorer, workspace) = (into.to_path_buf(), explorer.clone(), workspace.clone());
 
     zdt_view::detached(async move {
         let done = zgui::task::blocking(move || {
-            let to = zdt_core::paths::free_name(&target);
-            zdt_core::paths::rename(&from, &to).map(|()| to)
+            let mut landed = Vec::new();
+            for path in from {
+                let Some(name) = path.file_name() else {
+                    continue;
+                };
+                let to = zdt_core::paths::free_name(&into.join(name));
+                zdt_core::paths::rename(&path, &to)?;
+                landed.push(to);
+            }
+            Ok::<_, std::io::Error>(landed)
         })
         .await;
         match done {
             Ok(landed) => {
                 explorer.refresh();
                 touched();
-                explorer.reveal(&landed);
-                workspace.say(format!("moved to {}", landed.display()));
+                let Some(last) = landed.last() else {
+                    return;
+                };
+                explorer.reveal(last);
+                workspace.say(match landed.len() {
+                    1 => format!("moved to {}", last.display()),
+                    many => format!("moved {many} items to {}", last.display()),
+                });
             }
             Err(error) => workspace.complain(error.to_string()),
         }

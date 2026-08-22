@@ -144,11 +144,47 @@
     opacity: 0.55;
 }
 
-/* Where a drag would drop. A line under the row for a file, a band for a directory — because
- * dropping onto a directory puts the file *in* it and dropping onto a file puts it beside. */
+/* What is in flight, dimmed and left where it is. The file is still there until the drop lands, and
+ * a row that closed up under the pointer would move the row being aimed at. */
+.tree__row[data-lifted="true"] {
+    opacity: 0.35;
+}
+
+/* Where a drag would drop.
+ *
+ * The band is always on the directory that *receives* it. Dropping onto a file puts the file beside
+ * it, which is to say into the directory holding it — so that is the row that lights, and a band on
+ * the file itself would name the wrong place.
+ *
+ * A band alone would not be enough: the caret row wears the same one, and during a drag both are on
+ * screen. The name and the chevron go to the accent colour as well, which nothing else in the tree
+ * ever does. */
 .tree__row[data-drop="into"] {
     background-color: var(--zui-color-accent);
-    box-shadow: inset 0 0 0 1px var(--zui-color-primary);
+    box-shadow: inset 2px 0 0 0 var(--zui-color-primary);
+}
+
+/* How far the destination reaches: the rails of everything already inside it, which together draw
+ * the way in from the top of the panel down to where the drop would land.
+ *
+ * The rails and not a second background tone. Every theme sets the sidebar's accent to the same
+ * value as the plain one, so a second band would be the first band again. */
+.tree__row[data-drop="inside"] .tree__rail__line {
+    background-color: var(--zui-color-primary);
+    opacity: 0.45;
+}
+
+/* The root is the head rather than a row, so a drop into it lights the head. */
+.tree__head[data-drop="root"] {
+    background-color: var(--zui-color-accent);
+}
+
+.tree[data-dragging="true"] {
+    cursor: grabbing;
+}
+
+.tree[data-dragging="true"][data-refused="true"] {
+    cursor: not-allowed;
 }
 
 .tree__name {
@@ -243,6 +279,74 @@
     outline: none;
     box-shadow: none;
     border-color: transparent;
+}
+
+/* What the pointer is carrying.
+ *
+ * A floating surface, so it carries the one border and the one shadow those are allowed. It is
+ * never the answer to a hit test, and it states a transform at rest so that following the pointer
+ * stays a placement change rather than a cascade of the whole element on every frame. */
+.treeghost {
+    position: absolute;
+    z-index: 46;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+    transform: translate(var(--ghost-x, 0px), var(--ghost-y, 0px));
+    min-width: 120px;
+    max-width: calc(var(--tree-width, 260px) - 16px);
+    padding: var(--zui-space-base) 0;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background-color: var(--zui-color-popover);
+    color: var(--zui-color-popover-foreground);
+    box-shadow: var(--zui-shadow-md);
+    font-size: var(--zdt-ui-size, 12px);
+}
+
+.treeghost:not([data-state="on"]):not([data-state="settling"]) {
+    display: none;
+}
+
+/* A drop that would do nothing says so on the thing being carried, where the eye already is. */
+.treeghost[data-refused="true"] {
+    opacity: 0.45;
+}
+
+.treeghost__line {
+    height: 22px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: 0 calc(var(--zui-space-base) * 3);
+}
+
+/* The rows coming along, set in and quieter: they are what travels with the thing that was taken
+ * hold of, and reading as loudly as it would make the ghost a list. */
+.treeghost__line[data-along="true"] {
+    padding-left: calc(var(--zui-space-base) * 6);
+    color: var(--zui-color-muted-foreground);
+    opacity: 0.75;
+}
+
+.treeghost__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* How many more are moving than the ghost has room to draw. */
+.treeghost__more {
+    display: none;
+}
+
+.treeghost__more[data-on="true"] {
+    display: flex;
+    align-items: center;
+    height: 16px;
+    padding: 0 calc(var(--zui-space-base) * 6);
+    color: var(--zui-color-muted-foreground);
 }
 
 .glyph {

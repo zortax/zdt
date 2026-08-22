@@ -7,6 +7,7 @@
 //! Reading a directory is blocking, so every operation that reads one goes through a worker and
 //! writes the answer back on the interface thread.
 
+pub mod drag;
 pub mod field;
 pub mod leap;
 pub mod menu;
@@ -59,9 +60,8 @@ struct Inner {
     /// By path, and never by index. A directory opening above them moves every index below it,
     /// and a selection that slid down a screen is one nobody meant.
     marked: RwSignal<Vec<PathBuf>, LocalStorage>,
-    /// What is being dragged, and where it would land.
-    dragging: RwSignal<Option<PathBuf>, LocalStorage>,
-    over: RwSignal<Option<PathBuf>, LocalStorage>,
+    /// The pointer gesture that moves files from one directory to another.
+    drag: crate::explorer::drag::Drag,
     /// Where the rows are drawn, once a panel has drawn them.
     ///
     /// No signal. Nothing on screen is decided by whether there is one, and an action that asks
@@ -82,8 +82,7 @@ impl Explorer {
                 open: RwSignal::new_local(false),
                 clipboard: RwSignal::new_local(None),
                 marked: RwSignal::new_local(Vec::new()),
-                dragging: RwSignal::new_local(None),
-                over: RwSignal::new_local(None),
+                drag: crate::explorer::drag::Drag::new(),
                 viewport: RefCell::new(None),
             }),
         }
@@ -273,70 +272,43 @@ impl Explorer {
 
     // ---- Dragging -------------------------------------------------------------------------
 
-    /// Says a drag of the row at `at` has begun.
-    pub fn start_drag(&self, at: usize) {
-        if let Some(row) = self.row_at(at) {
-            self.inner.dragging.set(Some(row.entry.path));
-        }
-    }
-
-    /// What is being dragged. Tracked.
+    /// The pointer gesture that moves files.
     #[must_use]
-    pub fn dragging(&self) -> Option<PathBuf> {
-        self.inner.dragging.get()
+    pub fn drag(&self) -> crate::explorer::drag::Drag {
+        self.inner.drag
     }
 
-    /// Says the pointer is over the row at `at` during a drag.
-    pub fn drag_over(&self, at: usize) {
-        if self.inner.dragging.with_untracked(Option::is_none) {
-            return;
-        }
-        let over = self.row_at(at).map(|row| row.entry.path);
-        if self.inner.over.get_untracked() != over {
-            self.inner.over.set(over);
-        }
-    }
-
-    /// Which row a drop would land on. Tracked.
-    #[must_use]
-    pub fn drop_target(&self) -> Option<PathBuf> {
-        self.inner.over.get()
-    }
-
-    /// Ends the drag, answering what should move where.
+    /// What a press on the row at `at` would carry.
     ///
-    /// The directory a drop lands in: the row itself when it is one, and the one holding it when
-    /// it is a file. That is what dropping *beside* something means.
-    pub fn finish_drag(&self) -> Option<(PathBuf, PathBuf)> {
-        let from = self.inner.dragging.get_untracked()?;
-        let onto = self.inner.over.get_untracked();
-        self.cancel_drag();
-
-        let onto = onto?;
-        let into = if self.inner.tree.borrow().is_directory(&onto) {
-            onto
-        } else {
-            onto.parent()?.to_path_buf()
+    /// [`acting_on`](Self::acting_on)'s rule, read for a pointer: a press on a row that is one of
+    /// the set takes the whole set, and a press on any other row clears the set and takes that row
+    /// alone. Dragging one file out of three that are picked out would otherwise leave two of them
+    /// lit up and untouched.
+    pub fn carried_from(&self, at: usize) -> Vec<PathBuf> {
+        let Some(row) = self.row_at(at) else {
+            return Vec::new();
         };
-        // Onto itself, or into the directory it is already in: nothing to do.
-        if into == from || from.parent() == Some(into.as_path()) {
-            return None;
+        if self
+            .inner
+            .marked
+            .with_untracked(|marked| marked.contains(&row.entry.path))
+        {
+            return self.inner.marked.get_untracked();
         }
-        // A directory cannot be moved inside itself, which would take the tree with it.
-        if into.starts_with(&from) {
-            return None;
-        }
-        Some((from, into))
+        self.clear_marks();
+        vec![row.entry.path]
     }
 
-    /// Ends the drag without moving anything.
-    pub fn cancel_drag(&self) {
-        if self.inner.dragging.with_untracked(Option::is_some) {
-            self.inner.dragging.set(None);
-        }
-        if self.inner.over.with_untracked(Option::is_some) {
-            self.inner.over.set(None);
-        }
+    /// Where `path` is in the list, when it is in it.
+    #[must_use]
+    pub fn index_of(&self, path: &Path) -> Option<usize> {
+        self.inner.tree.borrow().index_of(path)
+    }
+
+    /// Whether `path` is a directory the tree has already read.
+    #[must_use]
+    pub fn is_directory(&self, path: &Path) -> bool {
+        self.inner.tree.borrow().is_directory(path)
     }
 
     // ---- Moving about --------------------------------------------------------------------

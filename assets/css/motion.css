@@ -88,6 +88,15 @@
     transform-origin: top left;
 }
 
+/* The ghost under the pointer only fades in. It appears where the eye already is, and a zoom would
+ * fight the translate that makes it follow. */
+.treeghost[data-state="on"],
+.treeghost[data-state="settling"] {
+    animation-name: zdt-fade;
+    animation-duration: var(--zdt-quick);
+    animation-timing-function: var(--zdt-ease);
+}
+
 /* ---- Things that go ------------------------------------------------------------------------ */
 
 /* The same movement, run the other way.
@@ -137,6 +146,19 @@
     animation-name: zdt-vanish;
     animation-duration: var(--zdt-instant);
     animation-fill-mode: forwards;
+}
+
+/* Letting go. The ghost travels to where the rows land and fades on the way, so the eye follows
+ * them to the directory that took them. A refused drop and a cancelled one fly back to the row they
+ * came from, which is the same movement with the other destination.
+ *
+ * Stated only here. A transition on the ghost at rest would make it trail the pointer, which reads
+ * as lag rather than as a gesture. */
+.treeghost[data-state="settling"] {
+    transition-property: transform, opacity;
+    transition-duration: var(--zdt-quick);
+    transition-timing-function: var(--zdt-ease);
+    opacity: 0;
 }
 
 @keyframes zdt-vanish {
