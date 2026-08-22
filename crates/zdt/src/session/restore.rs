@@ -405,10 +405,10 @@ fn rebuild(node: &LayoutNode, windows: &[WindowId]) -> Option<Layout> {
 /// The file tree: what was open, and which row the caret was on.
 fn restore_tree(session: &Session, snapshot: &Snapshot) {
     let explorer = session.explorer();
-    if let Some(open) = snapshot.tree.open
-        && open != explorer.is_open_untracked()
-    {
-        explorer.toggle();
+    // The panel's visibility, and never the keyboard: a session coming back with its tree open is
+    // not a session somebody asked to type in the tree.
+    if let Some(open) = snapshot.tree.open {
+        explorer.set_open(open);
     }
     explorer.restore_session(
         snapshot.tree.expanded.clone(),

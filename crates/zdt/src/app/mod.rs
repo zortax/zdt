@@ -204,11 +204,18 @@ fn SessionShell(
     // Everything the session owns.
     session.provide();
 
+    // Whether this is the session on screen. A window keeps several mounted and takes all but one
+    // out of the flow, so this decides both what is drawn and who may hold the keyboard.
+    let showing = {
+        let (client, id) = (client.clone(), session.id());
+        Signal::derive_local(move || client.showing() == Some(id))
+    };
+
     // The one thing in the application that gives a node the keyboard. Every region says how it
     // takes it and none of them takes it for itself, so two regions cannot arm two claims in one
     // flush and leave the later one to win.
     let projection =
-        crate::focus::project::project(session.workspace().focus(), session.workspace());
+        crate::focus::project::project(session.workspace().focus(), session.workspace(), showing);
     on_cleanup_local(move || drop(projection));
 
     // And everything this window owns over it.
@@ -225,11 +232,15 @@ fn SessionShell(
     ));
     crate::settings::view::provide(crate::settings::view::ConfigModalState::new());
 
+    // A session that has never been worked in takes the panel's visibility from the settings. One
+    // that has takes it from what it wrote down, which `restore` has already put back.
+    //
+    // The visibility alone. A panel that opens because a setting says so is not a panel somebody
+    // asked to type in.
     if settings.with_untracked(|config| config.tree.open)
         && let Some(explorer) = zgui::reactive::use_local_context::<Explorer>()
-        && !explorer.is_open()
     {
-        explorer.toggle();
+        explorer.set_open(true);
     }
 
     // The git panel, floating: an overlay over whatever had the keyboard, and where the keyboard
@@ -247,15 +258,10 @@ fn SessionShell(
         crate::focus::Sink::Node(git_panel),
     );
 
-    let showing = {
-        let (client, id) = (client.clone(), session.id());
-        move || client.showing() == Some(id)
-    };
-
     view! {
         box(
             class = "session",
-            style:display = move || (!showing()).then(|| "none".to_owned())
+            style:display = move || (!showing.get()).then(|| "none".to_owned())
         ) {
             Frame {
                 // The tree runs the whole height of the window and the buffer line sits over the

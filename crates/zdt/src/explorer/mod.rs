@@ -340,19 +340,32 @@ impl Explorer {
 
     // ---- Opening and closing -------------------------------------------------------------
 
-    /// Shows or hides the panel.
+    /// Shows or hides the panel, and moves the keyboard with it.
     ///
-    /// Opening it for the first time reads the root, which is why it takes a worker.
+    /// What a key asking for the panel does: somebody who opened it means to use it.
     pub fn toggle(&self) {
         let open = !self.inner.open.get_untracked();
-        self.inner.open.set(open);
+        self.set_open(open);
         if open {
             self.focus();
-            if self.inner.rows.with_untracked(Vec::is_empty) {
-                self.expand_root();
-            }
         } else {
             self.unfocus();
+        }
+    }
+
+    /// Shows or hides the panel, leaving the keyboard where it is.
+    ///
+    /// What restoring a session does. Whether the panel was open and where the keyboard was are
+    /// two facts, and putting the first one back must not answer the second.
+    ///
+    /// Opening it for the first time reads the root, which is why it takes a worker.
+    pub fn set_open(&self, open: bool) {
+        if self.inner.open.get_untracked() == open {
+            return;
+        }
+        self.inner.open.set(open);
+        if open && self.inner.rows.with_untracked(Vec::is_empty) {
+            self.expand_root();
         }
     }
 

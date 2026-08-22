@@ -11,11 +11,9 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
 
 use zgui::prelude::*;
 use zgui::reactive::RenderEffect;
-use zgui::view::time::{TimeoutHandle, Timers};
 use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
@@ -269,52 +267,30 @@ fn BufferView(
                 });
             }
 
-            // The editor with the keyboard is the current buffer of the focused window. Followed
-            // and never set once, because both of those change under it. A `]b` or a `<C-w>w` has
-            // to move the keyboard as well as the view.
+            // Which view is being worked in, which the caret's own line band follows. Followed and
+            // never set once, because both the current buffer and the focused window change under
+            // it.
             //
-            // The claim is made from a timer. The first run of this effect happens while the
-            // editor is still being built, and an unmounted node cannot take focus. The handle is
-            // held for the component's life, because dropping a timer cancels it.
+            // Told to the editor, and never left to a class: the editor reads its colours off the
+            // computed style during layout, and a colour that changes because an attribute changed
+            // on an ancestor reaches it on no frame at all.
+            //
+            // Nothing here asks for the keyboard. The projector is the one thing that gives a node
+            // focus, and it already knows an editor is how a text buffer takes it.
             {
                 let workspace = workspace.clone();
-                let timers = Timers::current();
-                let claim: Rc<RefCell<Option<TimeoutHandle>>> = Rc::new(RefCell::new(None));
-                let held = Rc::clone(&claim);
-                let focus = RenderEffect::new(move |_| {
+                let active = RenderEffect::new(move |_| {
                     // Read first: an editor mounting is what has to wake this, and it is the one
                     // thing that changes without the window or the focus changing.
                     let _ = workspace.mounted_revision();
                     let current = workspace
                         .window(window)
                         .is_some_and(|state| state.current == Some(buffer));
-                    let active = current && workspace.focused() == window;
-
-                    // Which view is being worked in, which the caret's own line band follows. Told
-                    // to the editor, and never left to a class: the editor reads its colours off
-                    // the computed style during layout, and a colour that changes because an
-                    // attribute changed on an ancestor reaches it on no frame at all.
                     if let Some(handle) = workspace.handle_for(window, buffer) {
-                        handle.set_active(active);
+                        handle.set_active(current && workspace.focused() == window);
                     }
-
-                    if !active {
-                        return;
-                    }
-                    let Some(timers) = timers.as_ref() else {
-                        return;
-                    };
-                    let workspace = workspace.clone();
-                    *held.borrow_mut() = Some(timers.set_timeout(Duration::ZERO, move || {
-                        if let Some(handle) = workspace.handle_for(window, buffer) {
-                            handle.focus();
-                        }
-                    }));
                 });
-                on_cleanup_local(move || {
-                    drop(focus);
-                    drop(claim);
-                });
+                on_cleanup_local(move || drop(active));
             }
 
             // What the servers say, painted into the editor's own decoration layer.
