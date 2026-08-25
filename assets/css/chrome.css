@@ -166,30 +166,33 @@
     height: var(--status);
     align-items: center;
     gap: var(--zui-space-md);
-    padding: 0 var(--zui-space-md) 0 0;
+    padding: 0 var(--zui-space-md);
     color: var(--zui-color-muted-foreground);
     font-size: var(--zdt-ui-size-small, 11px);
     min-width: 0;
 }
 
-/* The mode block is the one place in the window that carries a solid fill, because it is the one
- * thing a modal editor must never leave the reader guessing about. */
+/* The mode is a pill: the word in its own colour, ringed by the same colour held back to a hint.
+ * Weight and colour say which mode this is, and the ring keeps the word a thing of its own without
+ * a fill loud enough to pull the eye off the text. */
 .statusline__mode {
     flex: none;
-    padding: 0 var(--zui-space-md);
-    height: var(--status);
-    line-height: var(--status);
-    color: var(--zui-color-background);
-    background-color: var(--zdt-mode-normal);
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    padding: 0 var(--zui-space-sm);
+    height: calc(var(--status) - var(--zui-space-sm));
+    border: 1px solid color-mix(in oklab, currentColor 35%, transparent);
+    border-radius: 999px;
+    color: var(--zdt-mode-normal);
+    font-weight: 700;
+    letter-spacing: 0.06em;
 }
 
-.statusline__mode[data-mode="insert"]   { background-color: var(--zdt-mode-insert); }
-.statusline__mode[data-mode="visual"]   { background-color: var(--zdt-mode-visual); }
-.statusline__mode[data-mode="replace"]  { background-color: var(--zdt-mode-replace); }
-.statusline__mode[data-mode="command"]  { background-color: var(--zdt-mode-command); }
-.statusline__mode[data-mode="terminal"] { background-color: var(--zdt-mode-terminal); }
+.statusline__mode[data-mode="insert"]   { color: var(--zdt-mode-insert); }
+.statusline__mode[data-mode="visual"]   { color: var(--zdt-mode-visual); }
+.statusline__mode[data-mode="replace"]  { color: var(--zdt-mode-replace); }
+.statusline__mode[data-mode="command"]  { color: var(--zdt-mode-command); }
+.statusline__mode[data-mode="terminal"] { color: var(--zdt-mode-terminal); }
 
 /* The file: its type's glyph, its name, and whether it is saved. One group, so the three move
  * together and the line does not reflow when the middle one grows. */

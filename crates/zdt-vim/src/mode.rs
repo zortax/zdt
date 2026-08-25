@@ -44,7 +44,7 @@ impl Mode {
         }
     }
 
-    /// Which colour the status line's block takes, as a data attribute.
+    /// Which colour the status line's mode pill takes, as a data attribute.
     #[must_use]
     pub const fn tone(self) -> &'static str {
         match self {
