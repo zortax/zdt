@@ -12,6 +12,7 @@ pub mod search;
 pub mod state;
 pub mod theme;
 pub mod tree;
+pub mod watch;
 
 pub use crate::config::{Config, Paths};
 pub use crate::fs::{Encoding, FileError, LineEnding, LoadedFile};

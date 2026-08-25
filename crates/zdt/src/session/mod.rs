@@ -134,7 +134,12 @@ struct Inner {
     language: Language,
     git: Git,
     status: crate::git::Status,
+    head: crate::git::Head,
     gitui: zdt_gitui::GitUi,
+    /// What keeps the buffers, the tree and the marks in step with the files on disk.
+    ///
+    /// Held for the session's life; dropping it stops the watching.
+    disk: RefCell<Option<crate::disk::Disk>>,
     cmdline: CommandLine,
     /// The long-lived effects. Held for the session's life; dropping them stops the following.
     effects: RefCell<Vec<Box<dyn std::any::Any>>>,
@@ -187,6 +192,8 @@ impl Session {
             // the panel that shows the rest of it.
             let git = Git::new(workspace.clone(), clock.clone());
             let status = crate::git::Status::new(project.root().to_path_buf(), clock.clone());
+            let head =
+                crate::git::Head::new(project.tooling_root().to_path_buf(), project.git_branch());
             let gitui = crate::git::panel(
                 workspace.clone(),
                 vim.clone(),
@@ -210,7 +217,9 @@ impl Session {
                 language,
                 git,
                 status,
+                head,
                 gitui,
+                disk: RefCell::new(None),
                 cmdline,
                 effects: RefCell::new(Vec::new()),
                 writer: RefCell::new(None),
@@ -284,6 +293,20 @@ impl Session {
             ]
         });
         *inner.effects.borrow_mut() = effects;
+
+        // And the watch on the project. Made under the session's owner too, because what it reads
+        // into is everything above.
+        let disk = inner.owner.with(|| {
+            crate::disk::Disk::follow(
+                &inner.workspace,
+                &inner.explorer,
+                &inner.git,
+                &inner.status,
+                &inner.head,
+                &inner.clock,
+            )
+        });
+        *inner.disk.borrow_mut() = disk;
     }
 
     /// Which session this is.
@@ -449,6 +472,7 @@ impl Session {
         crate::language::provide(self.inner.language.clone());
         crate::git::provide(self.inner.git.clone());
         crate::git::status::provide(self.inner.status.clone());
+        crate::git::head::provide(self.inner.head.clone());
         zdt_gitui::provide(self.inner.gitui.clone());
         crate::cmdline::provide(self.inner.cmdline.clone());
         zgui::reactive::provide_local_context(self.clone());
@@ -456,6 +480,7 @@ impl Session {
 
     /// Everything this session holds goes, which stops its servers and its programs.
     pub(crate) fn dispose(&self) {
+        self.inner.disk.borrow_mut().take();
         self.inner.effects.borrow_mut().clear();
         self.inner.owner.cleanup();
     }

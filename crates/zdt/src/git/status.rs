@@ -8,7 +8,7 @@
 //! read by the file tree. Different sources, different lifetimes, different moments to run again.
 //!
 //! A status reads the whole working tree, so it runs only while the tree is open. A session with
-//! the panel closed does none of this work.
+//! the panel closed does none of this work. What says the tree moved is [`crate::disk`].
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -148,8 +148,6 @@ struct Inner {
     pending: RefCell<Option<zdt_view::Pending>>,
     /// Which read is the current one, so a slow answer to an old question is dropped.
     generation: Cell<u64>,
-    /// The watch on `.git`.
-    watcher: RefCell<Option<zdt_view::Watcher>>,
 }
 
 impl Status {
@@ -170,7 +168,6 @@ impl Status {
                 marks: RwSignal::new_local(Rc::new(FxHashMap::default())),
                 pending: RefCell::new(None),
                 generation: Cell::new(0),
-                watcher: RefCell::new(None),
             }),
         }
     }
@@ -212,26 +209,20 @@ impl Status {
 
     /// Says whether anything is looking at the marks.
     ///
-    /// Turning it on reads at once and starts watching `.git`. Turning it off stops both.
+    /// Turning it on reads at once. Turning it off drops whatever was waiting to be read, and
+    /// every later question is answered by doing nothing until it is turned on again.
+    ///
+    /// What says the marks are out of date is [`crate::disk`], which watches the project and the
+    /// repository for the whole session. This only decides whether to act on what it says.
     pub fn watch(&self, wanted: bool) {
         if self.inner.wanted.replace(wanted) == wanted {
             return;
         }
-        if !wanted {
-            self.inner.watcher.borrow_mut().take();
+        if wanted {
+            self.refresh();
+        } else {
             self.inner.pending.borrow_mut().take();
-            return;
         }
-
-        self.refresh();
-        let Some(repo) = self.inner.repo.as_ref() else {
-            return;
-        };
-        // The directory, and not the files. Git replaces `HEAD` and the index instead of writing
-        // into them, so a watch on the file itself would follow the one that was renamed away.
-        let status = self.clone();
-        let watching = zdt_view::watch(&repo.dot_git(), move || status.refresh_soon());
-        *self.inner.watcher.borrow_mut() = watching;
     }
 
     /// Reads the status again, now.

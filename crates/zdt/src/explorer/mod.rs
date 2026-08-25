@@ -67,6 +67,11 @@ struct Inner {
     /// No signal. Nothing on screen is decided by whether there is one, and an action that asks
     /// how far a half page is needs the answer now rather than on the next flush.
     viewport: RefCell<Option<crate::explorer::tree::Viewport>>,
+    /// Whether the disk moved while the panel was closed.
+    ///
+    /// Reading a directory that nobody is looking at is work for nothing, so a change to a closed
+    /// panel is remembered instead and read when it opens.
+    stale: std::cell::Cell<bool>,
 }
 
 impl Explorer {
@@ -84,6 +89,7 @@ impl Explorer {
                 marked: RwSignal::new_local(Vec::new()),
                 drag: crate::explorer::drag::Drag::new(),
                 viewport: RefCell::new(None),
+                stale: std::cell::Cell::new(false),
             }),
         }
     }
@@ -364,8 +370,14 @@ impl Explorer {
             return;
         }
         self.inner.open.set(open);
-        if open && self.inner.rows.with_untracked(Vec::is_empty) {
+        if !open {
+            return;
+        }
+        if self.inner.rows.with_untracked(Vec::is_empty) {
             self.expand_root();
+        } else if self.inner.stale.get() {
+            // The disk moved while nobody was looking.
+            self.refresh();
         }
     }
 
@@ -456,8 +468,27 @@ impl Explorer {
     }
 
     /// Reads everything that is open again.
+    ///
+    /// What is open stays open, and the caret stays on the row it was on rather than on the index
+    /// it was at: a file made above it moves every index below, and a caret that slid down a
+    /// screen is one nobody asked for.
     pub fn refresh(&self) {
-        self.with_tree_on_a_worker(zdt_core::tree::Tree::refresh);
+        self.inner.stale.set(false);
+        let at = self.selected().map(|row| row.entry.path);
+        self.with_tree_then(zdt_core::tree::Tree::refresh, move |explorer| {
+            if let Some(at) = at.as_deref() {
+                explorer.go_to_path(at);
+            }
+        });
+    }
+
+    /// The same, when the panel is open. A closed panel remembers instead.
+    pub fn refresh_if_open(&self) {
+        if self.is_open_untracked() {
+            self.refresh();
+        } else {
+            self.inner.stale.set(true);
+        }
     }
 
     /// Opens the way to `path` and puts the caret on it.

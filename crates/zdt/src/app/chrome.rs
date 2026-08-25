@@ -20,11 +20,17 @@ pub fn Chrome() -> impl IntoView {
     let window = use_window();
     let workspace = use_workspace();
 
+    // What the session's watch on the repository keeps: a commit, a checkout or a rebase moves
+    // `HEAD`, and the corner moves with it. Never a file read from the header itself, which would
+    // be one per frame.
+    let head = crate::git::try_use_head();
     let branch = {
-        let workspace = workspace.clone();
-        // Read once: a branch changes when a person runs git, and the file watcher will say so
-        // once there is one. Reading it every frame would be a file read every frame.
-        workspace.project().git_branch()
+        let head = head.clone();
+        move || head.as_ref().and_then(crate::git::Head::label)
+    };
+    let branch_shown = {
+        let branch = branch.clone();
+        move || branch().is_none().then(|| "none".to_owned())
     };
 
     // The agent's commit, in the same corner it holds in the agent view: agent work is
@@ -84,26 +90,25 @@ pub fn Chrome() -> impl IntoView {
                 label(class = "nowrap") {"commit"}
             }
 
-            {branch.map(|branch| view! {
-                // A control, because it does something: the branch is the one part of the header
-                // that is *about* the repository, so it is where a person reaches to see it.
-                control(
-                    class = "chrome__branch",
-                    tabindex = Focus::Programmatic,
-                    a11y:label = "Git",
-                    on:pointer_down = move |event: &mut EventCx<'_, events::PointerDown>| {
-                        event.stop_propagation();
-                        if let Some(panel) =
-                            zgui::reactive::use_local_context::<zdt_gitui::GitUi>()
-                        {
-                            panel.open();
-                        }
+            // A control, because it does something: the branch is the one part of the header that
+            // is *about* the repository, so it is where a person reaches to see it. Held in the
+            // row and hidden when there is no repository, so the header does not rebuild itself
+            // every time somebody checks a branch out.
+            control(
+                class = "chrome__branch",
+                tabindex = Focus::Programmatic,
+                a11y:label = "Git",
+                style:display = branch_shown,
+                on:pointer_down = move |event: &mut EventCx<'_, events::PointerDown>| {
+                    event.stop_propagation();
+                    if let Some(panel) = zgui::reactive::use_local_context::<zdt_gitui::GitUi>() {
+                        panel.open();
                     }
-                ) {
-                    Icon(icon = icons::GIT_BRANCH, class = "icon--sm")
-                    label {{branch}}
                 }
-            })}
+            ) {
+                Icon(icon = icons::GIT_BRANCH, class = "icon--sm")
+                label {{move || branch().unwrap_or_default()}}
+            }
 
             WindowControls()
         }

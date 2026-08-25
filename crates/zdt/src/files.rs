@@ -112,7 +112,20 @@ fn go_to_line(workspace: &Workspace, buffer: BufferId, line: Option<u64>) {
     std::mem::forget(handle);
 }
 
-/// Re-reads open files whose bytes moved on disk under a clean buffer.
+/// Which open files to read again.
+#[derive(Clone, Copy)]
+pub enum Which<'a> {
+    /// All of them.
+    Everything,
+    /// The ones at these paths, and no others.
+    ///
+    /// What a watch on the project asks for: a change on disk names the files it touched, and
+    /// reading the twenty other buffers to find out they are unchanged is twenty reads for
+    /// nothing.
+    These(&'a rustc_hash::FxHashSet<PathBuf>),
+}
+
+/// Re-reads every open file whose bytes moved on disk under a clean buffer.
 ///
 /// What a settled agent turn asks for: the agent writes files under the session, and a buffer
 /// with no unsaved work follows the disk. A dirty buffer is left alone and keeps the editor's
@@ -122,46 +135,112 @@ pub fn refresh_from_disk(workspace: &Workspace) {
     if let Some(status) = zgui::reactive::use_local_context::<crate::git::Status>() {
         status.refresh_soon();
     }
+    refresh(workspace, git.as_ref(), Which::Everything);
+}
+
+/// The same, against layers that are held rather than looked up.
+///
+/// What follows a watch. A context read from a timer answers nothing, so what the disk layer has
+/// it hands over.
+pub fn refresh(workspace: &Workspace, git: Option<&crate::git::Git>, which: Which<'_>) {
     for id in workspace.order_untracked() {
-        let Some(entry) = workspace.buffer_untracked(id) else {
-            continue;
+        let wanted = match which {
+            Which::Everything => true,
+            Which::These(paths) => workspace
+                .buffer_untracked(id)
+                .and_then(|entry| entry.path)
+                .is_some_and(|path| paths.contains(&path)),
         };
-        let Some(path) = entry.path.clone() else {
-            continue;
-        };
-        let Some(document) = entry.document().cloned() else {
-            continue;
-        };
-        if entry.is_dirty() || entry.lossy {
-            continue;
+        if wanted {
+            reread(workspace, git, id);
         }
-        let workspace = workspace.clone();
-        let git = git.clone();
-        zdt_view::detached(async move {
-            let reading = path.clone();
-            let Ok(file) = blocking(move || zdt_core::fs::load(&reading)).await else {
+    }
+}
+
+/// Reads what is on disk into `buffer`, when the buffer has no unsaved work.
+///
+/// A dirty buffer is left alone: what somebody typed outweighs what a tool wrote, and the
+/// save-time conflict handling is where the two are reconciled. A buffer read with replaced bytes
+/// is left alone too, because writing one back is what would make the damage permanent.
+fn reread(workspace: &Workspace, git: Option<&crate::git::Git>, buffer: BufferId) {
+    let Some(entry) = workspace.buffer_untracked(buffer) else {
+        return;
+    };
+    let Some(path) = entry.path.clone() else {
+        return;
+    };
+    let Some(document) = entry.document().cloned() else {
+        return;
+    };
+    if entry.is_dirty() || entry.lossy {
+        return;
+    }
+
+    let workspace = workspace.clone();
+    let git = git.cloned();
+    zdt_view::detached(async move {
+        let reading = path.clone();
+        let Ok(file) = blocking(move || zdt_core::fs::load(&reading)).await else {
+            return;
+        };
+        let held = document.text();
+        if let Some(replacement) = narrowed(&held, &file.text) {
+            // Checked again on this thread: a keystroke while the read ran makes the buffer
+            // dirty, and a dirty buffer is never overwritten.
+            let Some(entry) = workspace.buffer_untracked(buffer) else {
                 return;
             };
-            if file.text != document.text() {
-                // Checked again on this thread: a keystroke while the read ran makes the buffer
-                // dirty, and a dirty buffer is never overwritten.
-                let Some(entry) = workspace.buffer_untracked(id) else {
-                    return;
-                };
-                if entry.is_dirty() {
-                    return;
-                }
-                let whole = 0..document.len_bytes();
-                if document.apply(vec![(whole, file.text)]) {
-                    entry.revision.set(document.revision());
-                    entry.mark_saved();
-                }
+            if entry.is_dirty() {
+                return;
             }
-            if let Some(git) = &git {
-                git.refresh_soon(id);
+            if document.apply(vec![replacement]) {
+                entry.revision.set(document.revision());
+                entry.mark_saved();
             }
-        });
+        }
+        if let Some(git) = &git {
+            git.refresh_soon(buffer);
+        }
+    });
+}
+
+/// The one replacement that turns `held` into `found`, when the two differ.
+///
+/// The part that moved, and never the whole file. Every view maps its carets and its selections
+/// through a change, so a replacement of the whole text takes every caret in it to the top: a file
+/// a tool rewrote one line of would move the caret of somebody reading the other end of it.
+fn narrowed(held: &str, found: &str) -> Option<(std::ops::Range<usize>, String)> {
+    if held == found {
+        return None;
     }
+
+    let mut start = held
+        .as_bytes()
+        .iter()
+        .zip(found.as_bytes())
+        .take_while(|(one, two)| one == two)
+        .count();
+    while !held.is_char_boundary(start) || !found.is_char_boundary(start) {
+        start -= 1;
+    }
+
+    let room = held.len().min(found.len()) - start;
+    let mut tail = held
+        .as_bytes()
+        .iter()
+        .rev()
+        .zip(found.as_bytes().iter().rev())
+        .take_while(|(one, two)| one == two)
+        .count()
+        .min(room);
+    while !held.is_char_boundary(held.len() - tail) || !found.is_char_boundary(found.len() - tail) {
+        tail -= 1;
+    }
+
+    Some((
+        start..held.len() - tail,
+        found[start..found.len() - tail].to_owned(),
+    ))
 }
 
 /// Opens `path` when it is a file, or says why it cannot.
@@ -252,4 +331,74 @@ pub fn save_as(
             Err(error) => workspace.complain(error.to_string()),
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::narrowed;
+
+    /// `held` with the one replacement in it, which is what the document is given.
+    fn applied(held: &str, found: &str) -> String {
+        match narrowed(held, found) {
+            Some((range, text)) => {
+                let mut out = held.to_owned();
+                out.replace_range(range, &text);
+                out
+            }
+            None => held.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_text_that_did_not_move_is_no_replacement() {
+        assert!(narrowed("one\ntwo\n", "one\ntwo\n").is_none());
+    }
+
+    #[test]
+    fn only_the_part_that_moved_is_replaced() {
+        // What keeps the caret of somebody reading the end of a file where they left it when a
+        // tool rewrites a line at the top.
+        let (range, text) = narrowed("one\ntwo\nthree\n", "one\nTWO\nthree\n").expect("it moved");
+        assert_eq!(range, 4..7);
+        assert_eq!(text, "TWO");
+    }
+
+    #[test]
+    fn an_insertion_writes_a_line_and_a_removal_takes_one_back() {
+        assert_eq!(
+            applied("one\nthree\n", "one\ntwo\nthree\n"),
+            "one\ntwo\nthree\n"
+        );
+        assert_eq!(applied("one\ntwo\nthree\n", "one\nthree\n"), "one\nthree\n");
+
+        // Nothing outside the one line is touched either way.
+        let (range, _) = narrowed("one\nthree\n", "one\ntwo\nthree\n").expect("it moved");
+        assert!(range.start >= 4 && range.end <= 9);
+    }
+
+    #[test]
+    fn a_replacement_lands_on_character_boundaries() {
+        // Two characters that share a first byte. A range that cut between the bytes of one would
+        // be a panic on the rope.
+        let (range, text) = narrowed("a é b", "a è b").expect("it moved");
+        assert!("a é b".is_char_boundary(range.start));
+        assert!("a é b".is_char_boundary(range.end));
+        assert_eq!(text, "è");
+    }
+
+    #[test]
+    fn a_repeated_ending_is_never_counted_twice() {
+        // The common head and the common tail must not overlap, or the range would run backwards.
+        let (range, _) = narrowed("aa", "aaaa").expect("it moved");
+        assert!(range.start <= range.end);
+        assert_eq!(applied("aa", "aaaa"), "aaaa");
+        assert_eq!(applied("aaaa", "aa"), "aa");
+    }
+
+    #[test]
+    fn a_whole_file_that_changed_is_replaced_whole() {
+        let (range, text) = narrowed("one\n", "two\n").expect("it moved");
+        assert_eq!(range, 0..3);
+        assert_eq!(text, "two");
+    }
 }

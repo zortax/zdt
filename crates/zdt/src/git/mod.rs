@@ -18,9 +18,11 @@ use zdt_git::{Change, Hunk};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 
+pub mod head;
 mod host;
 pub mod status;
 
+pub use crate::git::head::{Head, try_use_head};
 pub use crate::git::host::panel;
 pub use crate::git::status::{Mark, Status, use_status};
 

@@ -53,15 +53,20 @@ pub fn watch(directory: &Path, changed: impl Fn() + 'static) -> Option<Watcher> 
     // and renames it, which is two events for one change. The report is shared and not moved,
     // because it is called once per change and the channel goes on delivering.
     let changed = std::rc::Rc::new(changed);
+    // One flag per watch, and never one for the thread. Several watches run at once — the
+    // configuration directory, a repository, a project — and a flag they shared would let one
+    // watch's pause swallow another watch's change.
+    let held = std::rc::Rc::new(std::cell::Cell::new(false));
     let pump = spawn_receiver(rx, move |()| {
-        if held().replace(true) {
+        if held.replace(true) {
             // Something is already waiting to report. This change joins it.
             return;
         }
         let changed = std::rc::Rc::clone(&changed);
+        let held = std::rc::Rc::clone(&held);
         let task = spawn_local(async move {
             zgui::task::blocking(move || std::thread::sleep(SETTLE)).await;
-            held().set(false);
+            held.set(false);
             changed();
         });
         // The task outlives this call by design. The watch's own handle is what ends the
@@ -73,17 +78,6 @@ pub fn watch(directory: &Path, changed: impl Fn() + 'static) -> Option<Watcher> 
         _watcher: watcher,
         _pump: pump,
     })
-}
-
-/// Whether a report is already waiting to be made.
-///
-/// A cell on the interface thread and not a flag in the closure, because the closure is called
-/// again while the pause is running and both calls have to see the same answer.
-fn held() -> &'static std::thread::LocalKey<std::cell::Cell<bool>> {
-    thread_local! {
-        static WAITING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    }
-    &WAITING
 }
 
 /// Keeps a watch alive. Dropping it stops the watching.

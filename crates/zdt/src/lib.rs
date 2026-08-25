@@ -19,6 +19,7 @@ pub mod assets;
 pub mod cli;
 pub mod cmdline;
 pub mod completion;
+pub mod disk;
 pub mod explorer;
 pub mod files;
 pub mod focus;
