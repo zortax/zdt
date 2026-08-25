@@ -1,23 +1,32 @@
 //! One terminal, mounted.
 
 use crate::settings::Settings;
-use crate::terminals::use_terminals;
+use crate::terminals::{TerminalMode, use_terminals};
 use crate::workspace::{BufferId, WindowId, use_workspace};
 use zgui::prelude::*;
 use zgui::{component, view};
-use zgui_terminal::{TerminalConfig, TerminalHandle, TerminalProps};
+use zgui_terminal::{
+    GridPoint, Input, PointFilter, PointerPhase, TerminalConfig, TerminalHandle, TerminalProps,
+};
 
 /// One terminal.
 ///
 /// Mounted once per buffer and kept: the program behind it is a process, and rebuilding the view
 /// would be starting a second one.
+///
+/// # Where the keys go
+///
+/// Both of a terminal's modes answer here, and which one is [`TerminalMode`]'s to say. In terminal
+/// mode the program reads everything the keymap has not bound in `t`, and `input` stays
+/// [`Input::Live`] so that a key, its release and what an input method composes all reach it. In
+/// terminal-normal mode the keymap reads them all and `input` is [`Input::Held`], so nothing
+/// leaks past the vim engine to the program.
 #[component]
 pub fn Emulator(
     /// Which buffer it is.
     buffer: BufferId,
-    /// Whether it is the floating one. A window's contents otherwise.
-    floating: bool,
-    /// Which window it is in, when it is in one. `None` while it floats.
+    /// Which window it is in, when it is in one. `None` while it floats, which is what makes it
+    /// an overlay rather than a window's contents.
     #[prop(optional)]
     window: Option<WindowId>,
 ) -> impl IntoView {
@@ -49,7 +58,8 @@ pub fn Emulator(
         None => crate::focus::Spot::Overlay(crate::focus::Overlay::Float(buffer)),
     };
     // Inside, because the focusable element with the key handlers on it is the emulator's own and
-    // this box is the place on the screen it is drawn in.
+    // this box is the place on the screen it is drawn in. The same element in both modes, so
+    // leaving terminal mode moves no focus at all.
     crate::focus::claim::sink(spot, crate::focus::Sink::Inside(node));
 
     let on_ready = {
@@ -78,28 +88,54 @@ pub fn Emulator(
 
     let on_key = {
         let terminals = terminals.clone();
-        let workspace = workspace.clone();
         let vim = crate::vim::use_vim();
         Box::new(
             move |event: &zgui::vocab::KeyEvent, modifiers: zgui::vocab::Modifiers| {
                 let Some(chord) = crate::keys::chord_of(event, modifiers) else {
                     return false;
                 };
-                if escape(&terminals, &workspace, &vim, chord, buffer, floating) {
-                    return true;
+                match terminals.mode_of_untracked(buffer) {
+                    TerminalMode::Terminal => {
+                        terminals.terminal_key(&vim, buffer, chord, event, modifiers)
+                    }
+                    TerminalMode::Normal => terminals.normal_key(&vim, buffer, chord),
                 }
-                if terminals.is_inserting_untracked(buffer) {
-                    // Being typed into. The keymap is consulted in terminal mode, where almost
-                    // nothing is bound, so almost every key reaches the program. What is bound
-                    // there wins on purpose: `<F7>` and the rest of vim's own `maps.t`.
-                    return vim.key_in_region_as(chord, "terminal", zdt_vim::Mode::Terminal);
-                }
-                // Idle. The keymap answers in normal mode, so the scrollback can be walked and
-                // `<Leader>ff` still works from inside a terminal.
-                vim.key_in_region(chord, "terminal");
-                true
             },
         ) as zgui_terminal::KeyFilter
+    };
+
+    // While the keymap is reading, the program reads nothing. Held rather than answered key by
+    // key, because a release and a composition are typed too and never reach a key filter.
+    let input = {
+        let terminals = terminals.clone();
+        Signal::derive_local(move || match terminals.mode_of(buffer) {
+            TerminalMode::Terminal => Input::Live,
+            TerminalMode::Normal => Input::Held,
+        })
+    };
+
+    let on_point = {
+        let terminals = terminals.clone();
+        let focus = crate::focus::use_focus();
+        let vim = crate::vim::use_vim();
+        Box::new(move |at: GridPoint, phase: PointerPhase| {
+            if terminals.mode_of_untracked(buffer) != TerminalMode::Normal {
+                return false;
+            }
+            // The engine owns what is selected, so a gesture is a motion it is told about rather
+            // than a second thing painting the grid.
+            match phase {
+                PointerPhase::Down => {
+                    if let Some(window) = window {
+                        focus.enter_window(window);
+                    }
+                    terminals.point_at(&vim, buffer, at, false);
+                }
+                PointerPhase::Move => terminals.point_at(&vim, buffer, at, true),
+                PointerPhase::Up => {}
+            }
+            true
+        }) as PointFilter
     };
 
     // Whether *this* window is showing this terminal. Asking about the focused window instead
@@ -120,15 +156,16 @@ pub fn Emulator(
             node_ref = node,
             style:display = move || (!current()).then(|| "none".to_owned()),
             on:pointer_down = {
-                let terminals = terminals.clone();
                 let focus = crate::focus::use_focus();
                 move |_| {
                     // A terminal in a split is that split being taken up. A float is already the
                     // overlay with the keys, so it says nothing about which split is current.
+                    //
+                    // Nothing here changes the mode: a press that started typing would throw away
+                    // a caret somebody had put somewhere.
                     if let Some(window) = window {
                         focus.enter_window(window);
                     }
-                    terminals.start_typing(buffer);
                 }
             }
         ) {
@@ -136,71 +173,16 @@ pub fn Emulator(
                 class = "terminal__grid",
                 session = running,
                 config = config,
+                input = input,
                 on_ready = on_ready,
                 on_title = on_title,
                 on_exit = on_exit,
                 on_key = on_key,
+                on_point = on_point,
             )
         }
     }
     .any()
-}
-
-/// The keys a terminal does not get to keep.
-///
-/// Answers `true` when the key was one of them, which is what stops it reaching the program.
-fn escape(
-    terminals: &crate::terminals::Terminals,
-    workspace: &crate::workspace::Workspace,
-    vim: &crate::vim::Vim,
-    chord: zdt_vim::Chord,
-    buffer: BufferId,
-    floating: bool,
-) -> bool {
-    use zdt_vim::chord::{Key, Mods};
-
-    let control = chord.mods.contains(Mods::CONTROL);
-
-    // `<C-\>` starts vim's way out, and the `<C-n>` after it finishes the job. Held on the
-    // layer, because the engine is silent while a terminal is answering.
-    if control && chord.key == Key::Char('\\') {
-        terminals.expect_normal();
-        return true;
-    }
-    if terminals.expecting_normal() {
-        terminals.clear_expectation();
-        if control && chord.key == Key::Char('n') {
-            terminals.stop_typing(buffer);
-            if floating {
-                // A float with the keys taken away is a float nobody can reach, so it goes. The
-                // keyboard follows on its own: the float is an overlay, and the region underneath
-                // takes the keys back when it closes.
-                terminals.hide_float();
-            }
-            return true;
-        }
-        // `<C-\>` followed by anything else was `<C-\>` and then that thing: the program should
-        // have had both, and has only missed the first.
-        if let Some(handle) = terminals.handle(buffer) {
-            handle.write(vec![0x1c]);
-        }
-        return false;
-    }
-
-    // Moving out of a terminal without leaving terminal mode first, as the user's own `maps.t`
-    // does.
-    if control && let Key::Char(letter @ ('h' | 'j' | 'k' | 'l')) = chord.key {
-        terminals.stop_typing(buffer);
-        if floating {
-            terminals.hide_float();
-        } else {
-            workspace.cycle_window(matches!(letter, 'j' | 'l'));
-        }
-        vim.reset();
-        return true;
-    }
-
-    false
 }
 
 /// How a terminal looks and behaves, as the settings say.

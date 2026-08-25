@@ -112,6 +112,24 @@ impl Engine {
         }
     }
 
+    /// Starts a charwise visual selection where the caret is, if none is running.
+    ///
+    /// What a pointer drag comes to. A gesture says "from here to there" and never which visual
+    /// mode it meant, so it takes the one `v` gives and leaves a running selection as it is.
+    pub fn start_visual(&mut self, cx: &Context<'_>) -> Step {
+        if self.mode.is_visual() {
+            return Step::Consumed(Vec::new());
+        }
+        let at = self.caret(cx);
+        self.visual_anchor = at;
+        self.visual_head = at;
+        self.mode = Mode::Visual;
+        self.leave_visual();
+        let mut effects = vec![Effect::Mode(Mode::Visual)];
+        effects.append(&mut self.place(at, cx));
+        Step::Consumed(effects)
+    }
+
     /// What only makes sense with something selected.
     pub(super) fn visual(&mut self, action: &Action, cx: &Context<'_>) -> Step {
         match action.leaf() {

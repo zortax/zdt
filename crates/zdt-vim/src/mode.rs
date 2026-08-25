@@ -109,8 +109,8 @@ impl ModeSet {
     ///
     /// Vim's letters, with vim's meanings: `n` normal, `i` insert, `r` replace, `x` every visual
     /// mode including the block one, `v` those and select, `s` select alone, `b` the block one
-    /// alone, `o` operator-pending, `c` the command line, `t` a terminal. `a` is all of them, for
-    /// a binding like `<F7>` that must work wherever the person is.
+    /// alone, `o` operator-pending, `c` the command line, `t` a terminal. `a` is [`EVERY`](Self::EVERY),
+    /// which is every mode but a terminal's.
     #[must_use]
     pub fn from_letter(letter: &str) -> Option<Self> {
         let visual = Self::of(Mode::Visual)
@@ -127,10 +127,17 @@ impl ModeSet {
             "o" => Self::of(Mode::OperatorPending),
             "c" => Self::of(Mode::Command),
             "t" => Self::of(Mode::Terminal),
-            "a" => Self::ALL,
+            "a" => Self::EVERY,
             _ => return None,
         })
     }
+
+    /// Every mode a binding written without a letter applies in.
+    ///
+    /// Every mode but [`Mode::Terminal`]. While a program has the keys, only what `t` binds is
+    /// kept from it: `<Esc>`, `<C-u>` and `<C-l>` are the program's, as they are in vim. A
+    /// binding that must work inside a terminal too says `t` as well.
+    pub const EVERY: Self = Self(Self::ALL.0 & !Self::of(Mode::Terminal).0);
 
     /// Every mode there is.
     pub const ALL: Self = Self(
@@ -174,6 +181,21 @@ mod tests {
     }
 
     #[test]
+    fn a_binding_without_a_letter_leaves_a_terminal_alone() {
+        // While a program has the keys, every one of them is the program's unless `t` says
+        // otherwise. A base map that took `<Esc>` here would make a shell unusable.
+        let every = ModeSet::from_letter("a").expect("a is a mode letter");
+        assert!(!every.has(Mode::Terminal));
+        assert!(every.has(Mode::Normal));
+        assert!(every.has(Mode::Insert));
+        assert!(
+            ModeSet::from_letter("t")
+                .expect("t is a mode letter")
+                .has(Mode::Terminal)
+        );
+    }
+
+    #[test]
     fn everything_is_in_all() {
         for mode in [
             Mode::Normal,
@@ -189,7 +211,7 @@ mod tests {
         ] {
             assert!(ModeSet::ALL.has(mode), "{mode:?}");
         }
-        assert_eq!(ModeSet::from_letter("a"), Some(ModeSet::ALL));
+        assert_eq!(ModeSet::from_letter("a"), Some(ModeSet::EVERY));
     }
 
     #[test]

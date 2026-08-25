@@ -1,7 +1,7 @@
 //! The terminals.
 
 use crate::vim::Vim;
-use crate::workspace::{Axis, Workspace};
+use crate::workspace::{Axis, BufferId, Workspace};
 
 /// The terminals.
 ///
@@ -36,11 +36,9 @@ pub(super) fn run(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::
                         Axis::Vertical
                     };
                     workspace.split(axis);
-                    vim.reset();
                     if let Some(id) = terminals.open(&program) {
                         // The split was made for this terminal, so it goes when the terminal does.
                         terminals.owns_window(id, workspace.focused_untracked());
-                        terminals.start_typing(id);
                     }
                 }
             }
@@ -50,31 +48,35 @@ pub(super) fn run(workspace: &Workspace, vim: &Vim, leaf: &str, args: &zdt_vim::
                 Some(line) => Program::command(line),
                 None => Program::shell(),
             };
-            if let Some(id) = terminals.open(&program) {
-                terminals.start_typing(id);
-            }
+            terminals.open(&program);
         }
         // Whichever terminal is being looked at: the float when one is up, and the current buffer
-        // otherwise. Being in insert is a fact about one terminal, so leaving it names one.
+        // otherwise. Which mode a terminal is in is a fact about that terminal, so leaving one
+        // names one.
         "normal" => {
-            if let Some(buffer) = terminals.showing().or_else(|| {
-                workspace
-                    .current_buffer()
-                    .filter(crate::workspace::Buffer::is_terminal)
-                    .map(|buffer| buffer.id)
-            }) {
-                terminals.stop_typing(buffer);
+            if let Some(buffer) = looked_at(workspace, &terminals) {
+                terminals.enter_normal_mode(vim, buffer);
+            }
+        }
+        "insert" => {
+            if let Some(buffer) = looked_at(workspace, &terminals) {
+                terminals.enter_terminal_mode(vim, buffer);
             }
         }
         "hide" => terminals.hide_float(),
-        "insert" => {
-            if let Some(buffer) = workspace
-                .current_buffer()
-                .filter(|buffer| buffer.is_terminal())
-            {
-                terminals.start_typing(buffer.id);
-            }
-        }
         other => workspace.say(format!("terminal.{other} is not built yet")),
     }
+}
+
+/// Which terminal a key about "the terminal" is about.
+///
+/// The float when one is showing, because it is over everything and has the keys. The current
+/// buffer otherwise, when that buffer is a terminal.
+fn looked_at(workspace: &Workspace, terminals: &crate::terminals::Terminals) -> Option<BufferId> {
+    terminals.showing().or_else(|| {
+        workspace
+            .current_buffer()
+            .filter(crate::workspace::Buffer::is_terminal)
+            .map(|buffer| buffer.id)
+    })
 }

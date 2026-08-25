@@ -721,12 +721,6 @@ keys = "<C-c>"
 action = "mode.normal"
 desc = "Normal mode"
 
-[[map]]
-mode = ["t"]
-keys = "<C-\\><C-n>"
-action = "mode.normal"
-desc = "Leave the terminal"
-
 # ---- Search ------------------------------------------------------------------------------------
 
 [[map]]
@@ -1117,29 +1111,33 @@ desc = "Window right"
 
 # The same four without the prefix, which is what smart-splits binds and what a hand that is
 # already moving expects.
+#
+# Normal mode alone. Inside a terminal these are the program's: `<C-l>` clears a shell and `<C-u>`
+# kills a line, and a window command that took them would make one unusable. `<C-\><C-n>` first,
+# then any of these.
 [[map]]
-mode = ["n", "t"]
+mode = ["n"]
 keys = "<C-h>"
 action = "window.focus"
 args = { direction = "left" }
 desc = "Window left"
 
 [[map]]
-mode = ["n", "t"]
+mode = ["n"]
 keys = "<C-j>"
 action = "window.focus"
 args = { direction = "down" }
 desc = "Window below"
 
 [[map]]
-mode = ["n", "t"]
+mode = ["n"]
 keys = "<C-k>"
 action = "window.focus"
 args = { direction = "up" }
 desc = "Window above"
 
 [[map]]
-mode = ["n", "t"]
+mode = ["n"]
 keys = "<C-l>"
 action = "window.focus"
 args = { direction = "right" }

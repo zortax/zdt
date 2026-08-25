@@ -52,6 +52,11 @@ pub const OVERLAYS: &[(&str, &str, &str)] = &[
         include_str!("../../../assets/keymap-completion.toml"),
         "keymap-completion.toml",
     ),
+    (
+        crate::vim::surface::TERMINAL,
+        include_str!("../../../assets/keymap-terminal.toml"),
+        "keymap-terminal.toml",
+    ),
     (zdt_gitui::REGION, zdt_gitui::KEYMAP, "keymap-git.toml"),
     (
         zdt_agentui::REGION,

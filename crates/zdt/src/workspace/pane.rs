@@ -344,7 +344,7 @@ fn BufferView(
                       modifiers: zgui::vocab::Modifiers,
                       handle: &EditorHandle| {
                     match crate::keys::chord_of(event, modifiers) {
-                        Some(chord) => vim.key(chord, handle),
+                        Some(chord) => vim.key(chord, crate::vim::Surface::Editor(handle)),
                         // A modifier on its own, or a key the keymap has no word for.
                         None => false,
                     }
@@ -379,7 +379,7 @@ fn BufferView(
         // reason an editor does: a terminal taken out of the tree is a program shut down.
         BufferKind::Terminal { .. } => view! {
             box(class = "pane__buffer") {
-                Emulator(buffer = buffer, floating = false, window = Some(window))
+                Emulator(buffer = buffer, window = Some(window))
             }
         }
         .any(),

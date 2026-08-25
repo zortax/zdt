@@ -211,7 +211,6 @@ fn a_terminal_nobody_is_looking_at_names_no_mode() {
         .scope
         .with(|| terminals.open(&waiting()))
         .expect("cat starts");
-    terminals.start_typing(id);
 
     assert_eq!(focus.current(), Focus::Window(split));
     assert_eq!(
@@ -230,36 +229,12 @@ fn a_terminal_nobody_is_looking_at_names_no_mode() {
     );
 
     // Coming back finds it as it was left.
-    assert!(terminals.is_inserting(id), "which it still remembers");
-    terminals.close(id);
-}
-
-#[test]
-fn leaving_one_terminal_leaves_the_others_alone() {
-    let window = Window::open();
-    let (workspace, _) = mount(&window);
-    let terminals = terminals(&window, &workspace);
-
-    let one = window
-        .scope
-        .with(|| terminals.open(&waiting()))
-        .expect("cat starts");
-    let two = window
-        .scope
-        .with(|| terminals.open(&waiting()))
-        .expect("cat starts");
-    terminals.start_typing(one);
-    terminals.start_typing(two);
-
-    terminals.stop_typing(one);
-    assert!(!terminals.is_inserting(one));
-    assert!(
-        terminals.is_inserting(two),
-        "being in insert is a fact about one terminal"
+    assert_eq!(
+        terminals.mode_of(id),
+        zdt::terminals::TerminalMode::Terminal,
+        "which it still remembers"
     );
-
-    terminals.close(one);
-    terminals.close(two);
+    terminals.close(id);
 }
 
 #[test]

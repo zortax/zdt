@@ -2,19 +2,36 @@
 
 use super::*;
 
-/// What a region's key came to.
+/// How the keymap answers a sequence.
 ///
-/// Decided while the keymaps are borrowed, acted on after they are not.
-enum Region {
+/// Owned, and decided while the keymaps are borrowed: an action can load a keymap, so nothing may
+/// run while one is held.
+#[derive(Clone, PartialEq, Debug)]
+pub enum Answer {
     /// Part of a longer sequence.
-    Waiting,
-    /// Bound to nothing, so the region does not want it.
-    Unbound,
+    Pending,
+    /// Bound to nothing.
+    None,
     /// What to run.
     Run(Vec<zdt_vim::Action>),
 }
 
 impl Vim {
+    /// How the keymap answers `keys` in `mode`, with `region`'s rows in front.
+    ///
+    /// Pure: nothing is remembered and nothing runs. For a caller that keeps its own part-typed
+    /// sequence because it must give the keys back when nothing is bound.
+    #[must_use]
+    pub fn resolve(&self, region: Option<&str>, mode: Mode, keys: &[Chord]) -> Answer {
+        self.inner
+            .keymaps
+            .with_layered(region, |layered| match layered.resolve(mode, keys) {
+                Resolution::Pending(_) => Answer::Pending,
+                Resolution::None => Answer::None,
+                Resolution::Run(binding) => Answer::Run(binding.actions.clone()),
+            })
+    }
+
     /// Puts the engine back in normal mode, which a buffer or window switch has to do.
     ///
     /// The editor being left takes its visual painting off with it: nothing is selected in a mode
@@ -24,13 +41,19 @@ impl Vim {
         if let Some(handle) = self.inner.workspace.current_handle() {
             handle.set_overlay(Overlay::default());
         }
+        // A terminal paints on its own grid, and there is one engine for all of them, so a mode
+        // nobody is in any more must leave nothing painted anywhere.
+        if let Some(terminals) = zgui::reactive::use_local_context::<crate::terminals::Terminals>()
+        {
+            terminals.clear_paint();
+        }
         self.publish();
     }
 
     /// Takes one key. Answers whether the editor should be left out of it.
     ///
     /// This is what an editor's key filter is: `true` means the key is used up.
-    pub fn key(&self, chord: Chord, handle: &EditorHandle) -> bool {
+    pub fn key(&self, chord: Chord, surface: Surface<'_>) -> bool {
         // A drag in the file tree takes Escape, wherever the keyboard is. Pressing a file row opens
         // it, which sends the keyboard to the editor — so the panel's own handler is not where the
         // key arrives, and a gesture that holds the pointer must have a way out from here as well.
@@ -47,6 +70,30 @@ impl Vim {
             return chord == Chord::named(zdt_vim::chord::Named::Escape);
         }
 
+        // The layers below are the editor's own: they draw over a document, and a terminal has
+        // none of them.
+        if let Some(handle) = surface.editor()
+            && let Some(taken) = self.editor_layers(chord, handle)
+        {
+            return taken;
+        }
+
+        let step = self.step(chord, surface);
+        self.publish();
+        match step {
+            Step::Consumed(effects) => {
+                self.carry_out(effects, surface);
+                true
+            }
+            Step::Pending => true,
+            Step::PassThrough => false,
+        }
+    }
+
+    /// The layers that read a key before the grammar does, over an editor.
+    ///
+    /// Answers what to report when one of them took the key, and nothing when none did.
+    fn editor_layers(&self, chord: Chord, handle: &EditorHandle) -> Option<bool> {
         // Documentation has two states, and they take keys differently.
         //
         // Focused, which a second `K` does, it takes every key it has a row for. Somebody who
@@ -57,13 +104,13 @@ impl Vim {
             && hover.is_showing()
         {
             if hover.is_focused() {
-                return self.key_in_region(chord, "hover");
+                return Some(self.key_in_region(chord, "hover"));
             }
             // The same key again means "I want to read this", so it takes the keyboard rather
             // than dismissing what it just opened. Asked here and not in the action, because by
             // then this branch has already closed the panel.
             if self.chord_runs(chord, "lsp.hover") && hover.focus() {
-                return true;
+                return Some(true);
             }
             hover.hide();
         }
@@ -77,7 +124,7 @@ impl Vim {
             && self.mode_untracked() == Mode::Insert
             && self.key_in_region_on(chord, "completion", Mode::Insert, Some(handle))
         {
-            return true;
+            return Some(true);
         }
 
         // Labelled tabs take the next key, whatever it is: every letter is a label or the end of
@@ -89,7 +136,7 @@ impl Vim {
                 zdt_vim::chord::Key::Char(character) if chord.mods.is_empty() => Some(character),
                 _ => None,
             };
-            return tabs.key(character);
+            return Some(tabs.key(character));
         }
 
         // A leap in progress takes every key: once it has started, each one is either a character
@@ -99,19 +146,10 @@ impl Vim {
         // Only one over the text. A leap over the file tree's rows answers a row number, which is
         // no place in a rope, and the tree takes its keys where its own keys arrive.
         if self.inner.leaping.is_running_over(crate::leap::Over::Text) {
-            return self.leap_key(chord, handle);
+            return Some(self.leap_key(chord, handle));
         }
 
-        let step = self.step(chord, handle);
-        self.publish();
-        match step {
-            Step::Consumed(effects) => {
-                self.carry_out(effects, handle);
-                true
-            }
-            Step::Pending => true,
-            Step::PassThrough => false,
-        }
+        None
     }
 
     /// Starts a leap over the text, looking `direction`.
@@ -159,30 +197,47 @@ impl Vim {
         });
 
         if let crate::leap::Took::Landed(byte) = took {
-            let step = handle.query(|snapshot| {
-                let selections: Vec<Selection> = snapshot
-                    .selections()
-                    .iter()
-                    .map(|selection| Selection::new(selection.anchor, selection.head))
-                    .collect();
-                let visible = snapshot.visible_lines();
-                let context = Context {
-                    rope: snapshot.rope(),
-                    selections: &selections,
-                    view: View {
-                        top_line: visible.start,
-                        height: visible.len().max(1),
-                    },
-                    owner: self.owner(),
-                };
-                self.inner.engine.borrow_mut().leap_to(byte, &context)
+            let surface = Surface::Editor(handle);
+            let owner = self.owner_of(surface);
+            let step = surface.query(owner, |context| {
+                self.inner.engine.borrow_mut().jump_to(byte, context)
             });
             if let Step::Consumed(effects) = step {
-                self.carry_out(effects, handle);
+                self.carry_out(effects, surface);
             }
         }
         self.publish();
         true
+    }
+
+    /// Puts the caret where a gesture landed on a terminal.
+    ///
+    /// `extending` starts a visual selection first, which is what a drag means. The landing is a
+    /// motion like any other, so an operator waiting for something to apply to is given the range
+    /// up to it.
+    pub fn jump_to(&self, at: zgui_terminal::GridPoint, extending: bool, scrollback: &Scrollback) {
+        let surface = Surface::Terminal(scrollback);
+        let owner = self.owner_of(surface);
+        let byte = surface.query(owner, |context| {
+            crate::terminals::normal::map::byte_of(context.rope, at)
+        });
+
+        if extending {
+            let step = surface.query(owner, |context| {
+                self.inner.engine.borrow_mut().start_visual(context)
+            });
+            if let Step::Consumed(effects) = step {
+                self.carry_out(effects, surface);
+            }
+        }
+
+        let step = surface.query(owner, |context| {
+            self.inner.engine.borrow_mut().jump_to(byte, context)
+        });
+        if let Step::Consumed(effects) = step {
+            self.carry_out(effects, surface);
+        }
+        self.publish();
     }
 
     /// Takes one key for a region that is not an editor: the tree, a picker, a terminal.
@@ -222,17 +277,9 @@ impl Vim {
         // than the ones underneath them.
         self.inner.typing.set(Some(Typing { region, mode }));
 
-        // What to do, decided while the maps are borrowed, and done after they are not: an action
-        // can load a keymap.
-        let outcome = self.inner.keymaps.with_layered(Some(region), |layered| {
-            match layered.resolve(mode, &keys) {
-                Resolution::Pending(_) => Region::Waiting,
-                Resolution::None => Region::Unbound,
-                Resolution::Run(binding) => Region::Run(binding.actions.clone()),
-            }
-        });
+        let outcome = self.resolve(Some(region), mode, &keys);
 
-        if !matches!(outcome, Region::Waiting) {
+        if outcome != Answer::Pending {
             keys.clear();
             self.inner.typing.set(None);
         }
@@ -240,9 +287,9 @@ impl Vim {
         self.publish_region();
 
         match outcome {
-            Region::Waiting => true,
-            Region::Unbound => false,
-            Region::Run(actions) => {
+            Answer::Pending => true,
+            Answer::None => false,
+            Answer::Run(actions) => {
                 for action in &actions {
                     crate::actions::run(&self.inner.workspace, self, action, handle);
                 }

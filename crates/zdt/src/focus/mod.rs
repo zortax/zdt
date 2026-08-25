@@ -17,6 +17,13 @@
 //! the caret stays where it was. Which is which is whether anything registers a [`Sink`] for it, so
 //! a layer that draws no input needs no sink and gets the behaviour for free.
 //!
+//! # Moving it ends the mode
+//!
+//! There is one modal engine and several places it can be driving, so a mode has to end where the
+//! keyboard leaves. Every mover here puts the engine back to normal before it moves, which is why
+//! no window command has to remember to. An overlay is not a move: a picker opened over a visual
+//! selection gives it back when it closes.
+//!
 //! # What is not here
 //!
 //! Whether an overlay is open is the overlay's own state, and stays there. What this holds is the
@@ -195,28 +202,43 @@ impl Focusing {
 
     /// Makes `window` the current pane and gives it the keyboard.
     pub fn enter_window(&self, window: WindowId) {
-        self.set_window(window);
+        if self.inner.window.get_untracked() != window {
+            self.leaving();
+            self.inner.window.set(window);
+        }
         self.enter_panes();
     }
 
     /// Gives the keyboard to the panes, whichever one is current.
     pub fn enter_panes(&self) {
-        if self.inner.region.get_untracked() != Region::Panes {
-            self.inner.region.set(Region::Panes);
-        }
+        self.enter_region(Region::Panes);
     }
 
     /// Gives the keyboard to the file tree.
     pub fn enter_tree(&self) {
-        if self.inner.region.get_untracked() != Region::Tree {
-            self.inner.region.set(Region::Tree);
-        }
+        self.enter_region(Region::Tree);
     }
 
     /// Gives the keyboard to the agent surface.
     pub fn enter_agent(&self) {
-        if self.inner.region.get_untracked() != Region::Agent {
-            self.inner.region.set(Region::Agent);
+        self.enter_region(Region::Agent);
+    }
+
+    fn enter_region(&self, region: Region) {
+        if self.inner.region.get_untracked() != region {
+            self.leaving();
+            self.inner.region.set(region);
+        }
+    }
+
+    /// Says the keyboard is about to move, so the mode it was in ends here.
+    ///
+    /// One engine drives every region, so a mode left behind is a selection painted where nobody
+    /// is typing and a status line naming a mode nobody is in. Called before the move, while what
+    /// is being left is still what is current, so the painting comes off the thing that has it.
+    fn leaving(&self) {
+        if let Some(vim) = zgui::reactive::use_local_context::<crate::vim::Vim>() {
+            vim.reset();
         }
     }
 

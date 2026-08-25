@@ -6,7 +6,7 @@
 use zdt_vim::Mode;
 
 use super::{Focus, Focusing, Overlay};
-use crate::terminals::Terminals;
+use crate::terminals::{TerminalMode, Terminals};
 use crate::vim::Vim;
 use crate::workspace::Workspace;
 
@@ -18,11 +18,17 @@ impl Focusing {
     /// is why this asks the focus first and a terminal second.
     #[must_use]
     pub fn mode(&self, vim: &Vim, terminals: Option<&Terminals>, workspace: &Workspace) -> Mode {
-        let inserting = |buffer| terminals.is_some_and(|held| held.is_inserting(buffer));
+        // While the program has the keys it is TERMINAL, whatever the engine was left in. While
+        // the keymap has them the engine is driving what the terminal holds, so it names the
+        // mode: NORMAL, VISUAL, PENDING, and the rest.
+        let terminal = |buffer| match terminals.map(|held| held.mode_of(buffer)) {
+            None | Some(TerminalMode::Terminal) => Mode::Terminal,
+            Some(TerminalMode::Normal) => vim.mode(),
+        };
 
         match self.current() {
             Focus::Overlay(Overlay::CommandLine) => Mode::Command,
-            Focus::Overlay(Overlay::Float(buffer)) if inserting(buffer) => Mode::Terminal,
+            Focus::Overlay(Overlay::Float(buffer)) => terminal(buffer),
             // The composer is a place to type, so its keys resolve where typing does.
             Focus::Agent => {
                 let composing = zgui::reactive::use_local_context::<zdt_agentui::AgentUi>()
@@ -44,11 +50,7 @@ impl Focusing {
                     return Mode::Normal;
                 };
                 if buffer.is_terminal() {
-                    if inserting(buffer.id) {
-                        Mode::Terminal
-                    } else {
-                        Mode::Normal
-                    }
+                    terminal(buffer.id)
                 } else if buffer.is_panel() {
                     // A panel is a page: no caret, and the engine is not answering for it.
                     Mode::Normal

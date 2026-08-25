@@ -10,6 +10,12 @@
 //! more than a buffer because it must be reachable from anywhere without disturbing what is on
 //! screen.
 //!
+//! # The two modes
+//!
+//! A terminal is either being typed into or being read. Which one it is belongs to the terminal
+//! rather than to the session, the way it does in vim, and [`mode`] holds it. [`keys`] is what a
+//! key does in each, and [`normal`] is what the vim engine reads while a terminal is being read.
+//!
 //! # Why the transports are held here
 //!
 //! The component takes its transport when it is built and never again. A buffer exists before any
@@ -18,6 +24,9 @@
 //! it. A terminal buffer that is never drawn holds a program that is never read from, so closing
 //! one shuts the program down.
 
+pub mod keys;
+pub mod mode;
+pub mod normal;
 pub mod view;
 
 use std::cell::RefCell;
@@ -30,6 +39,8 @@ use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
 use zgui_terminal::TerminalHandle;
 use zgui_terminal::transport::Pty;
+
+pub use crate::terminals::mode::TerminalMode;
 
 use crate::workspace::{BufferId, Workspace};
 
@@ -56,24 +67,21 @@ struct Inner {
     programs: RefCell<FxHashMap<BufferId, Program>>,
     /// Which float is being shown, when one is.
     showing: RwSignal<Option<BufferId>, LocalStorage>,
-    /// Every terminal that is taking keys away from the keymap.
+    /// What each terminal is doing with the keys. See [`mode`].
+    modes: RwSignal<FxHashMap<BufferId, TerminalMode>, LocalStorage>,
+    /// Where the caret is in each terminal whose keys are read rather than typed.
     ///
-    /// A set, and never one answer for the session: being in insert is a fact about a terminal, the
-    /// way it is in vim. Walking out of a split and back finds the terminal as it was left, and a
-    /// terminal nobody is looking at names no mode at all. Which of these has the keyboard is
-    /// [`crate::focus`]'s question.
-    inserting: RwSignal<rustc_hash::FxHashSet<BufferId>, LocalStorage>,
+    /// One per terminal in [`TerminalMode::Normal`], and nothing for the rest: a terminal being
+    /// typed into has the program's own cursor and no caret of its own.
+    normals: RefCell<FxHashMap<BufferId, normal::Scrollback>>,
+    /// What each terminal has held back while it waits to see what follows. See [`keys`].
+    waiting: RefCell<FxHashMap<BufferId, Vec<keys::Held>>>,
     /// The window a terminal was given a split of its own for, when it was.
     ///
     /// A terminal opened with `<Leader>tv` gets a window made for it, and that window has nothing
     /// to show once the terminal has gone, so it goes too. One opened into a window that was
     /// already showing something stays out of here, and closing it goes back to what was there.
     owned_windows: RefCell<FxHashMap<BufferId, crate::workspace::WindowId>>,
-    /// Whether `<C-\>` has been pressed and the `<C-n>` that would complete it is awaited.
-    ///
-    /// Held here, and not in the vim engine. The engine is silent while a terminal is answering,
-    /// because the whole point of terminal mode is that the keys go elsewhere.
-    escaping: std::cell::Cell<bool>,
 }
 
 /// What to run, and where.
@@ -132,9 +140,10 @@ impl Terminals {
                 floats: RefCell::new(FxHashMap::default()),
                 programs: RefCell::new(FxHashMap::default()),
                 showing: RwSignal::new_local(None),
-                inserting: RwSignal::new_local(rustc_hash::FxHashSet::default()),
+                modes: RwSignal::new_local(FxHashMap::default()),
+                normals: RefCell::new(FxHashMap::default()),
+                waiting: RefCell::new(FxHashMap::default()),
                 owned_windows: RefCell::new(FxHashMap::default()),
-                escaping: std::cell::Cell::new(false),
             }),
         }
     }
@@ -277,8 +286,19 @@ impl Terminals {
     // ---- Driving them -------------------------------------------------------------------------
 
     /// Remembers the handle a view has just built.
+    ///
+    /// A terminal whose keys were being read gets its caret again on the new handle: the view is
+    /// what draws the cursor, and one that has just been built is drawing nothing.
     pub fn register(&self, buffer: BufferId, handle: TerminalHandle) {
-        self.inner.handles.borrow_mut().insert(buffer, handle);
+        self.inner
+            .handles
+            .borrow_mut()
+            .insert(buffer, handle.clone());
+        if self.mode_of_untracked(buffer) == TerminalMode::Normal {
+            let scrollback = normal::Scrollback::new(buffer, handle);
+            scrollback.show_cursor();
+            self.inner.normals.borrow_mut().insert(buffer, scrollback);
+        }
     }
 
     /// Forgets it, which a view does as it unmounts.
@@ -326,7 +346,7 @@ impl Terminals {
         if self.inner.showing.get_untracked() == Some(buffer) {
             self.inner.showing.set(None);
         }
-        self.stop_typing(buffer);
+        self.forget_mode(buffer);
     }
 
     // ---- The floating ones ----------------------------------------------------------------------
@@ -342,7 +362,6 @@ impl Terminals {
                 self.hide_float();
             } else {
                 self.inner.showing.set(Some(id));
-                self.start_typing(id);
             }
             return;
         }
@@ -352,7 +371,6 @@ impl Terminals {
         };
         self.inner.floats.borrow_mut().insert(name.to_owned(), id);
         self.inner.showing.set(Some(id));
-        self.start_typing(id);
     }
 
     /// Puts the float away, leaving the program running.
@@ -383,60 +401,6 @@ impl Terminals {
             .collect();
         found.sort_by(|left, right| left.0.cmp(&right.0));
         found
-    }
-
-    // ---- Which terminals are taking keys -------------------------------------------------------
-
-    /// Whether the program in `buffer` is being typed into. Tracked.
-    #[must_use]
-    pub fn is_inserting(&self, buffer: BufferId) -> bool {
-        self.inner.inserting.with(|held| held.contains(&buffer))
-    }
-
-    /// The same, without subscribing.
-    #[must_use]
-    pub fn is_inserting_untracked(&self, buffer: BufferId) -> bool {
-        self.inner
-            .inserting
-            .with_untracked(|held| held.contains(&buffer))
-    }
-
-    /// Gives the keys to the terminal in `buffer`. This is vim's terminal mode.
-    pub fn start_typing(&self, buffer: BufferId) {
-        if !self.is_inserting_untracked(buffer) {
-            self.inner.inserting.update(|held| {
-                held.insert(buffer);
-            });
-        }
-    }
-
-    /// Says that `<C-\>` has been seen and the next key may complete the way out.
-    pub fn expect_normal(&self) {
-        self.inner.escaping.set(true);
-    }
-
-    /// Whether it has.
-    #[must_use]
-    pub fn expecting_normal(&self) -> bool {
-        self.inner.escaping.get()
-    }
-
-    /// Forgets it, which the next key does whether or not it completed anything.
-    pub fn clear_expectation(&self) {
-        self.inner.escaping.set(false);
-    }
-
-    /// Takes them back from the terminal in `buffer`, which is what `<C-\><C-n>` does.
-    ///
-    /// The terminal stays where it is and the program keeps running; what changes is that the
-    /// keymap answers again, so the scrollback can be walked with vim's own motions. Remembered
-    /// per terminal, so coming back to this one finds it as it was left.
-    pub fn stop_typing(&self, buffer: BufferId) {
-        if self.is_inserting_untracked(buffer) {
-            self.inner.inserting.update(|held| {
-                held.remove(&buffer);
-            });
-        }
     }
 }
 

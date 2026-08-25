@@ -137,8 +137,10 @@ fn text_objects_are_bound_where_they_are_typed_and_nowhere_else() {
 }
 
 #[test]
-fn escape_goes_back_to_normal_from_everywhere() {
-    // The one binding a modal editor cannot be missing in any mode.
+fn escape_goes_back_to_normal_from_everywhere_but_a_terminal() {
+    // The one binding a modal editor cannot be missing. A terminal is the exception, and vim's:
+    // while a program has the keys, `<Esc>` is the program's. A shell whose escape key was taken
+    // away is unusable.
     let map = defaults();
     for mode in [
         Mode::Normal,
@@ -150,7 +152,6 @@ fn escape_goes_back_to_normal_from_everywhere() {
         Mode::Select,
         Mode::OperatorPending,
         Mode::Command,
-        Mode::Terminal,
     ] {
         assert_eq!(
             action(&map, mode, "<Esc>"),
@@ -158,6 +159,7 @@ fn escape_goes_back_to_normal_from_everywhere() {
             "{mode:?}"
         );
     }
+    assert_eq!(action(&map, Mode::Terminal, "<Esc>"), None);
 }
 
 #[test]

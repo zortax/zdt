@@ -1,0 +1,56 @@
+# The keys a terminal reads in front of the base map.
+#
+# A terminal has two modes. In `t` the program reads everything, and only what this file binds is
+# kept from it — that is why `<Esc>`, `<C-u>` and `<C-l>` reach a shell. In terminal-normal mode
+# the vim engine drives what the terminal holds, so every motion, text object, operator and visual
+# mode in the base map already works here; the rows below are the ones that have to differ.
+#
+# A binding written with `a` in the base map does *not* apply in `t`, the same way `:map` does not
+# reach vim's terminal mode. Say `t` here for anything that must work while a program is reading.
+
+# ---- The way out ---------------------------------------------------------------------------
+
+[[map]]
+mode = ["t"]
+keys = "<C-\\><C-n>"
+action = "terminal.normal"
+desc = "Terminal normal mode"
+
+# A float has to be dismissible from inside itself, and a function key is not something a program
+# reads. Everything else stays the program's: this is the row to copy for any other binding that
+# must work while a program has the keys.
+[[map]]
+mode = ["t"]
+keys = "<F7>"
+action = "terminal.toggle"
+args = { placement = "float" }
+desc = "Toggle terminal"
+
+# ---- The ways back in ----------------------------------------------------------------------
+#
+# All four, as vim has them. There is nowhere else to put the caret: a program owns its own, and
+# typing goes where it left it.
+
+[[map]]
+mode = ["n"]
+keys = "i"
+action = "terminal.insert"
+desc = "Terminal mode"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "terminal.insert"
+desc = "Terminal mode"
+
+[[map]]
+mode = ["n"]
+keys = "I"
+action = "terminal.insert"
+desc = "Terminal mode"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "terminal.insert"
+desc = "Terminal mode"

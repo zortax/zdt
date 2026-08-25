@@ -15,6 +15,7 @@
 //! What is being typed is here, and belongs to one session. What the keys *mean* is
 //! [`crate::keymaps`], and is the same everywhere.
 
+pub mod surface;
 pub mod whichkey;
 
 mod apply;
@@ -24,10 +25,9 @@ mod read;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use zdt_vim::effect::{Context, Effect, Scroll, Selection, Step, Visual};
+use zdt_vim::effect::{Effect, Scroll, Step, Visual};
 use zdt_vim::engine::Engine;
 use zdt_vim::keymap::Resolution;
-use zdt_vim::motion::View;
 use zdt_vim::notation::{Leaders, parse};
 use zdt_vim::{Chord, Mode};
 use zgui::reactive::prelude::*;
@@ -37,7 +37,11 @@ use zgui_editor::{
 };
 
 use crate::keymaps::Keymaps;
+use crate::terminals::normal::Scrollback;
 use crate::workspace::Workspace;
+
+pub use crate::vim::keys::Answer;
+pub use crate::vim::surface::Surface;
 
 /// How deep a replay may go before it is refused.
 ///

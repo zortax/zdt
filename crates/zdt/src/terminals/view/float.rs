@@ -68,7 +68,7 @@ pub(crate) fn Float(
             node_ref = surface,
             attr:data-state = move || zdt_view::leaving_state(leaving)
         ) {
-            Emulator(buffer = buffer, floating = true)
+            Emulator(buffer = buffer)
         }
     }
 }

@@ -5,15 +5,15 @@
 //!
 //! # Which layer gets the key
 //!
-//! While a terminal is being typed into, almost every key belongs to the program: `j` is a `j`,
-//! `<Esc>` is an escape, and a keymap that answered either would make a terminal nobody can use.
-//! Three things are kept back:
+//! While a program is reading, every key belongs to it unless the keymap binds that key in
+//! terminal mode: `j` is a `j`, `<Esc>` is an escape, `<C-l>` clears the screen. What is bound
+//! there is `assets/keymap-terminal.toml`, and it is two rows — the way out and the key that puts
+//! a float away. Everything else a person wants kept back is a row they add.
 //!
-//! * `<C-\><C-n>`, which is vim's way out of terminal mode. After it the keymap answers again and
-//!   the scrollback can be walked with ordinary motions.
-//! * `<C-h/j/k/l>`, which move between windows. Vim's own terminal mode maps these for the same
-//!   reason: leaving a terminal must not need two hands.
-//! * the key that toggles the float, so that the thing that opened it can put it away.
+//! After `<C-\><C-n>` the keymap answers again and the vim engine drives what the terminal holds,
+//! so motions, text objects and the visual modes work over it exactly as they do over a file. See
+//! [`mode`](crate::terminals::mode) for the two states and
+//! [`normal`](crate::terminals::normal) for the surface the engine reads.
 
 pub(crate) mod emulator;
 mod float;

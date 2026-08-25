@@ -48,7 +48,7 @@ fn mount(text: &str) -> Modal {
                       modifiers: Modifiers,
                       handle: &EditorHandle| {
                     match zdt::keys::chord_of(event, modifiers) {
-                        Some(chord) => layer.key(chord, handle),
+                        Some(chord) => layer.key(chord, zdt::vim::Surface::Editor(handle)),
                         None => false,
                     }
                 },

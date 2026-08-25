@@ -39,7 +39,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
 
     match action.name.split('.').next().unwrap_or("") {
         "buffer" => self::buffer::run(workspace, leaf, args),
-        "window" => self::window::run(workspace, vim, leaf, args),
+        "window" => self::window::run(workspace, leaf, args),
         "app" => self::app::run(workspace, leaf),
         "editor" => self::leap::editor(handle, leaf),
         "leap" => self::leap::run(workspace, vim, leaf, handle),
