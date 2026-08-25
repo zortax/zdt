@@ -81,7 +81,7 @@ pub fn CommitModal(
             let Some(draft) = agent.client().commit_draft() else {
                 return;
             };
-            if draft.thread != opened.thread {
+            if draft.root != opened.root {
                 return;
             }
             let mut landed = Vec::new();
@@ -121,8 +121,8 @@ pub fn CommitModal(
     ) -> Option<Vec<zdt_agent::change::FileStat>> {
         let agent = held.with_untracked(Clone::clone)?;
         let opened = agent.committing()?;
-        let (thread, files) = agent.client().commit_files()?;
-        (thread == opened.thread).then_some(files)
+        let (root, files) = agent.client().commit_files()?;
+        (root == opened.root).then_some(files)
     }
     let file_rows = move || files_of(held).unwrap_or_default();
     let totals = move || {
@@ -260,7 +260,7 @@ pub fn CommitModal(
             return;
         };
         if let Some(opened) = agent.committing() {
-            agent.client().draft_commit(opened.thread);
+            agent.client().draft_commit(opened.root);
         }
     };
 

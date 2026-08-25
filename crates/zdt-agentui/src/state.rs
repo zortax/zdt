@@ -53,11 +53,17 @@ pub struct Review {
     pub turn: Option<i64>,
 }
 
-/// The commit modal's standing state: which thread, and whether the commit pushes.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// The commit modal's standing state: which directory, and whether the commit pushes.
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Committing {
-    /// Which thread's tree is committed.
-    pub thread: ThreadId,
+    /// The directory whose changes are committed.
+    ///
+    /// A directory and never a thread: what a person commits is the work in front of them, which
+    /// a thread may have written, or a person, or both. A session with no thread at all still has
+    /// changes to commit.
+    pub root: std::path::PathBuf,
+    /// The thread working there, when one is. Only a worktree thread's own branch reads it.
+    pub thread: Option<ThreadId>,
     /// Whether the commit is pushed afterwards.
     pub push: bool,
 }
@@ -171,6 +177,16 @@ struct Inner {
     screen: RwSignal<Screen, LocalStorage>,
     /// Which thread the chat view shows.
     selected: RwSignal<Option<ThreadId>, LocalStorage>,
+    /// The directory of the session the editor shows.
+    ///
+    /// What the selection is measured against: a thread belongs to a directory, and the surface
+    /// must never speak for a directory the person is not looking at.
+    here: RwSignal<Option<std::path::PathBuf>, LocalStorage>,
+    /// The directory a thread has been asked for and not yet arrived in.
+    ///
+    /// One ask per directory: the rows and the answer race, and a second ask made while the first
+    /// is in flight is a second thread nobody wanted.
+    creating: std::cell::RefCell<Option<std::path::PathBuf>>,
     /// Where the sidebar's caret is.
     at: RwSignal<usize, LocalStorage>,
     /// Where inside the surface the keyboard belongs.
@@ -217,6 +233,8 @@ impl AgentUi {
                 open: RwSignal::new_local(false),
                 screen: RwSignal::new_local(Screen::Editor),
                 selected: RwSignal::new_local(None),
+                here: RwSignal::new_local(None),
+                creating: std::cell::RefCell::new(None),
                 at: RwSignal::new_local(0),
                 wants: RwSignal::new_local(Want::List),
                 picked: RwSignal::new_local(Vec::new()),
@@ -505,8 +523,8 @@ impl AgentUi {
 
     /// Turns the window between the editor and the chat.
     ///
-    /// Entering the chat with nothing selected selects the row under the caret, so the toggle
-    /// always lands somewhere.
+    /// The chat always shows the work of the session on screen: turning to it takes that
+    /// directory's last thread, and makes one when the directory has none.
     pub fn toggle_screen(&self) {
         match self.inner.screen.get_untracked() {
             Screen::Agent => {
@@ -514,18 +532,93 @@ impl AgentUi {
                 self.inner.host.leave();
             }
             Screen::Editor => {
-                if self.selected_untracked().is_none() {
-                    let at = self.inner.at.get_untracked();
-                    if let Some(shell) = self.shell_at(at) {
-                        self.select(&shell);
-                    }
-                }
                 self.inner.open.set(true);
                 self.inner.screen.set(Screen::Agent);
+                // A deliberate turn to the chat asks again: an ask that went nowhere must not
+                // leave the directory without a thread for good.
+                self.inner.creating.borrow_mut().take();
+                // After the screen, because what a directory with no thread means depends on
+                // which face is being shown.
+                self.settle_selection();
                 self.caret_to_selection();
                 self.inner.wants.set(Want::List);
                 self.inner.host.focus_agent();
             }
+        }
+    }
+
+    // ---- The session on screen ---------------------------------------------------------------
+
+    /// Says which session the editor shows now.
+    ///
+    /// Called whenever a window puts a session on screen. What follows from it is [`Self::settle`],
+    /// which every arrival of the daemon's rows runs again.
+    pub fn showing_project(&self, root: &std::path::Path) {
+        if self
+            .inner
+            .here
+            .with_untracked(|held| held.as_deref() == Some(root))
+        {
+            return;
+        }
+        self.inner.here.set(Some(root.to_path_buf()));
+        // A thread asked for in the directory somebody has just left is no longer wanted here.
+        self.inner.creating.borrow_mut().take();
+    }
+
+    /// The directory of the session on screen. Tracked.
+    #[must_use]
+    pub fn here(&self) -> Option<std::path::PathBuf> {
+        self.inner.here.get()
+    }
+
+    /// The same, falling back to what the host says while no window has spoken yet.
+    #[must_use]
+    fn here_untracked(&self) -> Option<std::path::PathBuf> {
+        self.inner
+            .here
+            .get_untracked()
+            .or_else(|| self.inner.host.project_root())
+    }
+
+    /// The thread in `root` a person worked in last, when it has one.
+    #[must_use]
+    pub fn thread_in(&self, root: &std::path::Path) -> Option<ThreadShell> {
+        last_in(&self.inner.client.threads_untracked(), root)
+    }
+
+    /// Puts the selection back in step with the session on screen.
+    ///
+    /// The rule is [`answer_for`]; this is what carrying each answer out means.
+    pub fn settle_selection(&self) {
+        let Some(root) = self.here_untracked() else {
+            return;
+        };
+        let answer = answer_for(
+            &root,
+            self.selected_shell_untracked().as_ref(),
+            &self.inner.client.threads_untracked(),
+            Asked {
+                screen: self.inner.screen.get_untracked(),
+                listed: self.inner.client.has_listed_untracked(),
+                asked_in: self.inner.creating.borrow().clone(),
+            },
+        );
+
+        match answer {
+            Answer::Keep => {
+                self.inner.creating.borrow_mut().take();
+            }
+            Answer::Show(shell) => {
+                self.inner.creating.borrow_mut().take();
+                self.adopt(&shell);
+            }
+            Answer::Make => {
+                self.clear_selection();
+                *self.inner.creating.borrow_mut() = Some(root.clone());
+                self.inner.client.create(root, String::new());
+            }
+            Answer::Nothing => self.clear_selection(),
         }
     }
 
@@ -589,6 +682,18 @@ impl AgentUi {
 
     /// Makes `shell` the one the chat shows, and the editor follow its directory.
     pub fn select(&self, shell: &ThreadShell) {
+        self.adopt(shell);
+        // A worktree thread's fresh session starts from its project's saved editor state.
+        let inherits = (shell.worktree && !shell.project_root.as_os_str().is_empty())
+            .then_some(shell.project_root.as_path());
+        self.inner.host.open_project(&shell.root, inherits);
+    }
+
+    /// The same, leaving the editor where it is.
+    ///
+    /// What following the editor uses: the session is already the thread's own, and opening it
+    /// again would take the keyboard back into the surface somebody has just left.
+    fn adopt(&self, shell: &ThreadShell) {
         if self.inner.selected.get_untracked() != Some(shell.id) {
             self.inner.selected.set(Some(shell.id));
             self.clear_answers();
@@ -596,10 +701,17 @@ impl AgentUi {
             self.close_commit();
         }
         self.inner.client.watch(shell.id);
-        // A worktree thread's fresh session starts from its project's saved editor state.
-        let inherits = (shell.worktree && !shell.project_root.as_os_str().is_empty())
-            .then_some(shell.project_root.as_path());
-        self.inner.host.open_project(&shell.root, inherits);
+    }
+
+    /// Leaves the chat showing nothing.
+    fn clear_selection(&self) {
+        if self.inner.selected.get_untracked().is_none() {
+            return;
+        }
+        self.inner.selected.set(None);
+        self.clear_answers();
+        self.close_review();
+        self.close_commit();
     }
 
     /// Forgets a selection that named `thread`, which deleting it does.
@@ -626,6 +738,8 @@ impl AgentUi {
     /// Sends the keyboard to the composer.
     pub fn compose(&self) {
         self.inner.screen.set(Screen::Agent);
+        // A composer with no thread under it has nowhere to send what is typed.
+        self.settle_selection();
         self.inner.wants.set(Want::Composer);
         self.inner.host.focus_agent();
     }
@@ -659,6 +773,7 @@ impl AgentUi {
     /// Sends the keyboard to the timeline.
     pub fn to_chat(&self) {
         self.inner.screen.set(Screen::Agent);
+        self.settle_selection();
         if self.inner.wants.get_untracked() != Want::Chat {
             self.inner.wants.set(Want::Chat);
         }
@@ -1521,17 +1636,29 @@ impl AgentUi {
         }
     }
 
-    /// Opens the commit modal for the selected thread. `push` sends the commit on afterwards.
+    /// Opens the commit modal for the session on screen. `push` sends the commit on afterwards.
+    ///
+    /// The directory and never the selection. What is committed is every local change in the
+    /// session's own tree, whoever made them: a thread is not wanted for it, and the sidebar may
+    /// name one working somewhere else entirely.
     ///
     /// The scan and the draft start at once; the fields fill as the answers land, and nothing
     /// is committed until a person says so.
     pub fn open_commit(&self, push: bool) {
-        let Some(thread) = self.selected_untracked() else {
-            self.inner.host.say("no thread is selected");
+        let Some(root) = self.here_untracked() else {
+            self.inner.host.say("there is nothing here to commit");
             return;
         };
-        self.inner.client.draft_commit(thread);
-        self.inner.committing.set(Some(Committing { thread, push }));
+        // Carried only so a worktree thread's branch follows a commit onto a new one: the thread
+        // on screen when it works here, and the directory's last one otherwise.
+        let thread = match self.selected_shell_untracked() {
+            Some(shell) if shell.root == root => Some(shell.id),
+            _ => self.thread_in(&root).map(|shell| shell.id),
+        };
+        self.inner.client.draft_commit(root.clone());
+        self.inner
+            .committing
+            .set(Some(Committing { root, thread, push }));
         self.inner.wants.set(Want::Commit);
         self.inner.host.focus_agent();
         // Again a frame later, the same way the review takes the keyboard: the press that
@@ -1541,6 +1668,14 @@ impl AgentUi {
             let handle = timers.set_timeout(std::time::Duration::ZERO, move || host.focus_agent());
             std::mem::forget(handle);
         }
+    }
+
+    /// Whether there is a session whose changes could be committed. Tracked.
+    ///
+    /// What the button asks before drawing itself. A thread is never wanted for the answer.
+    #[must_use]
+    pub fn can_commit(&self) -> bool {
+        self.here().is_some() || self.inner.host.project_root().is_some()
     }
 
     /// The commit modal's state, while it is open. Tracked.
@@ -1621,6 +1756,7 @@ impl AgentUi {
             format!("{subject}\n\n{}", body.trim())
         };
         self.inner.client.commit(
+            opened.root,
             opened.thread,
             message,
             opened.push,
@@ -1644,6 +1780,77 @@ impl AgentUi {
     }
 }
 
+/// What the surface should show for the directory on screen.
+#[derive(Clone, PartialEq, Debug)]
+enum Answer {
+    /// What is selected already works in it.
+    Keep,
+    /// This thread does, and is the one worked in last.
+    Show(Box<ThreadShell>),
+    /// It has none, and one is wanted.
+    Make,
+    /// It has none, and none is wanted. The chat shows nothing.
+    Nothing,
+}
+
+/// Everything about the surface the rule reads, beside the threads themselves.
+struct Asked {
+    /// Which face the window shows.
+    screen: Screen,
+    /// Whether the daemon has said what threads there are.
+    listed: bool,
+    /// The directory a thread has already been asked for and not yet arrived in.
+    asked_in: Option<std::path::PathBuf>,
+}
+
+/// The thread in `root` worked in last, when it has one.
+///
+/// Archived threads are put away and never come back on their own, so a directory whose only
+/// threads are archived counts as one with none.
+fn last_in(threads: &[ThreadShell], root: &std::path::Path) -> Option<ThreadShell> {
+    threads
+        .iter()
+        .filter(|shell| !shell.archived && shell.root == root)
+        .max_by_key(|shell| shell.updated_at_ms)
+        .cloned()
+}
+
+/// What the surface should show for `root`.
+///
+/// Four answers, and which one applies is the whole rule:
+///
+/// - the selection already works in the directory: it stays. Choosing a thread by hand is never
+///   undone by this;
+/// - the directory has other threads: the one worked in last is what the chat shows;
+/// - it has none and the chat is the screen: one is made, because a chat has to show a
+///   conversation;
+/// - it has none and the editor is the screen: nothing is selected. A thread from another
+///   directory named here would answer for the wrong work and commit the wrong tree.
+fn answer_for(
+    root: &std::path::Path,
+    selected: Option<&ThreadShell>,
+    threads: &[ThreadShell],
+    asked: Asked,
+) -> Answer {
+    if selected.is_some_and(|shell| shell.root == root) {
+        return Answer::Keep;
+    }
+    if let Some(shell) = last_in(threads, root) {
+        return Answer::Show(Box::new(shell));
+    }
+    // An empty list before the daemon has spoken says nothing at all, and a thread made on the
+    // strength of it is a thread nobody asked for beside the ones already there.
+    if asked.screen != Screen::Agent || !asked.listed {
+        return Answer::Nothing;
+    }
+    // One ask at a time: the rows and the answer race, and asking again while the first is in
+    // flight is a second thread nobody wanted.
+    if asked.asked_in.as_deref() == Some(root) {
+        return Answer::Nothing;
+    }
+    Answer::Make
+}
+
 /// How long ago `then` was, in one short word.
 fn age_words(then: u64) -> String {
     let now = zdt_core::state::now_ms();
@@ -1656,5 +1863,124 @@ fn age_words(then: u64) -> String {
         format!("{}h ago", seconds / 3600)
     } else {
         format!("{}d ago", seconds / 86_400)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use zdt_agent::thread::{ThreadId, ThreadShell};
+
+    use super::{Answer, Asked, Screen, answer_for, last_in};
+
+    /// One thread in `root`, last moved at `updated`.
+    fn shell(id: i64, root: &str, updated: u64) -> ThreadShell {
+        ThreadShell {
+            id: ThreadId(id),
+            root: PathBuf::from(root),
+            updated_at_ms: updated,
+            ..ThreadShell::default()
+        }
+    }
+
+    /// What the surface is like when the daemon has spoken and nothing is pending.
+    fn asked(screen: Screen) -> Asked {
+        Asked {
+            screen,
+            listed: true,
+            asked_in: None,
+        }
+    }
+
+    /// The directory the editor is showing in every test here.
+    fn here() -> &'static Path {
+        Path::new("/work/one")
+    }
+
+    #[test]
+    fn a_directory_with_threads_shows_the_one_worked_in_last() {
+        let threads = [
+            shell(1, "/work/one", 100),
+            shell(2, "/work/one", 300),
+            shell(3, "/work/two", 900),
+        ];
+        for screen in [Screen::Editor, Screen::Agent] {
+            let answer = answer_for(here(), None, &threads, asked(screen));
+            assert_eq!(
+                answer,
+                Answer::Show(Box::new(threads[1].clone())),
+                "{screen:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_directory_with_none_shows_nothing_in_the_editor_and_gets_one_in_the_chat() {
+        // The whole point: switching sessions must not leave another directory's thread named
+        // here, and the chat must never be a face with no conversation in it.
+        let threads = [shell(3, "/work/two", 900)];
+        assert_eq!(
+            answer_for(here(), None, &threads, asked(Screen::Editor)),
+            Answer::Nothing
+        );
+        assert_eq!(
+            answer_for(here(), None, &threads, asked(Screen::Agent)),
+            Answer::Make
+        );
+    }
+
+    #[test]
+    fn a_thread_from_another_directory_is_never_kept() {
+        let elsewhere = shell(3, "/work/two", 900);
+        let threads = [elsewhere.clone()];
+        assert_eq!(
+            answer_for(here(), Some(&elsewhere), &threads, asked(Screen::Editor)),
+            Answer::Nothing
+        );
+    }
+
+    #[test]
+    fn a_selection_that_works_here_is_left_alone() {
+        // Choosing a thread by hand is never undone, even when another one moved more recently.
+        let chosen = shell(1, "/work/one", 100);
+        let threads = [chosen.clone(), shell(2, "/work/one", 300)];
+        assert_eq!(
+            answer_for(here(), Some(&chosen), &threads, asked(Screen::Agent)),
+            Answer::Keep
+        );
+    }
+
+    #[test]
+    fn nothing_is_made_before_the_daemon_has_spoken() {
+        // An empty list means "not answered yet" until it says otherwise, and a thread made on
+        // the strength of it is one nobody asked for.
+        let asked = Asked {
+            listed: false,
+            ..asked(Screen::Agent)
+        };
+        assert_eq!(answer_for(here(), None, &[], asked), Answer::Nothing);
+    }
+
+    #[test]
+    fn one_thread_is_asked_for_at_a_time() {
+        // The rows and the answer race; asking again while the first is in flight is a second
+        // thread nobody wanted.
+        let asked = Asked {
+            asked_in: Some(PathBuf::from("/work/one")),
+            ..asked(Screen::Agent)
+        };
+        assert_eq!(answer_for(here(), None, &[], asked), Answer::Nothing);
+    }
+
+    #[test]
+    fn an_archived_thread_is_not_a_thread_the_directory_has() {
+        let mut put_away = shell(1, "/work/one", 900);
+        put_away.archived = true;
+        assert!(last_in(&[put_away.clone()], here()).is_none());
+        assert_eq!(
+            answer_for(here(), None, &[put_away], asked(Screen::Editor)),
+            Answer::Nothing
+        );
     }
 }

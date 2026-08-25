@@ -22,7 +22,7 @@ pub mod todo;
 pub mod wire;
 
 /// Which conversation the socket speaks. Bumped only when a message changes shape incompatibly.
-pub const VERSION: u32 = 10;
+pub const VERSION: u32 = 11;
 
 /// What went wrong on the wire.
 #[derive(Debug, thiserror::Error)]

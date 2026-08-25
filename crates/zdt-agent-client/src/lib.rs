@@ -64,8 +64,8 @@ impl Notice {
 /// A drafted commit message, as the daemon wrote it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitDraft {
-    /// Which thread it was drafted for.
-    pub thread: ThreadId,
+    /// The directory it was drafted for.
+    pub root: PathBuf,
     /// One imperative line.
     pub subject: String,
     /// The body under it.
@@ -94,6 +94,11 @@ pub struct AgentClient {
 struct Inner {
     /// Whether the daemon is on the other end right now.
     connected: RwSignal<bool, LocalStorage>,
+    /// Whether the daemon has said what threads there are, at least once.
+    ///
+    /// An empty list before it speaks says nothing, and something that acts on "there are no
+    /// threads here" must wait for the difference.
+    listed: RwSignal<bool, LocalStorage>,
     /// Every thread, newest first, as the daemon last said.
     threads: RwSignal<Vec<ThreadShell>, LocalStorage>,
     /// Which thread's conversation is followed.
@@ -134,7 +139,7 @@ struct Inner {
     /// What the last import scan turned up: the instance, and its conversations.
     imports: RwSignal<Option<(String, Vec<zdt_agent::protocol::ImportRow>)>, LocalStorage>,
     /// What a commit of the scanned thread would take, from the last scan.
-    commit_files: RwSignal<Option<(ThreadId, Vec<zdt_agent::change::FileStat>)>, LocalStorage>,
+    commit_files: RwSignal<Option<(PathBuf, Vec<zdt_agent::change::FileStat>)>, LocalStorage>,
     /// The drafted commit message, once the model has written.
     commit_draft: RwSignal<Option<CommitDraft>, LocalStorage>,
     /// Where commands go while a connection is up.
@@ -150,6 +155,7 @@ impl AgentClient {
         let client = Self {
             inner: Rc::new(Inner {
                 connected: RwSignal::new_local(false),
+                listed: RwSignal::new_local(false),
                 threads: RwSignal::new_local(Vec::new()),
                 watching: RwSignal::new_local(None),
                 order: RwSignal::new_local(Vec::new()),
@@ -182,6 +188,21 @@ impl AgentClient {
     #[must_use]
     pub fn is_connected(&self) -> bool {
         self.inner.connected.get()
+    }
+
+    /// Whether the daemon has said what threads there are. Tracked.
+    ///
+    /// Until it has, an empty [`threads`](Self::threads) means "not answered yet" and never
+    /// "there are none".
+    #[must_use]
+    pub fn has_listed(&self) -> bool {
+        self.inner.listed.get()
+    }
+
+    /// The same, without subscribing.
+    #[must_use]
+    pub fn has_listed_untracked(&self) -> bool {
+        self.inner.listed.get_untracked()
     }
 
     /// Every thread, newest first. Tracked.
@@ -385,13 +406,15 @@ impl AgentClient {
     /// A non-empty `branch` is made at `HEAD` first and the commit lands on it.
     pub fn commit(
         &self,
-        thread: ThreadId,
+        root: PathBuf,
+        thread: Option<ThreadId>,
         message: String,
         push: bool,
         branch: String,
         paths: Vec<String>,
     ) {
         self.ask(ClientMsg::Commit {
+            root,
             thread,
             message,
             push,
@@ -403,15 +426,15 @@ impl AgentClient {
     /// Scans what a commit would take and has a message drafted for it.
     ///
     /// The files land in [`Self::commit_files`], the draft in [`Self::commit_draft`].
-    pub fn draft_commit(&self, thread: ThreadId) {
+    pub fn draft_commit(&self, root: PathBuf) {
         self.inner.commit_files.set(None);
         self.inner.commit_draft.set(None);
-        self.ask(ClientMsg::DraftCommit { thread });
+        self.ask(ClientMsg::DraftCommit { root });
     }
 
     /// What a commit of the scanned thread would take. Tracked.
     #[must_use]
-    pub fn commit_files(&self) -> Option<(ThreadId, Vec<zdt_agent::change::FileStat>)> {
+    pub fn commit_files(&self) -> Option<(PathBuf, Vec<zdt_agent::change::FileStat>)> {
         self.inner.commit_files.get()
     }
 
@@ -765,17 +788,17 @@ impl AgentClient {
             ServerMsg::Imports { instance, rows } => {
                 self.inner.imports.set(Some((instance, rows)));
             }
-            ServerMsg::CommitFiles { thread, files } => {
-                self.inner.commit_files.set(Some((thread, files)));
+            ServerMsg::CommitFiles { root, files } => {
+                self.inner.commit_files.set(Some((root, files)));
             }
             ServerMsg::CommitDraft {
-                thread,
+                root,
                 subject,
                 body,
                 branch,
             } => {
                 self.inner.commit_draft.set(Some(CommitDraft {
-                    thread,
+                    root,
                     subject,
                     body,
                     branch,
@@ -822,6 +845,9 @@ impl AgentClient {
             }
         });
         self.inner.threads.set(threads);
+        if !self.inner.listed.get_untracked() {
+            self.inner.listed.set(true);
+        }
         if !news.is_empty() {
             self.inner.news.update(|held| held.extend(news));
         }

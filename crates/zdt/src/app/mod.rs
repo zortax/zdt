@@ -212,6 +212,20 @@ fn SessionShell(
         Signal::derive_local(move || client.showing() == Some(id))
     };
 
+    // The agent surface follows the session on screen: what the chat shows, and what a commit is
+    // about, are the work of the directory being looked at and never of whatever the sidebar had
+    // selected in another one.
+    let following = {
+        let agent = zdt_agentui::use_agent();
+        let root = session.project().root().to_path_buf();
+        RenderEffect::new(move |_| {
+            if showing.get() {
+                agent.showing_project(&root);
+            }
+        })
+    };
+    on_cleanup_local(move || drop(following));
+
     // The one thing in the application that gives a node the keyboard. Every region says how it
     // takes it and none of them takes it for itself, so two regions cannot arm two claims in one
     // flush and leave the later one to win.

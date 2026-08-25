@@ -110,10 +110,17 @@ pub enum ClientMsg {
         /// Which turn, by the daemon's id for it.
         turn: i64,
     },
-    /// Commit everything in the thread's working tree.
+    /// Commit everything in a working tree.
+    ///
+    /// About the directory and never about a thread: what a person commits is the work in front
+    /// of them, which a thread may have written, or a person, or both.
     Commit {
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory whose repository is committed.
+        root: std::path::PathBuf,
+        /// The thread working there, when one is. Only a worktree thread's own branch follows a
+        /// commit onto a new one; nothing else about the commit reads it.
+        #[serde(default)]
+        thread: Option<ThreadId>,
         /// The commit message.
         message: String,
         /// Whether to push the branch afterwards.
@@ -131,8 +138,8 @@ pub enum ClientMsg {
     /// Answered twice: [`ServerMsg::CommitFiles`] as soon as the tree is read, and
     /// [`ServerMsg::CommitDraft`] once the model has written.
     DraftCommit {
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory whose repository is scanned.
+        root: std::path::PathBuf,
     },
     /// Take the thread away, history included. A worktree thread's worktree goes with it.
     Delete {
@@ -351,8 +358,9 @@ pub enum ServerMsg {
     },
     /// Something a command asked for went well, in one line worth showing.
     Note {
-        /// Which thread.
-        thread: ThreadId,
+        /// Which thread, when it is about one. A commit is about a directory and names none.
+        #[serde(default)]
+        thread: Option<ThreadId>,
         /// What happened.
         message: String,
     },
@@ -370,17 +378,17 @@ pub enum ServerMsg {
         /// What was found, newest first.
         rows: Vec<ImportRow>,
     },
-    /// What a commit of the thread's working tree would take.
+    /// What a commit of a working tree would take.
     CommitFiles {
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory that was scanned.
+        root: std::path::PathBuf,
         /// The files, with their counts.
         files: Vec<crate::change::FileStat>,
     },
     /// A drafted commit message, for a person to read and change.
     CommitDraft {
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory the message is about.
+        root: std::path::PathBuf,
         /// One imperative line.
         subject: String,
         /// The body under it. Empty when the change needs none.

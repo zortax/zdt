@@ -36,13 +36,14 @@ pub fn Chrome() -> impl IntoView {
     // The agent's commit, in the same corner it holds in the agent view: agent work is
     // committed without turning the window around.
     let agent = zdt_agentui::try_use_agent();
+    // Shown for the session on screen, and never for whatever thread the sidebar has selected:
+    // the button commits the tree a person is looking at. A session with no thread yet is given
+    // one when it is pressed.
     let commit_shown = {
         let agent = agent.clone();
         move || {
-            let selected = agent
-                .as_ref()
-                .is_some_and(|agent| agent.selected().is_some());
-            (!selected).then(|| "none".to_owned())
+            let ready = agent.as_ref().is_some_and(zdt_agentui::AgentUi::can_commit);
+            (!ready).then(|| "none".to_owned())
         }
     };
     let open_commit = {

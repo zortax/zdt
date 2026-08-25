@@ -47,6 +47,22 @@ pub struct MadeWorktree {
     note: Option<String>,
 }
 
+/// What a commit takes, as one argument.
+struct Committing {
+    /// The directory whose repository is committed.
+    root: std::path::PathBuf,
+    /// The thread working there, when one is. Only a worktree thread's branch reads it.
+    thread: Option<ThreadId>,
+    /// The message to commit under.
+    message: String,
+    /// Whether to push afterwards.
+    push: bool,
+    /// A fresh branch to make and commit onto. Empty commits where the checkout stands.
+    branch: String,
+    /// The files to take. Empty takes everything.
+    paths: Vec<String>,
+}
+
 /// One thing for the engine to do.
 pub enum Cmd {
     /// A client finished its handshake.
@@ -87,8 +103,8 @@ pub enum Cmd {
     GitDone {
         /// Which connection asked.
         id: ClientId,
-        /// Which thread it worked in.
-        thread: ThreadId,
+        /// Which thread it worked in, when it worked in one.
+        thread: Option<ThreadId>,
         /// One line about what happened, or what went wrong.
         said: Result<String, String>,
     },
@@ -130,8 +146,8 @@ pub enum Cmd {
     CommitScanned {
         /// Which connection asked.
         id: ClientId,
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory that was scanned.
+        root: std::path::PathBuf,
         /// The files a commit would take.
         files: Vec<FileStat>,
     },
@@ -139,8 +155,8 @@ pub enum Cmd {
     CommitDrafted {
         /// Which connection asked.
         id: ClientId,
-        /// Which thread.
-        thread: ThreadId,
+        /// The directory the message is about.
+        root: std::path::PathBuf,
         /// One imperative line.
         subject: String,
         /// The body under it.
@@ -292,15 +308,15 @@ impl Engine {
                         self.to(id, ServerMsg::Note { thread, message });
                         self.broadcast_shells().await;
                     }
-                    Err(message) => self.error(id, Some(thread), &message),
+                    Err(message) => self.error(id, thread, &message),
                 },
                 Cmd::Named { thread, title } => self.named(thread, title).await,
-                Cmd::CommitScanned { id, thread, files } => {
-                    self.to(id, ServerMsg::CommitFiles { thread, files });
+                Cmd::CommitScanned { id, root, files } => {
+                    self.to(id, ServerMsg::CommitFiles { root, files });
                 }
                 Cmd::CommitDrafted {
                     id,
-                    thread,
+                    root,
                     subject,
                     body,
                     branch,
@@ -308,7 +324,7 @@ impl Engine {
                     self.to(
                         id,
                         ServerMsg::CommitDraft {
-                            thread,
+                            root,
                             subject,
                             body,
                             branch,
@@ -340,13 +356,27 @@ impl Engine {
             } => self.create(id, &root, &title, worktree, instance).await,
             ClientMsg::Revert { thread, turn } => self.revert(id, thread, turn).await,
             ClientMsg::Commit {
+                root,
                 thread,
                 message,
                 push,
                 branch,
                 paths,
-            } => self.commit(id, thread, message, push, branch, paths).await,
-            ClientMsg::DraftCommit { thread } => self.draft_commit(id, thread).await,
+            } => {
+                self.commit(
+                    id,
+                    Committing {
+                        root,
+                        thread,
+                        message,
+                        push,
+                        branch,
+                        paths,
+                    },
+                )
+                .await;
+            }
+            ClientMsg::DraftCommit { root } => self.draft_commit(id, &root).await,
             ClientMsg::Send { thread, text } => self.send(id, thread, text).await,
             ClientMsg::Interrupt { thread } => {
                 let interrupted = match self.provider_of(thread).await {
@@ -750,7 +780,13 @@ impl Engine {
             Ok(thread) => {
                 self.to(id, ServerMsg::Created { thread });
                 if let Some(message) = note {
-                    self.to(id, ServerMsg::Note { thread, message });
+                    self.to(
+                        id,
+                        ServerMsg::Note {
+                            thread: Some(thread),
+                            message,
+                        },
+                    );
                 }
                 self.broadcast_shells().await;
             }
@@ -1056,7 +1092,7 @@ impl Engine {
         self.to(
             id,
             ServerMsg::Note {
-                thread,
+                thread: Some(thread),
                 message: "went back to before the turn".to_owned(),
             },
         );
@@ -1069,30 +1105,27 @@ impl Engine {
     /// A non-empty `branch` is made at `HEAD` first and the commit lands on it. The git work
     /// runs off the loop — a push crosses the network — and the answer comes back as
     /// [`Cmd::GitDone`].
-    async fn commit(
-        &mut self,
-        id: ClientId,
-        thread: ThreadId,
-        message: String,
-        push: bool,
-        branch: String,
-        paths: Vec<String>,
-    ) {
-        let row = match store::thread_row(&self.pool, thread).await {
-            Ok(Some(row)) => row,
-            _ => {
-                self.refuse(id, &format!("thread {thread} is not there"));
-                return;
-            }
-        };
-        if row.state.is_busy() {
-            self.refuse(id, "a turn is running; wait for it first");
+    async fn commit(&mut self, id: ClientId, asked: Committing) {
+        let Committing {
+            root,
+            thread,
+            message,
+            push,
+            branch,
+            paths,
+        } = asked;
+        // A turn writing files is a tree half rewritten, whichever thread is doing it.
+        if self.busy_in(&root).await {
+            self.refuse(id, "a turn is running there; wait for it first");
             return;
         }
+        let row = match thread {
+            Some(thread) => store::thread_row(&self.pool, thread).await.ok().flatten(),
+            None => None,
+        };
         let to_self = self.to_self.clone();
-        let root = row.root;
         // A worktree thread follows its checkout onto the new branch.
-        let tracks = !row.branch.is_empty();
+        let tracks = row.is_some_and(|row| !row.branch.is_empty());
         tokio::task::spawn_blocking(move || {
             let said = (|| {
                 let repo = zdt_git::Repo::open(&root).map_err(|error| error.to_string())?;
@@ -1120,7 +1153,11 @@ impl Engine {
                 }
                 Ok(told)
             })();
-            if said.is_ok() && !branch.is_empty() && tracks {
+            if said.is_ok()
+                && !branch.is_empty()
+                && tracks
+                && let Some(thread) = thread
+            {
                 let _ = to_self.send(Cmd::Rebranched {
                     thread,
                     branch: branch.clone(),
@@ -1134,14 +1171,7 @@ impl Engine {
     ///
     /// The files go back the moment the tree is read; the draft follows when the model answers.
     /// A person types over either without waiting.
-    async fn draft_commit(&mut self, id: ClientId, thread: ThreadId) {
-        let row = match store::thread_row(&self.pool, thread).await {
-            Ok(Some(row)) => row,
-            _ => {
-                self.refuse(id, &format!("thread {thread} is not there"));
-                return;
-            }
-        };
+    async fn draft_commit(&mut self, id: ClientId, root: &std::path::Path) {
         let Some(provider) = self
             .providers
             .messenger(&self.tuning.commit_instance)
@@ -1152,11 +1182,13 @@ impl Engine {
         };
         let model = self.tuning.commit_model.clone();
         let to_self = self.to_self.clone();
-        let root = row.root;
+        let root = root.to_path_buf();
         let on_branch = head_branch(&root);
+        // The directory is what every answer is keyed by, so the scan gets a copy of its own.
+        let scanning = root.clone();
         tokio::spawn(async move {
             let scanned = tokio::task::spawn_blocking(move || {
-                let repo = zdt_git::Repo::open(&root).ok()?;
+                let repo = zdt_git::Repo::open(&scanning).ok()?;
                 zdt_git::commit::pending(&repo).ok()
             })
             .await
@@ -1176,7 +1208,7 @@ impl Engine {
                 .collect();
             let _ = to_self.send(Cmd::CommitScanned {
                 id,
-                thread,
+                root: root.clone(),
                 files: files.clone(),
             });
             if files.is_empty() {
@@ -1192,12 +1224,25 @@ impl Engine {
             };
             let _ = to_self.send(Cmd::CommitDrafted {
                 id,
-                thread,
+                root,
                 subject,
                 body,
                 branch,
             });
         });
+    }
+
+    /// Whether any thread working in `root` has a turn running.
+    ///
+    /// A commit is about a directory, so what stops one is any work underway in that directory
+    /// and never one thread in particular: a tree half rewritten commits half a change.
+    async fn busy_in(&self, root: &std::path::Path) -> bool {
+        let Ok(shells) = store::shells(&self.pool).await else {
+            return false;
+        };
+        shells
+            .iter()
+            .any(|shell| shell.root == root && shell.state.is_busy())
     }
 
     /// Takes a thread away. A worktree thread's worktree and branch go with it, and so do its
@@ -1317,7 +1362,13 @@ impl Engine {
                 self.settle(thread, error).await;
             }
             AgentEvent::Noted { message, .. } => {
-                self.to_watchers(thread, ServerMsg::Note { thread, message });
+                self.to_watchers(
+                    thread,
+                    ServerMsg::Note {
+                        thread: Some(thread),
+                        message,
+                    },
+                );
             }
             AgentEvent::Fatal { error, .. } => {
                 self.set_runners(thread, Vec::new()).await;

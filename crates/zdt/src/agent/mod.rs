@@ -50,6 +50,20 @@ pub fn install(sessions: &SessionHost, settings: &crate::settings::Settings) {
     };
     std::mem::forget(opening);
 
+    // The selection follows the session on screen, and every arrival of the daemon's rows says
+    // the answer again: the rows land after the first window is drawn, and a directory whose
+    // threads had not arrived yet would otherwise keep the answer it was given before them.
+    let settling = {
+        let (client, agent) = (client.clone(), agent.clone());
+        RenderEffect::new(move |_| {
+            let _ = agent.here();
+            let _ = client.threads();
+            let _ = client.has_listed();
+            agent.settle_selection();
+        })
+    };
+    std::mem::forget(settling);
+
     restore_face(sessions, &client, &agent);
 
     zdt_agentui::provide(agent);

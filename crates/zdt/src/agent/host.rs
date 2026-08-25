@@ -2,7 +2,8 @@
 //!
 //! Everything here reads its session out of the local context at call time: the surface is one,
 //! the sessions are many, and a verb always means the session whose subtree the call came from.
-//! The one exception is opening a project, which is the registry's business.
+//! A call from above them all — an effect over the whole application — means the session on
+//! screen. The one exception is opening a project, which is the registry's business.
 
 use std::path::Path;
 
@@ -23,9 +24,22 @@ impl Editor {
         Self { sessions }
     }
 
-    /// The session the calling subtree draws, when there is one.
+    /// The session the calling subtree draws, or the one a window is showing.
+    ///
+    /// The fallback is for a call that came from above every session: an effect over the whole
+    /// application, or an answer off the socket. Both mean the session on screen, which is the
+    /// only one a person could have been asking about.
     fn session(&self) -> Option<crate::session::Session> {
-        crate::session::use_session()
+        crate::session::use_session().or_else(|| self.shown())
+    }
+
+    /// The session a window is showing, read without subscribing.
+    fn shown(&self) -> Option<crate::session::Session> {
+        self.sessions
+            .clients()
+            .into_iter()
+            .find_map(|client| client.showing_untracked())
+            .and_then(|id| self.sessions.session(id))
     }
 }
 
