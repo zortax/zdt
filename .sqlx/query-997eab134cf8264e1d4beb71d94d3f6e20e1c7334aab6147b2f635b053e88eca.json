@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM turns WHERE thread_id = ? AND id >= ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "997eab134cf8264e1d4beb71d94d3f6e20e1c7334aab6147b2f635b053e88eca"
+}

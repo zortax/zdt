@@ -241,8 +241,11 @@ impl Settings {
     }
 
     /// Turns the scheme over, which `<Leader>ub` does.
+    ///
+    /// Written to disk: a colour scheme is a lasting choice, and one that came back different
+    /// after a restart would read as a bug.
     pub fn toggle_scheme(&self) {
-        self.update(|config| {
+        self.edit(|config| {
             config.ui.scheme = match config.ui.scheme {
                 Scheme::Light => Scheme::Dark,
                 Scheme::Dark | Scheme::System => Scheme::Light,

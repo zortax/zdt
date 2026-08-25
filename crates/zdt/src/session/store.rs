@@ -183,6 +183,73 @@ pub fn sweep_blobs(directory: &Path, keeping: &[String]) {
     state::sweep_unfinished(directory);
 }
 
+/// Copies the session for `base` into the slot for `root`, rewriting every path underneath.
+///
+/// What a fresh worktree thread starts from: the base project's buffers, splits, scroll and
+/// tree, aimed at the worktree's checkout. Paths outside the base stay as they are. Blobs are
+/// copied first and the manifest last, like every write. Nothing happens when the base has no
+/// session or `root` already has one, and `false` says so.
+pub fn clone_into(state: &State, base: &Path, root: &Path) -> bool {
+    if read(state, root).is_some() {
+        return false;
+    }
+    let Some(mut snapshot) = read(state, base) else {
+        return false;
+    };
+    let from = directory_for(state, base);
+    let to = directory_for(state, root);
+
+    // The blobs, verbatim: their names and hashes hold, only the manifest's paths move.
+    for buffer in &snapshot.buffers {
+        let Some(content) = &buffer.content else {
+            continue;
+        };
+        let target = to.join(&content.file);
+        if let Some(parent) = target.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        // A blob that does not copy is a buffer that opens from disk with no history, never a
+        // broken session.
+        let _ = std::fs::copy(from.join(&content.file), target);
+    }
+
+    rebase(&mut snapshot, base, root);
+    snapshot.written_at_ms = state::now_ms();
+    write_manifest(&to, &snapshot).is_ok()
+}
+
+/// Aims every path in `snapshot` that sits under `base` at `root` instead.
+fn rebase(snapshot: &mut Snapshot, base: &Path, root: &Path) {
+    let move_path = |path: &mut PathBuf| {
+        if let Ok(rest) = path.strip_prefix(base) {
+            *path = root.join(rest);
+        }
+    };
+    snapshot.root = root.to_path_buf();
+    for buffer in &mut snapshot.buffers {
+        if let Some(path) = &mut buffer.path {
+            move_path(path);
+        }
+        if let Some(terminal) = &mut buffer.terminal
+            && let Some(directory) = &mut terminal.directory
+        {
+            move_path(directory);
+        }
+    }
+    for path in &mut snapshot.tree.expanded {
+        move_path(path);
+    }
+    if let Some(path) = &mut snapshot.tree.at {
+        move_path(path);
+    }
+    for path in &mut snapshot.tree.marked {
+        move_path(path);
+    }
+    for path in &mut snapshot.recent {
+        move_path(path);
+    }
+}
+
 /// Takes the session for `root` away.
 ///
 /// # Errors
@@ -424,6 +491,88 @@ mod tests {
 
         prune(&state, &opening);
         assert!(read(&state, &opening).is_some());
+        let _ = std::fs::remove_dir_all(&state.root);
+    }
+
+    #[test]
+    fn a_clone_moves_every_path_under_the_base_and_leaves_the_rest() {
+        let state = temporary("clone");
+        let base = Path::new("/home/someone/work");
+        let root = Path::new("/state/worktrees/work/zdt-1234");
+
+        let mut held = snapshot(base, 10);
+        held.buffers.push(BufferSnapshot {
+            path: Some(base.join("src/main.rs")),
+            ..BufferSnapshot::default()
+        });
+        held.buffers.push(BufferSnapshot {
+            path: Some(PathBuf::from("/etc/hosts")),
+            ..BufferSnapshot::default()
+        });
+        held.tree.expanded.push(base.join("src"));
+        held.tree.at = Some(base.join("src/main.rs"));
+        held.recent.push(base.join("README.md"));
+        write_manifest(&directory_for(&state, base), &held).expect("it writes");
+
+        assert!(clone_into(&state, base, root));
+        let back = read(&state, root).expect("the clone reads");
+        assert_eq!(back.root, root);
+        assert_eq!(
+            back.buffers[0].path.as_deref(),
+            Some(&*root.join("src/main.rs"))
+        );
+        assert_eq!(
+            back.buffers[1].path.as_deref(),
+            Some(Path::new("/etc/hosts")),
+            "a path outside the base stays"
+        );
+        assert_eq!(back.tree.expanded[0], root.join("src"));
+        assert_eq!(back.recent[0], root.join("README.md"));
+        // And the base is untouched.
+        assert_eq!(read(&state, base).expect("it reads").root, base);
+        let _ = std::fs::remove_dir_all(&state.root);
+    }
+
+    #[test]
+    fn a_clone_copies_the_blobs_and_never_clobbers_an_existing_session() {
+        let state = temporary("clone-blobs");
+        let base = Path::new("/home/someone/work");
+        let root = Path::new("/state/worktrees/work/zdt-5678");
+
+        let directory = directory_for(&state, base);
+        let content = BufferContent {
+            format: FORMAT,
+            text: Some("dirty text".to_owned()),
+            ..BufferContent::default()
+        };
+        let reference = write_blob(&directory, 0, &content).expect("it writes");
+        let mut held = snapshot(base, 10);
+        held.buffers.push(BufferSnapshot {
+            path: Some(base.join("a.txt")),
+            content: Some(reference.clone()),
+            ..BufferSnapshot::default()
+        });
+        write_manifest(&directory, &held).expect("it writes");
+
+        assert!(clone_into(&state, base, root));
+        let cloned = read(&state, root).expect("it reads");
+        let blob = cloned.buffers[0].content.as_ref().expect("the ref is kept");
+        let back = read_blob(&directory_for(&state, root), blob).expect("the blob copied");
+        assert_eq!(back.text.as_deref(), Some("dirty text"));
+
+        // A second clone finds the slot taken and does nothing.
+        assert!(!clone_into(&state, base, root));
+        let _ = std::fs::remove_dir_all(&state.root);
+    }
+
+    #[test]
+    fn a_clone_from_nowhere_is_nothing() {
+        let state = temporary("clone-absent");
+        assert!(!clone_into(
+            &state,
+            Path::new("/never/was"),
+            Path::new("/never/will-be"),
+        ));
         let _ = std::fs::remove_dir_all(&state.root);
     }
 

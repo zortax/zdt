@@ -39,6 +39,8 @@ pub enum DiffRow {
         new: Option<u32>,
         /// Which hunk it belongs to.
         hunk: usize,
+        /// Which file of the diff it belongs to, by position.
+        file: usize,
     },
 }
 
@@ -59,7 +61,7 @@ pub fn diff_rows(files: &[FileDiff]) -> Vec<DiffRow> {
     let mut rows = Vec::new();
     let mut hunk = 0;
 
-    for file in files {
+    for (index, file) in files.iter().enumerate() {
         let (added, removed) = file.counts();
         rows.push(DiffRow::File {
             path: file.path.clone(),
@@ -78,6 +80,7 @@ pub fn diff_rows(files: &[FileDiff]) -> Vec<DiffRow> {
                 old: line.old,
                 new: line.new,
                 hunk,
+                file: index,
             }));
             hunk += 1;
         }

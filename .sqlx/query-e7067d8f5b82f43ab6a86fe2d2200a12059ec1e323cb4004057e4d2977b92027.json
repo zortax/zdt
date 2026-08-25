@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT before_ref FROM turns WHERE thread_id = ? AND before_ref != '' ORDER BY id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "before_ref",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "before_ref"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e7067d8f5b82f43ab6a86fe2d2200a12059ec1e323cb4004057e4d2977b92027"
+}

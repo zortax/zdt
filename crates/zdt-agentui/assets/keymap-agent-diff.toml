@@ -1,0 +1,76 @@
+# The review surface's own keys.
+#
+# Read as an overlay in front of the ordinary keymap: the review answers first, and everything
+# it says nothing about still works while it has the keyboard. The pane itself scrolls by mouse.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "agent.review_down"
+desc = "Next file"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "agent.review_up"
+desc = "Previous file"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "agent.review_down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "agent.review_up"
+
+[[map]]
+mode = ["n"]
+keys = "]f"
+action = "agent.review_down"
+
+[[map]]
+mode = ["n"]
+keys = "[f"
+action = "agent.review_up"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "agent.review_open"
+desc = "Open in the editor"
+
+[[map]]
+mode = ["n"]
+keys = "o"
+action = "agent.review_open"
+
+[[map]]
+mode = ["n"]
+keys = "s"
+action = "agent.review_split"
+desc = "Side by side"
+
+[[map]]
+mode = ["n"]
+keys = "w"
+action = "agent.review_whitespace"
+desc = "Hide whitespace-only hunks"
+
+[[map]]
+mode = ["n"]
+keys = "r"
+action = "agent.revert"
+desc = "Revert the reviewed turn"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "agent.review_close"
+desc = "Back to the conversation"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "agent.review_close"

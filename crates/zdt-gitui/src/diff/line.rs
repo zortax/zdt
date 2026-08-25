@@ -90,6 +90,7 @@ pub(crate) fn DiffLine(
                         text,
                         old,
                         new,
+                        file,
                         ..
                     } => {
                         let tone = match kind {
@@ -102,6 +103,12 @@ pub(crate) fn DiffLine(
                             zdt_git::LineKind::Removed => "-",
                             zdt_git::LineKind::Context => " ",
                         };
+                        let marks = git.diff_marks();
+                        let coloured = marks
+                            .get(file)
+                            .and_then(|sides| sides.line(kind, old, new))
+                            .map(|(held, number)| (held.as_ref(), number));
+                        let body = zdt_syntax::line_view(&text, coloured);
                         view! {
                             row(class = "git__line", attr:data-kind = Some(tone.to_owned())) {
                                 // Both sides' numbers, because a diff is two files and knowing
@@ -113,7 +120,7 @@ pub(crate) fn DiffLine(
                                     {new.map(|n| n.to_string()).unwrap_or_default()}
                                 }
                                 label(class = "git__line-mark") {{mark}}
-                                label(class = "git__line-text") {{text}}
+                                box(class = "git__line-text") {{body}}
                             }
                         }
                         .any()

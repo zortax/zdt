@@ -21,7 +21,9 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/toast.css"),
     include_str!("../../../assets/css/completion.css"),
     include_str!("../../../assets/css/settings.css"),
+    zdt_syntax::STYLE,
     zdt_gitui::STYLE,
+    zdt_agentui::STYLE,
     // Last, so one place decides what moves. Each thing that moves says nothing about it.
     include_str!("../../../assets/css/motion.css"),
     include_str!("../../../assets/css/whichkey.css"),
@@ -51,6 +53,21 @@ pub const OVERLAYS: &[(&str, &str, &str)] = &[
         "keymap-completion.toml",
     ),
     (zdt_gitui::REGION, zdt_gitui::KEYMAP, "keymap-git.toml"),
+    (
+        zdt_agentui::REGION,
+        zdt_agentui::KEYMAP,
+        "keymap-agent.toml",
+    ),
+    (
+        zdt_agentui::REGION_CHAT,
+        zdt_agentui::KEYMAP_CHAT,
+        "keymap-agent-chat.toml",
+    ),
+    (
+        zdt_agentui::REGION_DIFF,
+        zdt_agentui::KEYMAP_DIFF,
+        "keymap-agent-diff.toml",
+    ),
 ];
 
 /// Every compiled-in style sheet, joined.

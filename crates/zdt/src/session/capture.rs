@@ -111,6 +111,7 @@ pub fn capture(session: &Session, views: &Views, generation: u64) -> Snapshot {
         cmdline: CmdlineSnapshot {
             history: session.cmdline().history(),
         },
+        agent: session.agent_view(),
         recent: workspace.recent(),
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM messages WHERE thread_id = ? AND id >= ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "823318ab73fa9b0930ce191e840c10c93f565e5b04f45ff524b8a4dd49b96805"
+}

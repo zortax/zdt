@@ -26,10 +26,17 @@ zdt-core = { path = "crates/zdt-core" }
 zdt-vim = { path = "crates/zdt-vim" }
 zdt-lsp = { path = "crates/zdt-lsp" }
 zdt-git = { path = "crates/zdt-git" }
+zdt-syntax = { path = "crates/zdt-syntax" }
 zdt-view = { path = "crates/zdt-view" }
 zdt-icons = { path = "crates/zdt-icons" }
 zdt-gitui = { path = "crates/zdt-gitui" }
 zdt-ipc = { path = "crates/zdt-ipc" }
+zdt-agent = { path = "crates/zdt-agent" }
+zdt-agent-harness = { path = "crates/zdt-agent-harness" }
+zdt-agent-claude = { path = "crates/zdt-agent-claude" }
+zdt-agent-codex = { path = "crates/zdt-agent-codex" }
+zdt-agent-client = { path = "crates/zdt-agent-client" }
+zdt-agentui = { path = "crates/zdt-agentui" }
 
 # --- text --------------------------------------------------------------------------------
 ropey = "1.6"
@@ -73,12 +80,30 @@ gix = { version = "0.85", default-features = false, features = [
 ] }
 
 # --- platform ----------------------------------------------------------------------------
-tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync", "net"] }
+tokio = { version = "1", features = [
+    "process",
+    "io-util",
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "net",
+    "time",
+] }
 tokio-util = { version = "0.7", features = ["compat"] }
 notify = "8"
 notify-debouncer-full = "0.5"
 dirs = "6"
 libloading = "0.8"
+
+# --- agent -------------------------------------------------------------------------------
+sqlx = { version = "0.9", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+    "macros",
+    "migrate",
+] }
+uuid = { version = "1", features = ["v4"] }
 
 # --- data --------------------------------------------------------------------------------
 serde = { version = "1", features = ["derive"] }

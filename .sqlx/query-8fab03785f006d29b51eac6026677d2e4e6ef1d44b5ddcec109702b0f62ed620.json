@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE turns SET before_ref = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "8fab03785f006d29b51eac6026677d2e4e6ef1d44b5ddcec109702b0f62ed620"
+}

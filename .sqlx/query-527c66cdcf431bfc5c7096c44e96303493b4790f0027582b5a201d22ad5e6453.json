@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT after_ref FROM turns\n         WHERE thread_id = ? AND after_ref != '' ORDER BY id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "after_ref",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "after_ref"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "527c66cdcf431bfc5c7096c44e96303493b4790f0027582b5a201d22ad5e6453"
+}

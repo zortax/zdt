@@ -30,7 +30,6 @@ pub mod host;
 pub mod labels;
 pub mod panel;
 pub mod status;
-mod visible;
 
 pub use crate::diff::{DiffRow, diff_rows};
 pub use crate::host::{Host, Nowhere};

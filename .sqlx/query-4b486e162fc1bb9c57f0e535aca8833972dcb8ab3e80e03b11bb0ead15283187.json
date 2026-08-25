@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE threads\n         SET state = 'failed',\n             last_error = 'the session did not survive a restart; send a message to continue',\n             updated_at_ms = ?\n         WHERE state IN ('starting', 'working')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "4b486e162fc1bb9c57f0e535aca8833972dcb8ab3e80e03b11bb0ead15283187"
+}

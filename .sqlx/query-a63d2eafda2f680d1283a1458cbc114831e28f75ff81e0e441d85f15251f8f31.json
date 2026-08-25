@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT todos FROM threads WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "todos",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "todos"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a63d2eafda2f680d1283a1458cbc114831e28f75ff81e0e441d85f15251f8f31"
+}

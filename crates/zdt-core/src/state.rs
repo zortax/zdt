@@ -57,6 +57,12 @@ impl State {
     pub fn sessions(&self) -> PathBuf {
         self.root.join("sessions")
     }
+
+    /// Where the agent daemon keeps its database and its logs.
+    #[must_use]
+    pub fn agent(&self) -> PathBuf {
+        self.root.join("agent")
+    }
 }
 
 /// What went wrong writing state.

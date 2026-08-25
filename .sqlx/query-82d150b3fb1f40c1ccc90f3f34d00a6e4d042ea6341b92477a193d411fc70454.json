@@ -1,0 +1,350 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT threads.id, threads.title, threads.state, threads.last_error,\n                threads.mode, threads.model, threads.proposed_plan,\n                threads.worktree, threads.branch, threads.instance, threads.provider,\n                threads.diff_files, threads.diff_added, threads.diff_removed,\n                threads.context_tokens, threads.context_limit, threads.cost_usd,\n                threads.pinned, threads.snoozed_until, threads.settled, threads.archived,\n                threads.unread, threads.draft, threads.effort,\n                threads.created_at_ms, threads.updated_at_ms,\n                projects.root, projects.name\n         FROM threads\n         JOIN projects ON projects.id = threads.project_id\n         ORDER BY threads.id DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "title"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "last_error",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "last_error"
+          }
+        }
+      },
+      {
+        "name": "mode",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "mode"
+          }
+        }
+      },
+      {
+        "name": "model",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "name": "proposed_plan",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "proposed_plan"
+          }
+        }
+      },
+      {
+        "name": "worktree",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "worktree"
+          }
+        }
+      },
+      {
+        "name": "branch",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "branch"
+          }
+        }
+      },
+      {
+        "name": "instance",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "instance"
+          }
+        }
+      },
+      {
+        "name": "provider",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "name": "diff_files",
+        "ordinal": 11,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "diff_files"
+          }
+        }
+      },
+      {
+        "name": "diff_added",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "diff_added"
+          }
+        }
+      },
+      {
+        "name": "diff_removed",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "diff_removed"
+          }
+        }
+      },
+      {
+        "name": "context_tokens",
+        "ordinal": 14,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "context_tokens"
+          }
+        }
+      },
+      {
+        "name": "context_limit",
+        "ordinal": 15,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "context_limit"
+          }
+        }
+      },
+      {
+        "name": "cost_usd",
+        "ordinal": 16,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "cost_usd"
+          }
+        }
+      },
+      {
+        "name": "pinned",
+        "ordinal": 17,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "pinned"
+          }
+        }
+      },
+      {
+        "name": "snoozed_until",
+        "ordinal": 18,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "snoozed_until"
+          }
+        }
+      },
+      {
+        "name": "settled",
+        "ordinal": 19,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "settled"
+          }
+        }
+      },
+      {
+        "name": "archived",
+        "ordinal": 20,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "archived"
+          }
+        }
+      },
+      {
+        "name": "unread",
+        "ordinal": 21,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "unread"
+          }
+        }
+      },
+      {
+        "name": "draft",
+        "ordinal": 22,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "draft"
+          }
+        }
+      },
+      {
+        "name": "effort",
+        "ordinal": 23,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "effort"
+          }
+        }
+      },
+      {
+        "name": "created_at_ms",
+        "ordinal": 24,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "created_at_ms"
+          }
+        }
+      },
+      {
+        "name": "updated_at_ms",
+        "ordinal": 25,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "updated_at_ms"
+          }
+        }
+      },
+      {
+        "name": "root",
+        "ordinal": 26,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "root"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 27,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "82d150b3fb1f40c1ccc90f3f34d00a6e4d042ea6341b92477a193d411fc70454"
+}

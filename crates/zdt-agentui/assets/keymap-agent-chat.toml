@@ -1,0 +1,142 @@
+# The chat view's own keys: the asks, the menus, and the ways out.
+#
+# Read as an overlay in front of the ordinary keymap: the chat answers first, and everything it
+# says nothing about still works while it has the keyboard. The scrollback itself moves by mouse
+# alone.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "agent.chat_down"
+desc = "Down an open menu"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "agent.chat_up"
+desc = "Up an open menu"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "agent.chat_down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "agent.chat_up"
+
+[[map]]
+mode = ["n"]
+keys = "i"
+action = "agent.compose"
+desc = "Write a prompt"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "agent.approve"
+desc = "Approve the ask"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "agent.always"
+desc = "Approve for the session"
+
+[[map]]
+mode = ["n"]
+keys = "d"
+action = "agent.decline"
+desc = "Decline the ask"
+
+[[map]]
+mode = ["n"]
+keys = "1"
+action = "agent.choose_1"
+
+[[map]]
+mode = ["n"]
+keys = "2"
+action = "agent.choose_2"
+
+[[map]]
+mode = ["n"]
+keys = "3"
+action = "agent.choose_3"
+
+[[map]]
+mode = ["n"]
+keys = "4"
+action = "agent.choose_4"
+
+[[map]]
+mode = ["n"]
+keys = "5"
+action = "agent.choose_5"
+
+[[map]]
+mode = ["n"]
+keys = "6"
+action = "agent.choose_6"
+
+[[map]]
+mode = ["n"]
+keys = "7"
+action = "agent.choose_7"
+
+[[map]]
+mode = ["n"]
+keys = "8"
+action = "agent.choose_8"
+
+[[map]]
+mode = ["n"]
+keys = "9"
+action = "agent.choose_9"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "agent.confirm"
+desc = "Confirm"
+
+[[map]]
+mode = ["n"]
+keys = "m"
+action = "agent.mode"
+desc = "Choose the mode"
+
+[[map]]
+mode = ["n"]
+keys = "M"
+action = "agent.model"
+desc = "Choose the model"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "agent.stop"
+desc = "Stop the turn"
+
+[[map]]
+mode = ["n"]
+keys = "<Tab>"
+action = "agent.toggle"
+desc = "Back to the editor"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "agent.back"
+desc = "To the list"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "agent.back"
+
+[[map]]
+mode = ["n"]
+keys = "h"
+action = "agent.back"

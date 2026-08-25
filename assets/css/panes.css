@@ -156,12 +156,6 @@
     padding: calc(var(--zui-space-base) * 2) calc(var(--zui-space-base) * 3);
 }
 
-/* The spinner beside what a server is busy with. */
-.spinner {
-    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
-    color: var(--zui-color-primary);
-}
-
 /* A window with nothing in it.
  *
  * Two lines and a glyph. Not a dashboard: what a person wants from an empty pane is to stop

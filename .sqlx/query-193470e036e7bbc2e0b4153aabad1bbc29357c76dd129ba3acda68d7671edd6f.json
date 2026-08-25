@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE threads SET context_tokens = ?, context_limit = MAX(context_limit, ?) WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "193470e036e7bbc2e0b4153aabad1bbc29357c76dd129ba3acda68d7671edd6f"
+}

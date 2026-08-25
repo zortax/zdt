@@ -70,6 +70,7 @@ pub struct Snapshot {
     pub tree: TreeSnapshot,
     pub vim: VimSnapshot,
     pub cmdline: CmdlineSnapshot,
+    pub agent: AgentSnapshot,
     /// Every file opened, most recent first, for the picker.
     #[serde(with = "os_paths")]
     pub recent: Vec<PathBuf>,
@@ -301,6 +302,33 @@ pub struct TreeSnapshot {
     pub at: Option<PathBuf>,
     #[serde(with = "os_paths")]
     pub marked: Vec<PathBuf>,
+}
+
+/// The agent surface, as this session's window last showed it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AgentSnapshot {
+    /// Which face the window showed.
+    pub face: FaceSort,
+    /// Which thread the chat showed, by the daemon's own id.
+    pub thread: Option<i64>,
+    /// Whether the sidebar was on screen. Nothing on snapshots from before it was written, and
+    /// the configuration decides then.
+    pub side_open: Option<bool>,
+}
+
+/// Which face a window shows.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FaceSort {
+    /// The editor: the tree, the splits, the buffer line.
+    #[default]
+    Editor,
+    /// The chat view of the selected thread.
+    Agent,
+    /// A face a later zdt has and this one does not. Read as the editor.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Vim's memory.

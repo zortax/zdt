@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT thread_id, first_item, resume_before, before_ref FROM turns WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "thread_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "thread_id"
+          }
+        }
+      },
+      {
+        "name": "first_item",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "first_item"
+          }
+        }
+      },
+      {
+        "name": "resume_before",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "resume_before"
+          }
+        }
+      },
+      {
+        "name": "before_ref",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "turns",
+            "name": "before_ref"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "5371ca9e7123f139fcaa6af01468cd794dc77b412bbf1ed68b6ba01a01b17a7a"
+}

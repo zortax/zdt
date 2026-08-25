@@ -71,6 +71,7 @@ pub(super) fn outline_rows(
                 matched: Vec::new(),
                 glyph: Some(glyph),
                 tint: Some(tint),
+                icon: None,
                 target: Target::File {
                     path: path.to_path_buf(),
                     line: Some(line),
@@ -100,6 +101,7 @@ pub(super) fn outline_rows(
                     matched: Vec::new(),
                     glyph: Some(glyph),
                     tint: Some(tint),
+                    icon: None,
                     target: Target::File {
                         path: path.to_path_buf(),
                         line: Some(line),
@@ -145,6 +147,7 @@ pub(super) fn diagnostics_picker(workspace: &Workspace, language: &Language) {
                 matched: Vec::new(),
                 glyph: Some(crate::language::diagnostics::glyph(Some(severity))),
                 tint: Some(crate::language::diagnostics::tint(Some(severity))),
+                icon: None,
                 target: Target::File {
                     path: path.clone(),
                     line: Some(line),

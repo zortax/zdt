@@ -88,8 +88,76 @@
     font-weight: 600;
 }
 
+.md__strike {
+    text-decoration-line: line-through;
+    color: var(--zui-color-muted-foreground);
+}
+
 .md__link {
     color: var(--zdt-doc-link, var(--zui-color-primary));
+}
+
+/* ---- Quotes ------------------------------------------------------------------------------- */
+
+.md__quote {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--zui-space-base) * 2);
+    padding: var(--zui-space-base) calc(var(--zui-space-base) * 3);
+    border-left: 2px solid var(--zui-color-border);
+    color: var(--zui-color-muted-foreground);
+}
+
+/* ---- Lists that nest ---------------------------------------------------------------------- */
+
+.md__entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+}
+
+.md__nest {
+    display: flex;
+    padding-left: calc(var(--zui-space-base) * 5);
+}
+
+/* A number is wider than a bullet, and lines up on its dot. */
+.md__bullet[data-numbered="true"] {
+    width: auto;
+    min-width: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.md__item[data-done="true"] .md__item-text {
+    color: var(--zui-color-muted-foreground);
+}
+
+/* ---- Tables ------------------------------------------------------------------------------- */
+
+/* Wider than the column, the table scrolls in its own box; the page never does. */
+.md__tablewrap {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.md__table {
+    display: grid;
+    border: 1px solid var(--zui-color-border);
+    border-radius: calc(var(--zui-radius-base) - 2px);
+    overflow: hidden;
+}
+
+.md__th,
+.md__td {
+    display: block;
+    padding: calc(var(--zui-space-base) * 1) calc(var(--zui-space-base) * 3);
+    min-width: 0;
+}
+
+.md__th {
+    font-weight: 600;
+    background-color: var(--zdt-doc-block, var(--zui-color-muted));
 }
 
 /* ---- Fenced blocks ------------------------------------------------------------------------ */

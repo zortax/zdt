@@ -189,3 +189,9 @@
     opacity: 0.75;
     font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
 }
+
+/* A provider mark in the glyph's place, spaced like the glyph beside it. */
+.picker__icon {
+    flex: none;
+    margin-right: 6px;
+}

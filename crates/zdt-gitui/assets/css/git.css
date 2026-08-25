@@ -438,8 +438,8 @@
 .git__line[data-kind="removed"] .git__line-mark { color: var(--zdt-git-removed); }
 
 .git__line-text {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: none;
+    width: max-content;
     white-space: pre;
     overflow: hidden;
 }

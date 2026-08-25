@@ -1,0 +1,22 @@
+[package]
+name = "zdt-syntax"
+description = "Tree-sitter colours for text that is in no editor, with a shared cache"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zgui.workspace = true
+zgui-editor.workspace = true
+zdt-core.workspace = true
+zdt-git.workspace = true
+zdt-view.workspace = true
+smallvec.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+zgui-editor = { workspace = true, features = ["lang-rust"] }

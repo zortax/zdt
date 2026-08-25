@@ -106,11 +106,17 @@ impl GitUi {
     /// The diff as one flat list of rows. Tracked.
     ///
     /// Flat because it is drawn by a virtual list, and a virtual list needs to know how many rows
-    /// there are without building any of them. A commit that touches forty files is a few thousand
-    /// rows, and building them all to show thirty is what made the panel unusable.
+    /// there are without building any of them. Flattened once beside the read, so asking is a
+    /// reference count and never a walk.
     #[must_use]
-    pub fn diff_rows(&self) -> Vec<DiffRow> {
-        diff_rows(&self.inner.diff.get())
+    pub fn diff_rows(&self) -> Rc<Vec<DiffRow>> {
+        self.inner.flat.get()
+    }
+
+    /// The syntax colours of each file of the diff, in the diff's order. Tracked.
+    #[must_use]
+    pub fn diff_marks(&self) -> Rc<Vec<zdt_syntax::DiffMarks>> {
+        self.inner.marks.get()
     }
 
     /// Whether the panel has the keyboard. Tracked.

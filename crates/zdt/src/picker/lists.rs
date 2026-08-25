@@ -37,6 +37,7 @@ impl Picker {
                 matched: Vec::new(),
                 glyph: Some(kind.glyph),
                 tint: Some(kind.tint),
+                icon: None,
                 target: Target::Buffer(id),
             };
             if Some(id) == current {

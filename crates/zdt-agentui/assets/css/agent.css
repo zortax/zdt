@@ -1,0 +1,1728 @@
+/* The agent surface: the thread sidebar and the chat view. */
+
+.agent-side {
+    flex: 0 0 auto;
+    width: var(--agent-width, 280px);
+    height: 100%;
+    min-height: 0;
+    background: var(--zui-color-sidebar);
+    color: var(--zui-color-sidebar-foreground, var(--zui-color-foreground));
+    border-right: 1px solid var(--zui-color-border);
+    overflow: hidden;
+}
+
+.agent-side:not([data-open="true"]) {
+    display: none;
+}
+
+/* A little taller than the chrome beside it on purpose: the strip is the sidebar's drag
+ * handle, and the title breathes. */
+.agent-side__head {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 10px;
+}
+
+.agent-side__title {
+    font-weight: 600;
+}
+
+/* The face toggle: two pills in one quiet capsule, the one on screen lit. */
+.agent-side__faces {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: 999px;
+    background: var(--zui-color-muted);
+}
+
+.agent-side__face {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-side__face:hover {
+    color: var(--zui-color-foreground);
+}
+
+.agent-side__face[data-on="true"] {
+    background: var(--zui-color-background);
+    color: var(--zui-color-foreground);
+}
+
+/* The strip under the header: the search over the list, and the button that starts a thread. */
+.agent-side__tools {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px 6px 8px;
+}
+
+.agent-side__searchbox {
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: max(calc(var(--zui-radius-base) - 3px), 2px);
+    background: var(--zui-color-background);
+}
+
+.agent-side__searchmark {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-side .agent-side__searchfield {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: auto;
+    min-height: 16px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-side .agent-side__searchfield:focus-visible {
+    border: none;
+    box-shadow: none;
+}
+
+.agent-side .agent-side__searchfield:empty::before {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.agent-side__add {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: max(calc(var(--zui-radius-base) - 3px), 2px);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-side__add:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+/* As wide as its names, and no wider. */
+.agent-side__newpop {
+    display: flex;
+    flex-direction: column;
+    width: max-content;
+    max-width: 320px;
+}
+
+.agent-side__newpop .agent-pop__row {
+    align-items: center;
+    gap: 8px;
+}
+
+.agent-side__rows {
+    flex: 0 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 8px;
+    gap: 4px;
+}
+
+.agent-side__row {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px 7px 10px;
+    /* A shade tighter than the base radius: a two-line card with fully rounded corners reads
+     * softer than the rest of the chrome. */
+    border-radius: max(calc(var(--zui-radius-base) - 3px), 2px);
+    min-width: 0;
+}
+
+.agent-side__row:hover {
+    background: var(--zui-color-accent);
+}
+
+/* The caret is a hint and the selection is a fact: the caret's wash is fainter, and a row that
+ * is both wears the selection's. */
+.agent-side__row[data-caret="true"] {
+    background: color-mix(in oklab, var(--zui-color-accent) 50%, transparent);
+}
+
+.agent-side__row[data-selected="true"] {
+    background: var(--zui-color-accent);
+}
+
+.agent-side__top {
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.agent-side__name {
+    min-width: 0;
+    font-weight: 500;
+}
+
+.agent-side__age {
+    flex: 0 0 auto;
+    font-size: var(--zdt-ui-size-small);
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-side__under {
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* The status: an outline and a word, coloured by what the thread is doing. The breath of a
+ * waiting icon is a timer's toggle; the transition here is what makes it a pulse. */
+.agent-side__state {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+/* The resting rotation keeps the transform in the shared style; the animations only move it. */
+.agent-side__glyph {
+    transform: rotate(0deg);
+}
+
+.agent-side__row[data-tone="working"] .agent-side__glyph {
+    animation-name: zdt-turn;
+    animation-duration: 900ms;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.agent-side__row[data-tone="waiting"] .agent-side__glyph {
+    animation-name: zdt-breathe;
+    animation-duration: 1400ms;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+.agent-side__row[data-tone="working"] .agent-side__state {
+    color: var(--zui-color-primary);
+}
+
+.agent-side__row[data-tone="waiting"] .agent-side__state {
+    color: var(--zdt-diagnostic-warning, #d5a44a);
+}
+
+.agent-side__row[data-tone="plan"] .agent-side__state {
+    color: var(--zdt-agent-plan, #b18af8);
+}
+
+.agent-side__row[data-tone="failed"] .agent-side__state {
+    color: var(--zdt-danger, #d06060);
+}
+
+.agent-side__project {
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-side__foot {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-side__foot[data-off="true"] {
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-side__resize {
+    position: relative;
+    z-index: 21;
+    flex: 0 0 auto;
+    width: 6px;
+    margin-left: -3px;
+    margin-right: -3px;
+    align-self: stretch;
+    cursor: col-resize;
+}
+
+.agent-side__resize:not([data-open="true"]) {
+    display: none;
+}
+
+/* ---- The chat view ---------------------------------------------------------------------- */
+
+.agent-view {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--editor-bg, var(--zui-color-background));
+}
+
+.agent-view:not([data-open="true"]) {
+    display: none;
+}
+
+/* The strip matches the editor's chrome: same height, and the window buttons at its end pad
+ * themselves, so the buttons sit in the same corner in both faces of the window. */
+.agent-view__head {
+    height: var(--chrome);
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 0 0 16px;
+    min-width: 0;
+}
+
+.agent-view__title {
+    font-weight: 600;
+}
+
+.agent-view__project {
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-view__error {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    color: var(--zdt-danger, #d06060);
+    font-size: var(--zdt-ui-size-small);
+}
+
+/* ---- The timeline ----------------------------------------------------------------------- */
+
+/* The reading column holds one measure however wide the window is. The width is said outright
+ * rather than as a max-width: the text measure follows a definite width, and a max-width alone
+ * is clamped after the measure. */
+/* The side padding is nearly nothing, so the scrollbar sits against the window edge; the rows
+ * keep their own gutters through their max-width instead. */
+.agent-log {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 2px;
+    gap: 12px;
+}
+
+.agent-log__row {
+    flex: 0 0 auto;
+    display: flex;
+    width: 720px;
+    max-width: calc(100% - 44px);
+    min-width: 0;
+}
+
+.agent-log__row .agent-log__text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.agent-log__row .md {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* What the person said: a quiet bubble against the right edge, the way a chat reads, with air
+ * between it and the turns around it. */
+.agent-log__row--user {
+    justify-content: flex-end;
+    margin: 14px 0;
+}
+
+/* Prose in the timeline breathes more than a hover panel does: wider gaps between blocks, and
+ * fenced code and tables stand a little apart from the words around them. */
+.agent-log .md {
+    gap: 10px;
+}
+
+.agent-log .md__block,
+.agent-log .md__tablewrap {
+    margin: 4px 0;
+}
+
+.agent-log__row--user .agent-log__text {
+    flex: 0 1 auto;
+    width: auto;
+    background: var(--zui-color-accent);
+    border-radius: 10px;
+    padding: 7px 12px;
+    max-width: 85%;
+}
+
+.agent-log__row--thinking {
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-log__text {
+    white-space: pre-wrap;
+}
+
+.agent-log__working {
+    flex: 0 0 auto;
+    width: 720px;
+    max-width: calc(100% - 44px);
+    align-items: center;
+    gap: 8px;
+    padding: 2px 2px;
+    color: var(--zui-color-muted-foreground);
+}
+
+
+.agent-log__empty {
+    display: none;
+    padding: 24px 0;
+}
+
+.agent-log__empty[data-on="true"] {
+    display: flex;
+    justify-content: center;
+}
+
+/* ---- The composer ----------------------------------------------------------------------- */
+
+.agent-composer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 24px 14px 24px;
+    align-items: center;
+}
+
+/* One card: the editor, and the controls under it. */
+.agent-composer__card {
+    position: relative;
+    width: 720px;
+    max-width: 100%;
+    border: 1px solid var(--zui-color-border);
+    border-radius: 10px;
+    background: var(--zui-color-background);
+}
+
+.agent-composer__card:focus-within {
+    border-color: var(--zui-color-ring);
+}
+
+/* The editor and its mirror share one box, so the mirror wraps where the editor does. */
+.agent-composer__editwrap {
+    position: relative;
+    z-index: 0;
+    width: 100%;
+}
+
+.agent-composer__editor {
+    width: 100%;
+    min-height: 56px;
+    max-height: 40vh;
+    overflow-y: auto;
+    padding: 8px 10px 4px 10px;
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* The measurement copy: the same text, the same width, and nothing painted. */
+.agent-composer__mirror {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 10px 4px 10px;
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.agent-composer__foot {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px 5px 6px;
+}
+
+.agent-composer__chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 8px;
+    border-radius: 9px;
+    background: var(--zui-color-accent);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-composer__chip:hover {
+    color: var(--zui-color-foreground);
+}
+
+.agent-composer__stop,
+.agent-composer__send {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--zui-radius-base);
+    /* An outline and no fill: the buttons read as buttons without weight. */
+    border: 1px solid var(--zui-color-border);
+    background: transparent;
+}
+
+/* The context ring: how much of the window the conversation has used. */
+.agent-composer__ring {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin-right: 2px;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-composer__ring[data-high="true"] {
+    color: var(--zdt-diagnostic-warning, #d5a44a);
+}
+
+.agent-composer__stop {
+    color: var(--zdt-danger, #d06060);
+}
+
+.agent-composer__send {
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-composer__stop:hover,
+.agent-composer__send:hover {
+    background: var(--zui-color-accent);
+}
+
+.agent-composer__send:hover {
+    color: var(--zui-color-foreground);
+}
+
+/* ---- The popdowns ----------------------------------------------------------------------- */
+
+/* Behind an open menu, over everything else: the click that lands nowhere closes the menu. */
+.agent-pop__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 110;
+}
+
+.agent-pop {
+    position: absolute;
+    z-index: 120;
+    padding: 3px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-popover, var(--zui-color-background));
+    box-shadow: var(--zui-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+/* The trigger's own popdown, placed at the measured mark. */
+.agent-pop--suggest {
+    min-width: 320px;
+    max-width: 420px;
+}
+
+.agent-pop--menu {
+    min-width: 300px;
+    max-width: 420px;
+}
+
+.agent-pop__row {
+    align-items: center;
+    gap: 8px;
+    padding: 2px 8px;
+    border-radius: var(--zui-radius-base);
+    min-width: 0;
+}
+
+.agent-pop__row:hover,
+.agent-pop__row[data-on="true"] {
+    background: var(--zui-color-accent);
+}
+
+.agent-pop__row--tall {
+    padding: 4px 8px;
+}
+
+.agent-pop__lines {
+    min-width: 0;
+    gap: 0;
+}
+
+.agent-pop__label {
+    flex: 0 0 auto;
+}
+
+.agent-pop__desc {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-pop__check {
+    flex: 0 0 auto;
+    color: var(--zui-color-primary);
+}
+
+/* ---- The header ------------------------------------------------------------------------- */
+
+.agent-view__usage {
+    font-size: var(--zdt-ui-size-small);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- What sits under the timeline ------------------------------------------------------- */
+
+/* Everything below the log holds the same reading column the log does. */
+.agent-view__foot {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+}
+
+.agent-view__banner {
+    width: 720px;
+    max-width: 100%;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 2px;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+/* ---- Folds and work rows ---------------------------------------------------------------- */
+
+.agent-log__fold {
+    align-items: center;
+    gap: 6px;
+    padding: 1px 2px;
+    color: var(--zui-color-muted-foreground);
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-log__fold:hover {
+    background: var(--zui-color-accent);
+}
+
+.agent-log__fold[data-failed="true"] {
+    color: var(--zdt-danger, #d06060);
+}
+
+.agent-log__row--work {
+    padding: 0;
+}
+
+.agent-work {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-work__head {
+    align-items: center;
+    gap: 6px;
+    padding: 1px 2px;
+    min-width: 0;
+}
+
+.agent-work:hover .agent-work__head {
+    background: var(--zui-color-accent);
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-work__glyph {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-work[data-status="running"] .agent-work__glyph {
+    color: var(--zui-color-primary);
+}
+
+.agent-work[data-status="failed"] .agent-work__glyph,
+.agent-work[data-status="failed"] .agent-work__name {
+    color: var(--zdt-danger, #d06060);
+}
+
+.agent-work[data-status="declined"] .agent-work__name,
+.agent-work[data-status="declined"] .agent-work__summary {
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-work__name {
+    flex: 0 0 auto;
+    font-size: var(--zdt-ui-size-small);
+    font-weight: 500;
+}
+
+.agent-work__summary {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+}
+
+.agent-work__detail {
+    margin: 2px 0 4px 20px;
+    padding: 6px 8px;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+    white-space: pre-wrap;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+/* ---- Thinking --------------------------------------------------------------------------- */
+
+/* One quiet line for a thought: a spinner and a clock while it runs, a word when it is done,
+ * and the whole text a press away. */
+.agent-think {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-think__head {
+    align-items: center;
+    gap: 6px;
+    padding: 1px 2px;
+    min-width: 0;
+}
+
+.agent-think:hover .agent-think__head {
+    background: var(--zui-color-accent);
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-think__glyph {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-think[data-running="true"] .agent-think__glyph {
+    color: var(--zui-color-primary);
+}
+
+.agent-think__word,
+.agent-think__clock {
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-think__clock {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-think__text {
+    margin: 2px 0 4px 20px;
+    padding: 6px 8px;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+    white-space: pre-wrap;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+/* ---- The decision surface --------------------------------------------------------------- */
+
+.agent-ask {
+    width: 720px;
+    max-width: 100%;
+    margin: 4px 0;
+    border: 1px solid var(--zdt-diagnostic-warning, var(--zui-color-border));
+    border-radius: 10px;
+    padding: 8px 12px;
+    gap: 6px;
+    background: var(--zui-color-background);
+}
+
+.agent-ask__title {
+    align-items: center;
+    gap: 6px;
+    color: var(--zdt-diagnostic-warning, var(--zui-color-foreground));
+    font-weight: 600;
+}
+
+.agent-ask__body {
+    gap: 6px;
+}
+
+.agent-ask__head {
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.agent-ask__glyph {
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-ask__name {
+    font-weight: 500;
+}
+
+.agent-ask__summary {
+    min-width: 0;
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-ask__detail {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 6px 8px;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+}
+
+.agent-ask__mono {
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+    white-space: pre-wrap;
+}
+
+.agent-ask__question {
+    white-space: pre-wrap;
+}
+
+.agent-ask__options {
+    gap: 2px;
+}
+
+.agent-ask__option {
+    align-items: center;
+    gap: 8px;
+    padding: 3px 6px;
+    border-radius: var(--zui-radius-base);
+    min-width: 0;
+}
+
+.agent-ask__option:hover {
+    background: var(--zui-color-accent);
+}
+
+.agent-ask__option[data-on="true"] {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-primary);
+}
+
+.agent-ask__number {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-ask__keys {
+    align-items: center;
+    gap: 12px;
+    padding-top: 2px;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-ask__key {
+    align-items: center;
+    gap: 4px;
+}
+
+.agent-ask__cap {
+    padding: 0 5px;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+}
+
+/* ---- The proposed plan ------------------------------------------------------------------ */
+
+.agent-plan {
+    width: 720px;
+    max-width: 100%;
+    margin: 4px 0;
+    border: 1px solid var(--zui-color-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    gap: 6px;
+    background: var(--zui-color-background);
+}
+
+.agent-plan__title {
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.agent-plan__go {
+    display: flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 10px;
+    border-radius: 10px;
+    background: var(--zui-color-primary);
+    color: var(--zui-color-primary-foreground, var(--zui-color-background));
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-plan__body {
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.agent-plan__hint {
+    font-size: var(--zdt-ui-size-small);
+}
+
+/* ---- The checklist ---------------------------------------------------------------------- */
+
+.agent-todos {
+    width: 720px;
+    max-width: 100%;
+}
+
+.agent-todos__head {
+    align-items: center;
+    gap: 6px;
+    padding: 2px 2px;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-todos__head:hover {
+    background: var(--zui-color-accent);
+}
+
+.agent-todos__rows {
+    padding: 2px 0 2px 18px;
+    gap: 1px;
+}
+
+.agent-todos__row {
+    align-items: center;
+    gap: 6px;
+    font-size: var(--zdt-ui-size-small);
+    min-width: 0;
+}
+
+.agent-todos__glyph {
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-todos__row[data-state="active"] {
+    color: var(--zui-color-foreground);
+}
+
+.agent-todos__row[data-state="active"] .agent-todos__glyph {
+    color: var(--zui-color-primary);
+}
+
+.agent-todos__row[data-state="done"] {
+    color: var(--zui-color-muted-foreground);
+}
+
+
+
+/* ---- The sidebar's branch and diff stat -------------------------------------------------- */
+
+.agent-side__branch {
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-side__wt {
+    flex: 0 0 auto;
+}
+
+.agent-side__stat {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--zdt-ui-size-small);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- The chat header's git actions ------------------------------------------------------- */
+
+.agent-view__tool {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    height: 20px;
+    border-radius: var(--zui-radius-base);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-view__tool:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-view__banner--warn {
+    color: var(--zdt-warning, #d0a060);
+}
+
+/* The timeline's shell, so the log and the review swap without either losing its place. */
+.agent-view__log {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- The diff card ----------------------------------------------------------------------- */
+
+.agent-diffcard {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-diffcard__head {
+    align-items: center;
+    gap: 6px;
+    padding: 1px 2px;
+    min-width: 0;
+}
+
+.agent-diffcard:hover .agent-diffcard__head {
+    background: var(--zui-color-accent);
+    border-radius: var(--zui-radius-base);
+}
+
+.agent-diffcard__glyph {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-diffcard__word {
+    font-size: var(--zdt-ui-size-small);
+    font-weight: 500;
+}
+
+.agent-diffcard__act {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px;
+    border-radius: var(--zui-radius-base);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-diffcard__act:hover {
+    background: var(--zui-color-background);
+    color: var(--zui-color-foreground);
+}
+
+.agent-diffcard__files {
+    margin: 2px 0 4px 20px;
+    padding: 4px 8px;
+    gap: 1px;
+    border-radius: var(--zui-radius-base);
+    background: var(--zui-color-accent);
+}
+
+.agent-diffcard__file {
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+}
+
+.agent-diffcard__file:hover {
+    color: var(--zui-color-primary);
+}
+
+.agent-diffcard__counts {
+    color: var(--zui-color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- The review surface ------------------------------------------------------------------ */
+
+.agent-review {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    align-self: stretch;
+}
+
+.agent-review__head {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--zui-color-border);
+}
+
+.agent-review__title {
+    font-weight: 600;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-review__counts {
+    font-size: var(--zdt-ui-size-small);
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-review__toggle {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    border-radius: var(--zui-radius-base);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-review__toggle:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-review__toggle[data-on="true"] {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-review__hold {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.agent-review__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0 2px 0 8px;
+}
+
+/* One wrapper per review row: a virtual list gives every row the same height, and the three
+ * kinds of row have to fill it identically. */
+.agent-review__row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+.agent-review__file {
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px;
+    min-width: 0;
+    height: 100%;
+    border-radius: var(--zui-radius-base);
+    font-size: var(--zdt-ui-size-small);
+    font-weight: 500;
+}
+
+.agent-review__file:hover,
+.agent-review__file[data-caret="true"] {
+    background: var(--zui-color-accent);
+}
+
+.agent-review__filecounts {
+    color: var(--zui-color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-review__hunk {
+    align-items: center;
+    padding: 0 6px;
+    height: 100%;
+    color: var(--zui-color-muted-foreground);
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-review__line {
+    align-items: center;
+    min-width: 0;
+    height: 100%;
+    /* The text box is as wide as its one line; the row cuts it at its own edge. */
+    overflow: hidden;
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-review__line[data-kind="added"] {
+    background-color: var(--zdt-git-added-bg);
+}
+
+.agent-review__line[data-kind="removed"] {
+    background-color: var(--zdt-git-removed-bg);
+}
+
+.agent-review__num {
+    flex: 0 0 auto;
+    width: 36px;
+    padding-right: 6px;
+    text-align: right;
+    color: var(--zui-color-muted-foreground);
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-review__line[data-kind="added"] .agent-review__num--new {
+    color: var(--zdt-git-added);
+}
+
+.agent-review__line[data-kind="removed"] .agent-review__num--old {
+    color: var(--zdt-git-removed);
+}
+
+.agent-review__text {
+    flex: none;
+    width: max-content;
+    white-space: pre;
+    overflow: hidden;
+}
+
+/* Side by side, from the same rows: a removed line keeps the left half, an added one takes the
+ * right, and context spans both. Alignment is by reading order, which is what a quick review
+ * needs. */
+.agent-review__hold[data-split="true"] .agent-review__line[data-kind="removed"] {
+    width: 50%;
+}
+
+.agent-review__hold[data-split="true"] .agent-review__line[data-kind="added"] {
+    width: 50%;
+    margin-left: 50%;
+}
+
+/* Provider marks: filled brand art beside the outlines. The Claude mark keeps its own orange;
+ * the OpenAI mark takes the text's colour. */
+.agent-side__brand {
+    flex: 0 0 auto;
+}
+
+.agent-pop__brand {
+    flex: 0 0 auto;
+    margin-right: 2px;
+}
+
+/* ---- Shelves and lifecycle marks ---------------------------------------------------------- */
+
+/* A shelf's header: one quiet word over the rows it holds. */
+.agent-side__shelf {
+    flex: 0 0 auto;
+    align-items: center;
+    margin-top: 6px;
+    padding: 0 6px;
+    font-size: var(--zdt-ui-size-small);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--zui-color-muted-foreground);
+}
+
+/* Parked rows recede: what sleeps or is put away must not compete with what works. */
+.agent-side__row[data-parked="true"] {
+    opacity: 0.55;
+}
+
+.agent-side__row[data-parked="true"]:hover,
+.agent-side__row[data-parked="true"][data-caret="true"] {
+    opacity: 1;
+}
+
+.agent-side__mark {
+    flex: 0 0 auto;
+}
+
+.agent-side__mark--pin {
+    color: var(--zui-color-primary);
+}
+
+/* The unread dot: small, green, and gone the moment the thread is looked at. */
+.agent-side__dot {
+    flex: 0 0 auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--zdt-git-added, #6a9a6a);
+}
+
+/* The quick actions swap in place with the status on hover and keyboard visits. */
+.agent-side__quick {
+    display: none;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+}
+
+.agent-side__row:hover .agent-side__quick {
+    display: flex;
+}
+
+.agent-side__row:hover .agent-side__state {
+    display: none;
+}
+
+/* The same height as the status line it swaps with, so hovering never moves the row. */
+.agent-side__act {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 5px;
+    font-size: var(--zdt-ui-size-small);
+    border-radius: max(calc(var(--zui-radius-base) - 4px), 2px);
+    color: var(--zui-color-muted-foreground);
+}
+
+/* Hot state by attribute, written from enter and leave. The label and the icon are named
+ * outright so every part of the button restyles on the same change. */
+.agent-side__act[data-hot="true"] {
+    background: var(--zui-color-secondary);
+    color: var(--zui-color-foreground);
+}
+
+.agent-side__act[data-hot="true"] label,
+.agent-side__act[data-hot="true"] .icon {
+    color: var(--zui-color-foreground);
+}
+
+/* ---- The commit modal --------------------------------------------------------------------- */
+
+.agent-commit__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 35%);
+}
+
+.agent-commit {
+    display: flex;
+    flex-direction: column;
+    width: 620px;
+    max-width: 92%;
+    max-height: 86%;
+    padding: 14px 16px;
+    gap: 8px;
+    border-radius: var(--zui-radius-base);
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-popover, var(--zui-color-background));
+    box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+
+.agent-commit__head {
+    align-items: center;
+    gap: 8px;
+}
+
+.agent-commit__title {
+    font-weight: 600;
+}
+
+.agent-commit__files {
+    flex: 0 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 44px;
+    max-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* No side padding on the container: the scrollbar sits on the card's edge, and the rows
+     * carry their own gutters. */
+    padding: 6px 0;
+    gap: 2px;
+    border-radius: max(calc(var(--zui-radius-base) - 3px), 2px);
+    background: var(--zui-color-accent);
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-commit__note {
+    padding: 0 10px;
+}
+
+.agent-commit__file {
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 10px;
+}
+
+.agent-commit__file[data-out="true"] {
+    opacity: 0.45;
+}
+
+/* The library's checkbox, compacted for a list row: a touch smaller, no lift, and the tick
+ * scaled with the box. */
+.agent-commit__check {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+}
+
+.agent-commit__check .zui-checkbox {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    box-shadow: none;
+}
+
+.agent-commit__check .zui-checkbox .zui-icon {
+    --zui-icon-size: 12px;
+}
+
+/* The edit toggle beside the counts: quiet until it is on. */
+.agent-commit__edit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: max(calc(var(--zui-radius-base) - 4px), 2px);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-commit__edit:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-commit__edit[data-on="true"] {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-primary);
+}
+
+.agent-commit__path {
+    min-width: 0;
+}
+
+.agent-commit__counts {
+    flex: 0 0 auto;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* One card for the message: the subject line over a rule over the body, and the branch box
+ * under it, each field named by its icon and its placeholder alone. */
+.agent-commit__msgbox {
+    display: flex;
+    border-radius: max(calc(var(--zui-radius-base) - 3px), 2px);
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-background);
+}
+
+.agent-commit__fieldrow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    min-width: 0;
+}
+
+/* The tall row grows downward, so its icon lines up with the first line rather than the middle
+ * of the whole box. */
+.agent-commit__fieldrow--tall {
+    min-height: 76px;
+    align-items: flex-start;
+}
+
+.agent-commit__fieldrow--tall .agent-commit__mark {
+    margin-top: 3px;
+}
+
+.agent-commit__mark {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-commit__rule {
+    flex: 0 0 auto;
+    height: 1px;
+    background: var(--zui-color-border);
+}
+
+/* The fields ride bare inside the card: the card is the border. Named through the card so the
+ * rule outweighs the component's own sheet, whichever installs later. */
+.agent-commit .agent-commit__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: auto;
+    min-height: 20px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+.agent-commit .agent-commit__input:focus-visible {
+    border: none;
+    box-shadow: none;
+}
+
+.agent-commit .agent-commit__input--tall {
+    min-height: 60px;
+    white-space: pre-wrap;
+}
+
+/* The component pins its placeholder to its own default padding; with the padding gone it sits
+ * where the text does. */
+.agent-commit .agent-commit__input:empty::before {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+.agent-commit__foot {
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.agent-commit__hint {
+    align-items: center;
+    gap: 5px;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-commit__button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: var(--zui-radius-base);
+    border: 1px solid var(--zui-color-border);
+    background: transparent;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-commit__button:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-commit__ghost {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: var(--zui-radius-base);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-commit__ghost:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
+.agent-commit__button--first {
+    color: var(--zui-color-foreground);
+    border-color: var(--zui-color-primary);
+}
+
+/* ---- Runners: what works beside the main agent -------------------------------------------- */
+
+.agent-runners {
+    width: 720px;
+    max-width: 100%;
+    align-self: center;
+    gap: 2px;
+}
+
+.agent-runners__line {
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    border-radius: var(--zui-radius-sm);
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-runners__line[data-opens="true"]:hover {
+    background: var(--zui-color-accent);
+    color: var(--zui-color-accent-foreground);
+}
+
+.agent-runners__title {
+    color: var(--zui-color-foreground);
+}
+
+.agent-runners__meta {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.agent-runners__go {
+    opacity: 0.7;
+}
+
+/* ---- The workflow modal -------------------------------------------------------------------- */
+
+.agent-workflow__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 35%);
+}
+
+.agent-workflow {
+    display: flex;
+    flex-direction: column;
+    width: 680px;
+    max-width: 92%;
+    max-height: 82%;
+    padding: 14px 16px;
+    gap: 10px;
+    border-radius: var(--zui-radius-base);
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-popover, var(--zui-color-background));
+    box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
+}
+
+.agent-workflow__head {
+    align-items: center;
+    gap: 8px;
+}
+
+.agent-workflow__title {
+    font-weight: 600;
+}
+
+.agent-workflow__body {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.agent-workflow__phase {
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--zui-color-border);
+    font-size: var(--zdt-ui-size-small);
+    font-weight: 600;
+}
+
+.agent-workflow__agent {
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-workflow__agent[data-state="done"] .icon { color: var(--zdt-git-added, var(--zui-color-primary)); }
+.agent-workflow__agent[data-state="error"] .icon { color: var(--zui-color-destructive); }
+.agent-workflow__agent[data-state="start"] .icon { color: var(--zui-color-muted-foreground); }
+
+.agent-workflow__label {
+    color: var(--zui-color-foreground);
+}
+
+.agent-workflow__spent {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-workflow__log {
+    padding: 0 4px;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-runners__spin,
+.agent-workflow__spin {
+    color: var(--zui-color-primary);
+}
+
+.agent-think__glyph {
+    transform: rotate(0deg);
+}
+
+.agent-think[data-running="true"] .agent-think__glyph {
+    animation-name: zdt-turn;
+    animation-duration: 900ms;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+/* The diff's colours on any count of changed lines, wherever one is shown. */
+.agent-added {
+    color: var(--zdt-git-added, #6a9a6a);
+    font-variant-numeric: tabular-nums;
+}
+
+.agent-removed {
+    color: var(--zdt-git-removed, #d06060);
+    font-variant-numeric: tabular-nums;
+}

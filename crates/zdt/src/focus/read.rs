@@ -10,6 +10,7 @@ impl Focusing {
             Some(overlay) => Focus::Overlay(overlay),
             None => match self.inner.region.get() {
                 Region::Tree => Focus::Tree,
+                Region::Agent => Focus::Agent,
                 Region::Panes => Focus::Window(self.inner.window.get()),
             },
         }
@@ -26,9 +27,16 @@ impl Focusing {
             Some(overlay) => Focus::Overlay(overlay),
             None => match self.inner.region.get_untracked() {
                 Region::Tree => Focus::Tree,
+                Region::Agent => Focus::Agent,
                 Region::Panes => Focus::Window(self.inner.window.get_untracked()),
             },
         }
+    }
+
+    /// Whether the agent surface has the keyboard, with nothing over it. Tracked.
+    #[must_use]
+    pub fn in_agent(&self) -> bool {
+        self.current() == Focus::Agent
     }
 
     /// Whether the tree has the keyboard, with nothing over it. Tracked.

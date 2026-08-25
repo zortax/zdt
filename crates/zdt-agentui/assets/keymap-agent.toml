@@ -1,0 +1,172 @@
+# The agent sidebar's own keys.
+#
+# Read as an overlay in front of the ordinary keymap: the list answers first, and everything it
+# says nothing about — `<Leader>ff`, `<C-w>l` — still works while the list has the keyboard.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "agent.down"
+desc = "Down"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "agent.up"
+desc = "Up"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "agent.down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "agent.up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "agent.half_down"
+
+[[map]]
+mode = ["n"]
+keys = "<C-u>"
+action = "agent.half_up"
+
+[[map]]
+mode = ["n"]
+keys = "gg"
+action = "agent.first"
+desc = "First thread"
+
+[[map]]
+mode = ["n"]
+keys = "G"
+action = "agent.last"
+desc = "Last thread"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "agent.open"
+desc = "Open the thread"
+
+[[map]]
+mode = ["n"]
+keys = "o"
+action = "agent.open"
+
+[[map]]
+mode = ["n"]
+keys = "i"
+action = "agent.compose"
+desc = "Write a prompt"
+
+[[map]]
+mode = ["n"]
+keys = "l"
+action = "agent.chat"
+desc = "Into the conversation"
+
+[[map]]
+mode = ["n"]
+keys = "n"
+action = "agent.new"
+desc = "New thread here"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "agent.stop"
+desc = "Stop the turn"
+
+[[map]]
+mode = ["n"]
+keys = "dd"
+action = "agent.delete"
+desc = "Delete the thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Tab>"
+action = "agent.toggle"
+desc = "Toggle agent view"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "agent.leave"
+desc = "Back to the editor"
+
+[[map]]
+mode = ["n"]
+keys = "q"
+action = "agent.leave"
+
+[[map]]
+mode = ["n"]
+keys = "p"
+action = "agent.pin"
+desc = "Pin or unpin"
+
+[[map]]
+mode = ["n"]
+keys = "<C-k>"
+action = "agent.pin_up"
+desc = "Move the pinned thread up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-j>"
+action = "agent.pin_down"
+desc = "Move the pinned thread down"
+
+[[map]]
+mode = ["n"]
+keys = "s"
+action = "agent.settle"
+desc = "Settle or unsettle"
+
+[[map]]
+mode = ["n"]
+keys = "z"
+action = "agent.snooze"
+desc = "Snooze…"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "agent.archive"
+desc = "Archive or bring back"
+
+[[map]]
+mode = ["n"]
+keys = "A"
+action = "agent.archived"
+desc = "Show or hide archived"
+
+[[map]]
+mode = ["n"]
+keys = "u"
+action = "agent.unread"
+desc = "Mark unread or read"
+
+[[map]]
+mode = ["n"]
+keys = "r"
+action = "agent.rename"
+desc = "Rename the thread"
+
+[[map]]
+mode = ["n"]
+keys = "R"
+action = "agent.retitle"
+desc = "Make a name up"
+
+[[map]]
+mode = ["n"]
+keys = "/"
+action = "agent.filter"
+desc = "Search the threads"

@@ -17,10 +17,23 @@ pub enum Launch {
     List,
     /// Take a directory's session away, and exit.
     Kill(PathBuf),
+    /// Speak to the agent daemon, and exit.
+    Agent(AgentVerb),
     /// Say how to use it, and exit.
     Help,
     /// Say which zdt this is, and exit.
     Version,
+}
+
+/// What to ask the agent daemon.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum AgentVerb {
+    /// Print every thread.
+    List,
+    /// Say whether a daemon runs, and which.
+    Status,
+    /// Ask the daemon to stop.
+    Stop,
 }
 
 /// A directory to work in, and what to open in it.
@@ -55,6 +68,11 @@ OPTIONS
         --kill <DIR>   Take a running zdt's session for <DIR> away
     -h, --help         Print this
     -V, --version      Print the version
+
+AGENT
+    zdt agent list     List every agent thread
+    zdt agent status   Say whether the agent daemon runs
+    zdt agent stop     Stop the agent daemon; running turns are interrupted
 ";
 
 /// Reads the command line.
@@ -75,7 +93,20 @@ pub fn parse_from(arguments: impl Iterator<Item = PathBuf>) -> Launch {
     let mut new_window = false;
     let mut arguments = arguments.peekable();
 
+    let mut first = true;
     while let Some(argument) = arguments.next() {
+        // The agent verbs stand first: `zdt agent list` speaks to the daemon and exits.
+        if std::mem::take(&mut first) && argument.to_string_lossy() == "agent" {
+            let verb = arguments
+                .next()
+                .map(|verb| verb.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            return Launch::Agent(match verb.as_str() {
+                "status" => AgentVerb::Status,
+                "stop" => AgentVerb::Stop,
+                _ => AgentVerb::List,
+            });
+        }
         match argument.to_string_lossy().as_ref() {
             "-h" | "--help" => return Launch::Help,
             "-V" | "--version" => return Launch::Version,

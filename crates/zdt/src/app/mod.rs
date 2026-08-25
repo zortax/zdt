@@ -20,6 +20,7 @@ use zgui::reactive::RenderEffect;
 use zgui::{component, view};
 use zgui_ui::prelude::{ToastCorner, ToasterProps};
 
+use crate::agent::view::AgentMountProps;
 use crate::app::chrome::ChromeProps;
 use crate::app::frame::FrameProps;
 use crate::app::statusline::StatusLineProps;
@@ -258,6 +259,13 @@ fn SessionShell(
         crate::focus::Sink::Node(git_panel),
     );
 
+    // Which face the window shows. Both stay mounted; the one not showing is out of the flow,
+    // exactly as hidden sessions are.
+    let editing = {
+        let agent = zdt_agentui::use_agent();
+        move || (agent.screen() == zdt_agentui::Screen::Agent).then(|| "none".to_owned())
+    };
+
     view! {
         box(
             class = "session",
@@ -266,13 +274,17 @@ fn SessionShell(
             Frame {
                 // The tree runs the whole height of the window and the buffer line sits over the
                 // panes alone: a tab bar reaching across a file tree says the tabs belong to the
-                // tree, and they do not.
+                // tree, and they do not. The agent surface sits left of them all, and its chat
+                // takes the editor area's place when it is the screen.
                 row(class = "frame__body") {
-                    Explorer()
-                    TreeResize()
-                    column(class = "workarea") {
-                        Chrome()
-                        Panes()
+                    AgentMount(showing = showing)
+                    row(class = "editorarea", style:display = editing) {
+                        Explorer()
+                        TreeResize()
+                        column(class = "workarea") {
+                            Chrome()
+                            Panes()
+                        }
                     }
                 }
                 HoverPanel()

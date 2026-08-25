@@ -140,6 +140,8 @@ struct Inner {
     effects: RefCell<Vec<Box<dyn std::any::Any>>>,
     /// What writes this session down, and when.
     writer: RefCell<Option<Rc<crate::session::save::Writer>>>,
+    /// The agent surface as this session's window last showed it.
+    agent: RefCell<crate::session::schema::AgentSnapshot>,
     /// Where each editor was looking, including editors that have gone away.
     views: Rc<RefCell<crate::session::capture::Views>>,
 }
@@ -212,6 +214,7 @@ impl Session {
                 cmdline,
                 effects: RefCell::new(Vec::new()),
                 writer: RefCell::new(None),
+                agent: RefCell::new(crate::session::schema::AgentSnapshot::default()),
                 views: Rc::new(RefCell::new(crate::session::capture::Views::default())),
             }
         });
@@ -226,6 +229,9 @@ impl Session {
         let held = crate::session::save::read_for(session.key());
         let generation = held.as_ref().map_or(0, |snapshot| snapshot.generation);
         if let Some(snapshot) = held.as_ref() {
+            // Kept rather than applied: the agent surface is above every session, and the one
+            // startup restore reads this back through `agent_view`.
+            *session.inner.agent.borrow_mut() = snapshot.agent.clone();
             // The map is taken out rather than borrowed: putting a session back opens buffers,
             // and a buffer's editor records where it is looking through this same cache.
             let mut views = crate::session::capture::Views::default();
@@ -358,6 +364,21 @@ impl Session {
         if let Some(writer) = self.writer() {
             writer.touched_text(buffer);
         }
+    }
+
+    /// The agent surface as this session's window last showed it.
+    #[must_use]
+    pub fn agent_view(&self) -> crate::session::schema::AgentSnapshot {
+        self.inner.agent.borrow().clone()
+    }
+
+    /// Remembers what the agent surface shows, and says it is worth writing down.
+    pub fn set_agent_view(&self, view: crate::session::schema::AgentSnapshot) {
+        if *self.inner.agent.borrow() == view {
+            return;
+        }
+        *self.inner.agent.borrow_mut() = view;
+        self.touched();
     }
 
     /// Writes whatever is owed, now. What closing a window and quitting both do.

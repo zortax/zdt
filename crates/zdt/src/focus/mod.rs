@@ -46,6 +46,8 @@ pub enum Region {
     Panes,
     /// The file tree.
     Tree,
+    /// The agent surface: its sidebar, and its chat when that is the screen.
+    Agent,
 }
 
 /// Something over the regions that takes the **keyboard**.
@@ -87,6 +89,8 @@ pub enum Focus {
     Window(WindowId),
     /// The file tree.
     Tree,
+    /// The agent surface.
+    Agent,
     /// A layer over whichever of those had it.
     Overlay(Overlay),
 }
@@ -101,6 +105,8 @@ pub enum Spot {
     Buffer(WindowId, BufferId),
     /// The file tree.
     Tree,
+    /// The agent surface.
+    Agent,
     /// A layer.
     Overlay(Overlay),
 }
@@ -204,6 +210,13 @@ impl Focusing {
     pub fn enter_tree(&self) {
         if self.inner.region.get_untracked() != Region::Tree {
             self.inner.region.set(Region::Tree);
+        }
+    }
+
+    /// Gives the keyboard to the agent surface.
+    pub fn enter_agent(&self) {
+        if self.inner.region.get_untracked() != Region::Agent {
+            self.inner.region.set(Region::Agent);
         }
     }
 

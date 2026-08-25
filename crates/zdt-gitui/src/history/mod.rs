@@ -8,7 +8,7 @@ use crate::use_gitui;
 
 use crate::panel::List;
 use crate::panel::ROW;
-use crate::visible::keep_visible;
+use zdt_view::keep_visible;
 
 use crate::history::row::HistoryRowProps;
 

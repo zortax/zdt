@@ -28,18 +28,25 @@ macro_rules! icons {
 }
 
 icons! {
+    ARCHIVE => "archive",
     ARROW_RIGHT => "arrow-right",
     BOOK_OPEN => "book-open",
+    BOT => "bot",
     BRACES => "braces",
+    CHECK => "check",
     CHEVRON_DOWN => "chevron-down",
     CHEVRON_LEFT => "chevron-left",
     CHEVRON_RIGHT => "chevron-right",
     CHEVRON_UP => "chevron-up",
     CIRCLE => "circle",
     CIRCLE_ALERT => "circle-alert",
+    CIRCLE_DASHED => "circle-dashed",
     CIRCLE_CHECK => "circle-check",
+    CIRCLE_QUESTION => "circle-question-mark",
     CIRCLE_X => "circle-x",
     CLIPBOARD_COPY => "clipboard-copy",
+    CLOCK => "clock",
+    CODE_XML => "code-xml",
     CLIPBOARD_PASTE => "clipboard-paste",
     COPY => "copy",
     CORNER_DOWN_LEFT => "corner-down-left",
@@ -49,39 +56,76 @@ icons! {
     EYE_OFF => "eye-off",
     FILE => "file",
     FILE_CODE => "file-code",
+    FILE_DIFF => "file-diff",
     FILE_PLUS => "file-plus",
     FOLDER => "folder",
+    FOLDER_GIT => "folder-git-2",
     FOLDER_OPEN => "folder-open",
     FOLDER_PLUS => "folder-plus",
     FOLDER_TREE => "folder-tree",
     FUNNEL => "funnel",
     GIT_BRANCH => "git-branch",
+    GIT_BRANCH_PLUS => "git-branch-plus",
+    GIT_COMMIT => "git-commit-horizontal",
+    GLOBE => "globe",
     HASH => "hash",
+    HISTORY => "history",
     INFO => "info",
     KEYBOARD => "keyboard",
     LANGUAGES => "languages",
     LIGHTBULB => "lightbulb",
+    LIST_TODO => "list-todo",
     LIST_TREE => "list-tree",
+    LOADER_CIRCLE => "loader-circle",
     MENU => "menu",
     MINUS => "minus",
+    MOON => "moon",
     PALETTE => "palette",
     PANEL_BOTTOM => "panel-bottom",
     PANEL_LEFT => "panel-left",
     PENCIL => "pencil",
+    PIN => "pin",
+    PLUG => "plug",
     PLUS => "plus",
     REFRESH_CW => "refresh-cw",
     REPLACE => "replace",
     SAVE => "save",
     SCISSORS => "scissors",
     SEARCH => "search",
+    SEND_HORIZONTAL => "send-horizontal",
     SETTINGS => "settings",
+    SPARKLES => "sparkles",
     SQUARE => "square",
+    SQUARE_CHECK => "square-check",
     TERMINAL => "terminal",
     TRASH => "trash-2",
     TRIANGLE_ALERT => "triangle-alert",
     TYPE => "type",
+    WORKFLOW => "workflow",
     WRENCH => "wrench",
     X => "x",
+}
+
+/// The provider marks, beside the outline set.
+///
+/// Brand art is filled, and each mark keeps its own colour rule: the Claude mark carries its
+/// brand orange in every theme, and the OpenAI mark follows the text beside it.
+pub const CLAUDE: &str = include_str!("../assets/brand/claude.svg");
+
+/// The OpenAI mark. See [`CLAUDE`].
+pub const OPENAI: &str = include_str!("../assets/brand/openai.svg");
+
+/// Every brand mark, by provider word. For whoever maps a provider to its mark, and for the
+/// tests.
+pub const BRANDS: &[(&str, &str)] = &[("claude", CLAUDE), ("codex", OPENAI)];
+
+/// The mark for a provider word, when there is one.
+#[must_use]
+pub fn brand(provider: &str) -> Option<&'static str> {
+    BRANDS
+        .iter()
+        .find(|(word, _)| *word == provider)
+        .map(|(_, mark)| *mark)
 }
 
 /// Draws one icon.
@@ -136,6 +180,15 @@ mod tests {
                 "{name} does not take the colour around it"
             );
             assert!(source.contains("fill=\"none\""), "{name} is filled");
+        }
+    }
+
+    #[test]
+    fn every_brand_mark_is_filled_art_with_a_view_box() {
+        for (name, source) in super::BRANDS {
+            assert!(source.contains("viewBox=\"0 0 "), "{name} has no view box");
+            assert!(source.contains("fill="), "{name} names no fill");
+            assert!(!source.contains("stroke="), "{name} is stroked");
         }
     }
 

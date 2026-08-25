@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE threads SET diff_files = ?, diff_added = ?, diff_removed = ? WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "1debb7a1cefab0990b943311be60f1d4c16f8f5818e95f47303c0eb9ab19cc64"
+}

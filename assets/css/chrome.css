@@ -32,6 +32,26 @@
     color: var(--zui-color-foreground);
 }
 
+/* The agent's commit button, matching the branch beside it. */
+.chrome__commit {
+    flex: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 20px;
+    border-radius: var(--zui-radius-sm);
+    gap: var(--zui-space-xs);
+    padding: 0 var(--zui-space-sm);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small, 11px);
+    text-wrap-mode: nowrap;
+}
+
+.chrome__commit:hover {
+    background-color: var(--zui-color-accent);
+    color: var(--zui-color-foreground);
+}
+
 .chrome__branch {
     flex: none;
     display: flex;
@@ -263,6 +283,18 @@
 
 .statusline__count[data-tone="hint"] {
     color: var(--zdt-diagnostic-hint);
+}
+
+/* The agent segment: threads that wait on a person, and threads still at work. */
+.statusline__agent {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 1);
+    color: var(--zui-color-muted-foreground);
+}
+
+.statusline__agent[data-tone="waiting"] {
+    color: var(--zdt-diagnostic-warning);
 }
 
 /* What state the language servers for this file are in.

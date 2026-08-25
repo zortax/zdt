@@ -140,6 +140,34 @@ pub fn StatusLine() -> impl IntoView {
         }
     };
 
+    // The agent segment: how many threads want a person, and how many still work. Facts that stay
+    // true, so they belong here; what just happened goes to the announcements.
+    let agent = zdt_agentui::try_use_agent();
+    let attention = {
+        let agent = agent.clone();
+        move || {
+            let agent = agent.as_ref()?;
+            let threads = agent.client().threads();
+            let waiting = threads
+                .iter()
+                .filter(|shell| {
+                    shell.asking > 0
+                        || shell.planned
+                        || shell.state == zdt_agent::thread::ThreadState::Failed
+                })
+                .count();
+            let working = threads.iter().filter(|shell| shell.is_working()).count();
+            match (waiting, working) {
+                (0, 0) => None,
+                (0, busy) => Some((format!("{busy} working"), "busy")),
+                (open, 0) => Some((format!("{open} waiting"), "waiting")),
+                (open, busy) => {
+                    Some((format!("{open} waiting \u{00b7} {busy} working"), "waiting"))
+                }
+            }
+        }
+    };
+
     view! {
         row(class = "statusline") {
             box(
@@ -216,6 +244,26 @@ pub fn StatusLine() -> impl IntoView {
                         Some(state) => view! {
                             box(class = "statusline__dot") {}
                             label(class = "nowrap") {{state.label().to_owned()}}
+                        }
+                        .any(),
+                        None => ().any(),
+                    }
+                }}
+            }
+
+            row(
+                class = "statusline__agent",
+                attr:data-tone = {
+                    let attention = attention.clone();
+                    move || attention().map(|(_, tone)| tone.to_owned())
+                }
+            ) {
+                {move || {
+                    use zdt_view::Erase;
+                    match attention() {
+                        Some((said, _)) => view! {
+                            Icon(icon = icons::BOT, class = "icon--xs")
+                            label(class = "nowrap") {{said}}
                         }
                         .any(),
                         None => ().any(),

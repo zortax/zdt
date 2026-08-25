@@ -1,0 +1,20 @@
+[package]
+name = "zdt-agent-client"
+description = "The editor's connection to the agent daemon, as signals"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zdt-agent.workspace = true
+zdt-core.workspace = true
+zdt-ipc.workspace = true
+zdt-view.workspace = true
+zgui.workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "zdt-agent-harness"
+description = "The adapter seam: how a provider process is spoken to"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+zdt-agent.workspace = true

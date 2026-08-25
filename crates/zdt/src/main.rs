@@ -34,6 +34,7 @@ fn main() -> anyhow::Result<()> {
         }
         Launch::List => list(),
         Launch::Kill(dir) => kill(&dir),
+        Launch::Agent(verb) => agent(verb),
         Launch::Open(open) => start(open),
     }
 }
@@ -101,7 +102,7 @@ fn run(open: Open, listener: Option<std::os::unix::net::UnixListener>) -> anyhow
         // Everything shared by every window and every session, in the one scope above them all.
         .with_context(move || {
             let global = zdt::app::global::install();
-            let host = zdt::session::host::SessionHost::new(global, root);
+            let host = zdt::session::host::SessionHost::new(global.clone(), root);
             let keeping = starting.path().map(std::path::Path::to_path_buf);
             // The session the first window opens on. Made here rather than in that window, so a
             // window that is suspended and rebuilt attaches to the same one.
@@ -109,6 +110,8 @@ fn run(open: Open, listener: Option<std::os::unix::net::UnixListener>) -> anyhow
             if let Some(listener) = listener.borrow_mut().take() {
                 host.serve(listener);
             }
+            // The agent surface: the daemon connection and the state every window shares.
+            zdt::agent::install(&host, global.settings());
             zdt::session::host::provide(host);
             // Sessions for directories that are gone, and ones nobody has opened in months.
             if let Some(keeping) = keeping {
@@ -123,6 +126,18 @@ fn run(open: Open, listener: Option<std::os::unix::net::UnixListener>) -> anyhow
                 .expect("the session opened above every window is still there");
             view! { Root(session = session, files = files.clone()) }
         })?;
+
+    // The daemon outlives the window unless the configuration says it goes with it. Threads
+    // keep working either way until the shutdown lands; the next window reattaches.
+    let stops = zdt_core::config::Paths::discover()
+        .and_then(|paths| zdt_core::config::load(&paths.config()).ok())
+        .is_some_and(|config| config.agent.stop_on_exit);
+    if stops {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()?
+            .block_on(zdt_agent_client::stop_running_daemon());
+    }
 
     Ok(())
 }
@@ -162,6 +177,80 @@ fn kill(dir: &std::path::Path) -> anyhow::Result<()> {
         }
         other => anyhow::bail!("the running zdt said something unexpected: {other:?}"),
     }
+}
+
+/// `zdt agent <verb>`: one question to the agent daemon, printed and done.
+fn agent(verb: zdt::cli::AgentVerb) -> anyhow::Result<()> {
+    use zdt::cli::AgentVerb;
+    use zdt_agent::protocol::{ClientMsg, ServerMsg};
+
+    let directory = zdt_ipc::client::directory()
+        .ok_or_else(|| anyhow::anyhow!("there is no runtime directory for the daemon's socket"))?;
+    let socket = directory.join("agentd.sock");
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async move {
+        let Ok(stream) = tokio::net::UnixStream::connect(&socket).await else {
+            anyhow::bail!("no agent daemon is running");
+        };
+        let (mut reading, mut writing) = stream.into_split();
+        let hello = ClientMsg::Hello {
+            version: zdt_agent::VERSION,
+            pid: std::process::id(),
+        };
+        zdt_agent::wire::write(&mut writing, &hello).await?;
+        let pid = match zdt_agent::wire::read::<ServerMsg>(&mut reading).await? {
+            ServerMsg::Welcome { pid, .. } => pid,
+            ServerMsg::Refused { reason } => anyhow::bail!("the daemon refused: {reason}"),
+            other => anyhow::bail!("the daemon said something unexpected: {other:?}"),
+        };
+        match verb {
+            AgentVerb::Status => {
+                println!(
+                    "zdt-agentd is running, pid {pid}, protocol {}",
+                    zdt_agent::VERSION
+                );
+            }
+            AgentVerb::Stop => {
+                zdt_agent::wire::write(&mut writing, &ClientMsg::Shutdown).await?;
+                println!("asked zdt-agentd (pid {pid}) to stop");
+            }
+            AgentVerb::List => loop {
+                // The thread list is pushed right after the welcome; everything else is skipped.
+                let ServerMsg::Shells { threads } =
+                    zdt_agent::wire::read::<ServerMsg>(&mut reading).await?
+                else {
+                    continue;
+                };
+                if threads.is_empty() {
+                    println!("no threads");
+                }
+                for shell in threads {
+                    println!(
+                        "{:>4}  {:<10} {:<28} {}",
+                        shell.id.0,
+                        shell.state.word(),
+                        clip(&shell.title, 28),
+                        shell.project,
+                    );
+                }
+                break;
+            },
+        }
+        Ok(())
+    })
+}
+
+/// At most `most` characters, with an ellipsis when something was cut.
+fn clip(text: &str, most: usize) -> String {
+    if text.chars().count() <= most {
+        return text.to_owned();
+    }
+    let mut cut: String = text.chars().take(most.saturating_sub(1)).collect();
+    cut.push('\u{2026}');
+    cut
 }
 
 /// Asks a running zdt one question, or says there is none.

@@ -160,9 +160,7 @@ impl GitUi {
 
     /// How many rows the diff is drawn as.
     pub(super) fn diff_row_count(&self) -> usize {
-        self.inner
-            .diff
-            .with_untracked(|files| diff_rows(files).len())
+        self.inner.flat.with_untracked(|rows| rows.len())
     }
 
     /// The unstaged entries, without subscribing.

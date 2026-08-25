@@ -27,6 +27,28 @@ pub fn Chrome() -> impl IntoView {
         workspace.project().git_branch()
     };
 
+    // The agent's commit, in the same corner it holds in the agent view: agent work is
+    // committed without turning the window around.
+    let agent = zdt_agentui::try_use_agent();
+    let commit_shown = {
+        let agent = agent.clone();
+        move || {
+            let selected = agent
+                .as_ref()
+                .is_some_and(|agent| agent.selected().is_some());
+            (!selected).then(|| "none".to_owned())
+        }
+    };
+    let open_commit = {
+        let agent = agent.clone();
+        move |event: &mut EventCx<'_, events::PointerDown>| {
+            event.stop_propagation();
+            if let Some(agent) = agent.as_ref() {
+                agent.open_commit(false);
+            }
+        }
+    };
+
     let order = {
         let workspace = workspace.clone();
         move || workspace.order()
@@ -50,6 +72,17 @@ pub fn Chrome() -> impl IntoView {
             }
 
             box(class = "fill") {}
+
+            control(
+                class = "chrome__commit",
+                tabindex = Focus::Programmatic,
+                a11y:label = "Commit the agent's work",
+                style:display = commit_shown,
+                on:pointer_down = open_commit
+            ) {
+                Icon(icon = icons::GIT_COMMIT, class = "icon--xs")
+                label(class = "nowrap") {"commit"}
+            }
 
             {branch.map(|branch| view! {
                 // A control, because it does something: the branch is the one part of the header

@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT projects.root, threads.resume, threads.state, threads.mode, threads.model,\n                threads.effort, threads.instance, threads.proposed_plan, threads.worktree,\n                threads.branch, threads.title\n         FROM threads\n         JOIN projects ON projects.id = threads.project_id\n         WHERE threads.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "root",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "root"
+          }
+        }
+      },
+      {
+        "name": "resume",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "resume"
+          }
+        }
+      },
+      {
+        "name": "state",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "name": "mode",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "mode"
+          }
+        }
+      },
+      {
+        "name": "model",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "model"
+          }
+        }
+      },
+      {
+        "name": "effort",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "effort"
+          }
+        }
+      },
+      {
+        "name": "instance",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "instance"
+          }
+        }
+      },
+      {
+        "name": "proposed_plan",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "proposed_plan"
+          }
+        }
+      },
+      {
+        "name": "worktree",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "worktree"
+          }
+        }
+      },
+      {
+        "name": "branch",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "branch"
+          }
+        }
+      },
+      {
+        "name": "title",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "title"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c5bcb202917bf62b2b2fb262f9ed09afb633cc2d5215c7d8c3cea94f7c8456e1"
+}

@@ -98,6 +98,11 @@ pub struct FileDiff {
     /// A binary file has no lines to show, and a panel that tried would draw a screenful of
     /// replacement characters.
     pub binary: bool,
+    /// The whole old text, for a consumer that reads past the hunks. Shared, so a clone of the
+    /// diff costs a reference count. Empty for a binary file, and for a file that is new.
+    pub old_text: Option<std::sync::Arc<str>>,
+    /// The whole new text. See `old_text`.
+    pub new_text: Option<std::sync::Arc<str>>,
 }
 
 impl FileDiff {
@@ -109,6 +114,8 @@ impl FileDiff {
             from: None,
             hunks: Vec::new(),
             binary: false,
+            old_text: None,
+            new_text: None,
         }
     }
 
@@ -179,6 +186,42 @@ pub fn commit(repo: &Repo, revision: &str) -> Result<Vec<FileDiff>, Error> {
         None => git.empty_tree(),
     };
 
+    trees(old_tree, new_tree)
+}
+
+/// What changed between two revisions, file by file.
+///
+/// Both name commits: branches, checkpoint references, or ids. The answer is `new` against
+/// `old`, which is what a review of the span between them asks.
+///
+/// # Errors
+///
+/// When either revision cannot be read.
+pub fn commits(repo: &Repo, old: &str, new: &str) -> Result<Vec<FileDiff>, Error> {
+    let git = repo.git();
+    let old_tree = git
+        .rev_parse_single(old)
+        .map_err(Error::git)?
+        .object()
+        .map_err(Error::git)?
+        .peel_to_commit()
+        .map_err(Error::git)?
+        .tree()
+        .map_err(Error::git)?;
+    let new_tree = git
+        .rev_parse_single(new)
+        .map_err(Error::git)?
+        .object()
+        .map_err(Error::git)?
+        .peel_to_commit()
+        .map_err(Error::git)?
+        .tree()
+        .map_err(Error::git)?;
+    trees(old_tree, new_tree)
+}
+
+/// What changed from one tree to another, file by file and in path order.
+fn trees(old_tree: gix::Tree<'_>, new_tree: gix::Tree<'_>) -> Result<Vec<FileDiff>, Error> {
     // One entry per file the commit touched: what it is called, and its bytes on each side.
     type Touched = (String, Option<Vec<u8>>, Option<Vec<u8>>);
     let mut changes: Vec<Touched> = Vec::new();
@@ -256,9 +299,15 @@ pub fn between(path: &str, old: Option<&[u8]>, new: Option<&[u8]>) -> FileDiff {
             from: None,
             hunks: Vec::new(),
             binary: true,
+            old_text: None,
+            new_text: None,
         };
     }
 
+    let old_text: Option<std::sync::Arc<str>> =
+        old.map(|bytes| String::from_utf8_lossy(bytes).into());
+    let new_text: Option<std::sync::Arc<str>> =
+        new.map(|bytes| String::from_utf8_lossy(bytes).into());
     let old_lines = lines_of(old.unwrap_or_default());
     let new_lines = lines_of(new.unwrap_or_default());
     FileDiff {
@@ -266,6 +315,8 @@ pub fn between(path: &str, old: Option<&[u8]>, new: Option<&[u8]>) -> FileDiff {
         from: None,
         hunks: hunks_between(&old_lines, &new_lines),
         binary: false,
+        old_text,
+        new_text,
     }
 }
 

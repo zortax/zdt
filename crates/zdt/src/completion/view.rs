@@ -119,8 +119,10 @@ pub fn CompletionPopup() -> impl IntoView {
     // flush its viewport observation goes leaves its bindings reading a disposed scope. Keeping it
     // loses nothing: rebuilding a two-thousand-row list per keystroke was waste, and the exit
     // animation never ran anyway.
+    // `display`, not `visibility`: a hidden element whose visibility flips can leave its last
+    // paint behind, and a ghost popup takes keys nobody can see it taking.
     let shown = move |placed: zdt_view::anchor::Placed, present: Signal<bool, LocalStorage>| {
-        move || (!present.get() || !placed.settled.get()).then(|| "hidden".to_owned())
+        move || (!present.get() || !placed.settled.get()).then(|| "none".to_owned())
     };
 
     view! {
@@ -131,7 +133,7 @@ pub fn CompletionPopup() -> impl IntoView {
                 attr:data-open = move || present.get().then(|| "true".to_owned()),
                 style:left = placed.left_px(),
                 style:top = placed.top_px(),
-                style:visibility = shown(placed, present),
+                style:display = shown(placed, present),
                 a11y:role = Role::ListBox,
                 a11y:label = "Suggestions"
             ) {
@@ -157,7 +159,7 @@ pub fn CompletionPopup() -> impl IntoView {
                 attr:data-open = move || docs_present.get().then(|| "true".to_owned()),
                 style:left = docs_placed.left_px(),
                 style:top = docs_placed.top_px(),
-                style:visibility = shown(docs_placed, docs_present),
+                style:display = shown(docs_placed, docs_present),
                 a11y:role = Role::Tooltip,
                 a11y:label = "Documentation"
             ) {

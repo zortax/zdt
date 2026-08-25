@@ -75,7 +75,7 @@ impl Vim {
             zgui::reactive::use_local_context::<crate::completion::Completion>()
             && completion.is_open()
             && self.mode_untracked() == Mode::Insert
-            && self.key_in_region_as(chord, "completion", Mode::Insert)
+            && self.key_in_region_on(chord, "completion", Mode::Insert, Some(handle))
         {
             return true;
         }
@@ -200,6 +200,20 @@ impl Vim {
     /// key falls through to the program, which is the point. What *is* bound there is what vim's
     /// own `maps.t` binds, and it wins over the program on purpose.
     pub fn key_in_region_as(&self, chord: Chord, region: &'static str, mode: Mode) -> bool {
+        self.key_in_region_on(chord, region, mode, None)
+    }
+
+    /// The same, with the editor the actions work in.
+    ///
+    /// The completion popup's accept writes into the buffer being completed, and an action run
+    /// without its editor can only decline. Every caller that has the handle passes it.
+    pub fn key_in_region_on(
+        &self,
+        chord: Chord,
+        region: &'static str,
+        mode: Mode,
+        handle: Option<&zgui_editor::EditorHandle>,
+    ) -> bool {
         // A region's keys have no grammar: no counts, no operators, nothing to hold between
         // presses but the sequence itself.
         let mut keys = self.inner.region_keys.borrow_mut();
@@ -230,7 +244,7 @@ impl Vim {
             Region::Unbound => false,
             Region::Run(actions) => {
                 for action in &actions {
-                    crate::actions::run(&self.inner.workspace, self, action, None);
+                    crate::actions::run(&self.inner.workspace, self, action, handle);
                 }
                 true
             }

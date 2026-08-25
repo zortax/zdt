@@ -13,6 +13,7 @@
 //! [`zdt_icons`] for the icon set, and [`zdt_gitui`] for the git panel.
 
 pub mod actions;
+pub mod agent;
 pub mod app;
 pub mod assets;
 pub mod cli;

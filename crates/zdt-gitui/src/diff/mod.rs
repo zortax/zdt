@@ -10,7 +10,7 @@ use zdt_view::Erase;
 use crate::panel::{List, Selected};
 
 use crate::diff::line::DiffLineProps;
-use crate::visible::keep_visible;
+use zdt_view::keep_visible;
 
 mod details;
 mod line;

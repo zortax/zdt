@@ -29,6 +29,8 @@ pub(crate) fn Matches() -> impl IntoView {
 }
 
 /// One match.
+// The provider mark is a path call the view macro wraps in braces of its own.
+#[allow(unused_braces)]
 #[component]
 pub(crate) fn MatchRow(
     /// Where it is in the list.
@@ -60,6 +62,17 @@ pub(crate) fn MatchRow(
         let row = row.clone();
         move || row().map_or_else(String::new, |row| row.detail)
     };
+    // A provider mark, in the glyph's place. Filled art, so the icon class's inherited stroke
+    // is turned off for it.
+    let icon = {
+        let row = row.clone();
+        move || row().and_then(|row| row.icon)
+    };
+    let icon_svg = {
+        let icon = icon.clone();
+        move || icon().unwrap_or(zdt_icons::DOT)
+    };
+    let icon_shown = move || icon().is_none().then(|| "none".to_owned());
 
     view! {
         row(
@@ -78,6 +91,11 @@ pub(crate) fn MatchRow(
                 }
             }
         ) {
+            zdt_icons::Icon(
+                icon = Signal::derive_local(icon_svg),
+                class = "icon--xs icon--brand picker__icon",
+                style:display = icon_shown
+            )
             label(class = "glyph", style:color = tint) {{glyph}}
             row(class = "picker__label nowrap") {
                 {move || {

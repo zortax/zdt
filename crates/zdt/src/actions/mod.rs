@@ -7,6 +7,7 @@
 //! An action nobody has written yet says so in the status line. That is what makes a half-built
 //! editor say which half.
 
+mod agent;
 mod app;
 mod buffer;
 mod cmdline;
@@ -53,6 +54,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "hover" => self::popups::hover(leaf),
         "completion" => self::popups::completion(workspace, leaf, handle),
         "gitpanel" => zdt_gitui::actions::run(leaf),
+        "agent" => self::agent::run(workspace, vim, leaf),
         "ui" => self::app::toggle(workspace, leaf, args),
         // Everything else belongs to a part of the editor that is still being built. Saying so is
         // better than a key that quietly does nothing.

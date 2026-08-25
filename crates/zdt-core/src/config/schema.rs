@@ -32,6 +32,8 @@ pub struct Config {
     pub keys: Keys,
     /// The language servers, by the name they are known as.
     pub lsp: Lsp,
+    /// The agent panel and its daemon.
+    pub agent: Agent,
 }
 
 /// How the interface looks.
@@ -335,6 +337,101 @@ impl Default for Keys {
             local_leader: ",".to_owned(),
         }
     }
+}
+
+/// The agent panel and its daemon.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Agent {
+    /// Whether the agent surface exists at all.
+    pub enabled: bool,
+    /// Whether the agent sidebar opens with the window.
+    pub open: bool,
+    /// How wide the agent sidebar is, in pixels.
+    pub width: u32,
+    /// Which model, in the provider's own words. Empty means the provider's default.
+    pub model: String,
+    /// The models the picker offers, in the provider's own words.
+    pub models: Vec<String>,
+    /// The provider program to run. Empty means `claude` off the search path.
+    pub binary: String,
+    /// How much a new thread's agent may do unasked: `supervised`, `accept_edits`, `auto`,
+    /// `full`, or `plan`.
+    pub default_mode: String,
+    /// Whether assistant prose is shown while it streams. Off shows each message whole, once it
+    /// is done, so half-arrived markdown is never drawn.
+    pub stream: bool,
+    /// Where agent worktrees are made. Empty means under the state directory.
+    pub worktrees: String,
+    /// Whether a new worktree fetches its base branch from `origin` and starts from the
+    /// remote's head.
+    pub start_from_origin: bool,
+    /// The instance new threads run on when none is chosen. Empty means the first one.
+    pub instance: String,
+    /// Days of quiet before an idle thread settles itself. Zero turns it off.
+    pub auto_settle_days: u32,
+    /// Minutes of quiet before an idle provider session is stopped. Zero keeps them alive.
+    pub idle_minutes: u64,
+    /// Whether closing the editor stops the daemon, running turns included. Off leaves it
+    /// running, so threads keep working and the next window reattaches.
+    pub stop_on_exit: bool,
+    /// Days a raw provider log is kept before the daemon prunes it. Zero keeps everything.
+    pub log_days: u32,
+    /// Whether threads name themselves after their first turn.
+    pub titles: bool,
+    /// The model titles are made with. Empty lets each provider pick its own cheap one.
+    pub title_model: String,
+    /// The instance commit messages are drafted with. Empty prefers a codex instance, then a
+    /// claude one.
+    pub commit_instance: String,
+    /// The model commit messages are drafted with. Empty lets the provider pick.
+    pub commit_model: String,
+    /// The provider instances, by the name they are known as.
+    ///
+    /// An empty table means one `claude` and one `codex` instance with everything default.
+    pub instances: BTreeMap<String, Instance>,
+}
+
+impl Default for Agent {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            open: false,
+            width: 280,
+            model: String::new(),
+            models: vec!["opus".to_owned(), "sonnet".to_owned(), "haiku".to_owned()],
+            binary: String::new(),
+            default_mode: "supervised".to_owned(),
+            stream: false,
+            worktrees: String::new(),
+            start_from_origin: true,
+            instance: String::new(),
+            auto_settle_days: 3,
+            idle_minutes: 15,
+            stop_on_exit: false,
+            log_days: 30,
+            titles: true,
+            title_model: String::new(),
+            commit_instance: String::new(),
+            commit_model: String::new(),
+            instances: BTreeMap::new(),
+        }
+    }
+}
+
+/// One configured account of a provider.
+#[derive(Clone, Debug, PartialEq, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct Instance {
+    /// Which harness it runs: `claude` or `codex`. Empty takes the instance's name.
+    pub provider: String,
+    /// The program to run. Empty means the provider's own name off the search path.
+    pub binary: String,
+    /// The provider's home directory: `CLAUDE_CONFIG_DIR` or `CODEX_HOME`. Empty means the
+    /// provider's default, which is what makes two homes two accounts.
+    pub home: String,
+    /// Which model its threads talk to when they name none. Empty means the provider decides.
+    pub model: String,
 }
 
 /// The language servers.

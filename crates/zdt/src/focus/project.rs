@@ -112,6 +112,7 @@ fn watch(focus: &Focusing, workspace: &Workspace) {
 fn sink_of(wanted: Focus, focus: &Focusing, workspace: &Workspace) -> Option<Sink> {
     match wanted {
         Focus::Tree => focus.sink_for(Spot::Tree),
+        Focus::Agent => focus.sink_for(Spot::Agent),
         Focus::Overlay(overlay) => focus.sink_for(Spot::Overlay(overlay)),
         Focus::Window(window) => {
             let buffer = workspace.buffer_in_untracked(window)?;

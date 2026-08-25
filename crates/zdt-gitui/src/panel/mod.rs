@@ -133,6 +133,11 @@ struct Inner {
 
     /// The diff of whatever is selected.
     diff: RwSignal<Vec<FileDiff>, LocalStorage>,
+    /// The same, flattened into the rows the virtual list draws. Set beside `diff`, so the
+    /// flattening happens once per read and never per row.
+    flat: RwSignal<Rc<Vec<DiffRow>>, LocalStorage>,
+    /// The syntax colours of each file of the diff, in the same order.
+    marks: RwSignal<Rc<Vec<zdt_syntax::DiffMarks>>, LocalStorage>,
     /// Which file of a commit's diff is expanded, when one is.
     at_file: RwSignal<usize, LocalStorage>,
     /// Whether the diff is shown side by side. One column otherwise.
@@ -181,6 +186,8 @@ impl GitUi {
                 at_branch: RwSignal::new_local(0),
                 at_diff: RwSignal::new_local(0),
                 diff: RwSignal::new_local(Vec::new()),
+                flat: RwSignal::new_local(Rc::new(Vec::new())),
+                marks: RwSignal::new_local(Rc::new(Vec::new())),
                 at_file: RwSignal::new_local(0),
                 side_by_side: RwSignal::new_local(false),
                 message: RwSignal::new_local(None),

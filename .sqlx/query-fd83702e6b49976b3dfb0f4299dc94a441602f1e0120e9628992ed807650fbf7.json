@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO projects (root, name, created_at_ms)\n           VALUES (?, ?, ?)\n           ON CONFLICT (root) DO UPDATE SET name = excluded.name\n           RETURNING id AS \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "projects",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "fd83702e6b49976b3dfb0f4299dc94a441602f1e0120e9628992ed807650fbf7"
+}

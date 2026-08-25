@@ -21,6 +21,7 @@
 //! One module still runs a process. See [`hunks`], whose whole job is to be the cheapest possible
 //! answer to "has this file changed at all" for a gutter that asks once per file per save.
 
+pub mod checkpoint;
 pub mod commit;
 pub mod diff;
 pub mod graph;
@@ -31,6 +32,7 @@ pub mod refs;
 pub mod repo;
 pub mod stage;
 pub mod status;
+pub mod worktree;
 
 pub use crate::commit::commit;
 pub use crate::diff::{DiffHunk, FileDiff, Line, LineKind};

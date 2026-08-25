@@ -88,6 +88,36 @@ impl Repo {
     }
 }
 
+/// Runs git in `repo`, with `env` set, and answers what it printed.
+///
+/// No shell is involved: every argument is one argument. On refusal the first useful line of
+/// what git said becomes the error.
+pub(crate) fn git(
+    repo: &Repo,
+    args: &[&str],
+    env: &[(&str, &std::ffi::OsStr)],
+) -> Result<String, Error> {
+    let mut command = std::process::Command::new("git");
+    command.arg("-C").arg(repo.root()).args(args);
+    for (name, value) in env {
+        command.env(name, value);
+    }
+    let output = command
+        .output()
+        .map_err(|error| Error::Git(format!("git could not be run: {error}")))?;
+
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+    }
+    let said = String::from_utf8_lossy(&output.stderr);
+    let first = said
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("git refused");
+    Err(Error::Git(first.to_owned()))
+}
+
 impl std::fmt::Debug for Repo {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter

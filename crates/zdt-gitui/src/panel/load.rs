@@ -86,17 +86,23 @@ impl GitUi {
         let what = self.selected();
         let git = self.clone();
         zdt_view::detached(async move {
-            let read = zgui::task::blocking(move || match &what {
-                Selected::File { path, staged } => {
-                    let found = if *staged {
-                        zdt_git::diff::staged(&repo, path)
-                    } else {
-                        zdt_git::diff::worktree(&repo, path)
-                    };
-                    vec![found.unwrap_or_else(|_| FileDiff::empty(path.clone()))]
-                }
-                Selected::Commit(id) => zdt_git::diff::commit(&repo, id).unwrap_or_default(),
-                Selected::Nothing => Vec::new(),
+            let read = zgui::task::blocking(move || {
+                let files = match &what {
+                    Selected::File { path, staged } => {
+                        let found = if *staged {
+                            zdt_git::diff::staged(&repo, path)
+                        } else {
+                            zdt_git::diff::worktree(&repo, path)
+                        };
+                        vec![found.unwrap_or_else(|_| FileDiff::empty(path.clone()))]
+                    }
+                    Selected::Commit(id) => zdt_git::diff::commit(&repo, id).unwrap_or_default(),
+                    Selected::Nothing => Vec::new(),
+                };
+                // Coloured here, on the worker: a parse is too slow for the interface thread,
+                // and the cache makes asking again about an unchanged file free.
+                let marks = files.iter().map(zdt_syntax::marks_of).collect::<Vec<_>>();
+                (files, marks)
             })
             .await;
 
@@ -104,7 +110,10 @@ impl GitUi {
             if git.inner.diff_generation.get() != generation {
                 return;
             }
-            git.inner.diff.set(read);
+            let (files, marks) = read;
+            git.inner.flat.set(Rc::new(diff_rows(&files)));
+            git.inner.marks.set(Rc::new(marks));
+            git.inner.diff.set(files);
         });
     }
 

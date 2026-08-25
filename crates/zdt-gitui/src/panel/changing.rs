@@ -276,7 +276,7 @@ impl GitUi {
     pub fn current_hunk(&self) -> Option<(String, zdt_git::DiffHunk)> {
         let at = self.inner.at_diff.get_untracked();
         let files = self.inner.diff.get_untracked();
-        let rows = diff_rows(&files);
+        let rows = self.inner.flat.get_untracked();
 
         // From the caret's row forwards: a heading has no hunk of its own, and the hunk it means
         // is the next one under it.

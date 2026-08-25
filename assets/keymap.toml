@@ -15,6 +15,7 @@
 # The leader is <Space> and the local leader is , — both set in `config.toml`.
 
 [groups]
+"<Leader>a" = "AI/Agent"
 "<Leader>b" = "Buffers"
 "<Leader>bs" = "Sort Buffers"
 "<Leader>d" = "Debugger"
@@ -1647,6 +1648,101 @@ keys = "<Leader>xl"
 action = "list.location"
 desc = "Location list"
 
+# ---- Agents --------------------------------------------------------------------------------------
+#
+# The agent surface: a sidebar of threads over every project, and a chat view over the one that
+# is selected. The sidebar's own keys are in the crate's keymap-agent.toml.
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>aa"
+action = "agent.toggle"
+desc = "Toggle the agent view"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ae"
+action = "agent.sidebar"
+desc = "Toggle the agent sidebar"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ao"
+action = "agent.focus"
+desc = "Focus the agent sidebar"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>an"
+action = "agent.new"
+desc = "New thread in this project"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>af"
+action = "agent.find"
+desc = "Find a thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ai"
+action = "agent.compose"
+desc = "Write to the thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ax"
+action = "agent.stop"
+desc = "Stop the running turn"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>am"
+action = "agent.mode"
+desc = "Choose the agent's mode"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>aM"
+action = "agent.model"
+desc = "Choose the agent's model"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ap"
+action = "agent.plan"
+desc = "Plan mode for this thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>aw"
+action = "agent.worktree"
+desc = "New worktree thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ad"
+action = "agent.review"
+desc = "Review the thread's changes"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ar"
+action = "agent.revert"
+desc = "Revert the last turn"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>ac"
+action = "agent.commit"
+desc = "Commit the thread's work"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>aC"
+action = "agent.commit_push"
+desc = "Commit and push"
+
 # ---- Sessions ------------------------------------------------------------------------------------
 #
 # A session is a directory, and it writes itself down as it is worked in. There is nothing to save
@@ -1836,3 +1932,15 @@ mode = ["n"]
 keys = "<Leader>pi"
 action = "lsp.info"
 desc = "Language server information"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>as"
+action = "agent.settle"
+desc = "Settle the thread"
+
+[[map]]
+mode = ["n"]
+keys = "<Leader>az"
+action = "agent.snooze"
+desc = "Snooze the thread"

@@ -66,7 +66,9 @@
 .git--modal,
 .config__modal,
 .prompt,
-.termfloat {
+.termfloat,
+.agent-commit,
+.agent-workflow {
     animation-name: zdt-zoom;
     animation-duration: var(--zdt-quick);
     animation-timing-function: var(--zdt-ease);
@@ -81,7 +83,8 @@
 .completion,
 .completion__docs,
 .rename,
-.treefield {
+.treefield,
+.agent-pop {
     animation-name: zdt-zoom;
     animation-duration: var(--zdt-quick);
     animation-timing-function: var(--zdt-ease);
@@ -207,4 +210,50 @@
     transition-property: background-color, color, opacity;
     transition-duration: var(--zdt-instant);
     transition-timing-function: var(--zdt-ease);
+}
+
+/* ---- Things that keep moving --------------------------------------------------------------- */
+
+/* The turn every spinner shares. Linear, because it repeats: an eased rotation hesitates every
+ * time one revolution meets the next, and a spinner that hesitates reads as a spinner that has
+ * stopped. The resting `rotate(0deg)` on the class is load-bearing: whether a box is transformed
+ * decides its stacking context, so that answer lives in the shared style and the animation only
+ * moves a transform the box already has. The engine samples the matrix on the frame loop, so the
+ * turn is as smooth as the display. */
+
+@keyframes zdt-turn {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.zdt-spin {
+    transform: rotate(0deg);
+    animation-name: zdt-turn;
+    animation-duration: 900ms;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+/* The breath of something waiting on a person. */
+@keyframes zdt-breathe {
+    from {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.35;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.zdt-breathe {
+    animation-name: zdt-breathe;
+    animation-duration: 1400ms;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
 }

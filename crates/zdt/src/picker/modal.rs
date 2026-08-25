@@ -169,9 +169,11 @@ impl Picker {
                 }
             }
             Target::Theme(name) => {
+                // Written to disk: choosing a theme is a lasting choice, where the previews on
+                // the way to it were not.
                 self.inner
                     .settings
-                    .update(|config| config.ui.theme = name.clone());
+                    .edit(|config| config.ui.theme = name.clone());
                 workspace.say(name);
             }
             Target::Action(action) => {

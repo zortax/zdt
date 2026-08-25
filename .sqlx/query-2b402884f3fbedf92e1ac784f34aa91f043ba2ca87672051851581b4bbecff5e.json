@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE threads SET settled = 1\n         WHERE settled = 0 AND archived = 0 AND pinned = 0\n           AND state IN ('idle', 'failed') AND updated_at_ms < ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "2b402884f3fbedf92e1ac784f34aa91f043ba2ca87672051851581b4bbecff5e"
+}

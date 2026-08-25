@@ -9,7 +9,7 @@ use crate::use_gitui;
 use crate::branches::row::BranchRowProps;
 use crate::panel::List;
 use crate::panel::ROW;
-use crate::visible::keep_visible;
+use zdt_view::keep_visible;
 
 mod row;
 

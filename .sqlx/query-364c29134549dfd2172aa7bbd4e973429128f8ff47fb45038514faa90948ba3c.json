@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT resume AS \"resume!: String\" FROM threads WHERE resume IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "name": "resume!: String",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "resume"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "364c29134549dfd2172aa7bbd4e973429128f8ff47fb45038514faa90948ba3c"
+}

@@ -66,6 +66,26 @@ impl Language {
         self.inner.pending.borrow_mut().insert(path, handle);
     }
 
+    /// Sends whatever change is still waiting, now.
+    ///
+    /// Completion asks about the text as it is. A request that raced the debounce would be
+    /// answered against the text as it was, and the answer's edit ranges would land beside the
+    /// word rather than on it.
+    pub fn flush_changes(&self, buffer: BufferId) {
+        if !self.inner.enabled.get() {
+            return;
+        }
+        let Some((path, _, _)) = self.about(buffer) else {
+            return;
+        };
+        // Only when something waits: the debounce handle is the sign of an unsent change, and
+        // dropping it cancels the send this replaces.
+        if self.inner.pending.borrow_mut().remove(&path).is_none() {
+            return;
+        }
+        self.send_change(buffer);
+    }
+
     /// Says a buffer has been written.
     pub fn saved(&self, buffer: BufferId) {
         if !self.inner.enabled.get() {

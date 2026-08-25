@@ -354,6 +354,7 @@ pub fn symbol_rows(symbols: &[zdt_lsp::Symbol], root: &std::path::Path) -> Vec<R
                     matched: Vec::new(),
                     glyph: Some(glyph),
                     tint: Some(tint),
+                    icon: None,
                     target: Target::File {
                         path,
                         line: Some(u64::from(symbol.range.start.line) + 1),
@@ -390,6 +391,9 @@ pub struct Row {
     pub glyph: Option<&'static str>,
     /// Which colour the glyph takes.
     pub tint: Option<&'static str>,
+    /// A filled vector mark, when the row stands for a provider. Drawn before the label in the
+    /// glyph's place.
+    pub icon: Option<&'static str>,
     /// What choosing it does.
     pub target: Target,
 }
@@ -404,6 +408,7 @@ impl Row {
             matched: Vec::new(),
             glyph: None,
             tint: None,
+            icon: None,
             target,
         }
     }
@@ -419,6 +424,7 @@ impl Row {
             matched: Vec::new(),
             glyph: Some(kind.glyph),
             tint: Some(kind.tint),
+            icon: None,
             target: Target::File {
                 path: root.join(&relative),
                 line,
@@ -471,6 +477,7 @@ impl Row {
             matched: Vec::new(),
             glyph: Some(kind.glyph),
             tint: Some(kind.tint),
+            icon: None,
             target: Target::File {
                 path: path.to_path_buf(),
                 line: Some(line),
@@ -484,6 +491,13 @@ impl Row {
     pub fn with_glyph(mut self, glyph: &'static str, tint: &'static str) -> Self {
         self.glyph = Some(glyph);
         self.tint = Some(tint);
+        self
+    }
+
+    /// The same row, wearing a filled vector mark.
+    #[must_use]
+    pub fn with_icon(mut self, icon: &'static str) -> Self {
+        self.icon = Some(icon);
         self
     }
 

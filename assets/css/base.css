@@ -66,3 +66,9 @@
 .muted { color: var(--zui-color-muted-foreground); }
 .fill { flex: 1 1 auto; min-width: 0; min-height: 0; }
 .nowrap { text-wrap-mode: nowrap; text-overflow: ellipsis; overflow: hidden; }
+
+/* A brand mark is filled art with colours of its own. The outline stroke the icon class sets
+ * would bury it, so a mark carries no stroke at all. */
+.icon--brand {
+    --zgui-stroke: none;
+}

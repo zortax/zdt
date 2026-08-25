@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE threads\n         SET unread = 0,\n             snoozed_until = CASE\n                 WHEN snoozed_until != 0 AND snoozed_until <= ? THEN 0\n                 ELSE snoozed_until\n             END\n         WHERE id = ?\n           AND (unread = 1 OR (snoozed_until != 0 AND snoozed_until <= ?))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "e7374653be1a9a75b384779308cf215a38d8ba603ae0f7434be9a1bce1d0bbd2"
+}

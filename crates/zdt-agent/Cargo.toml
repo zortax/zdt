@@ -1,0 +1,16 @@
+[package]
+name = "zdt-agent"
+description = "The agent vocabulary: threads, events, and the daemon protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true

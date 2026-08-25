@@ -23,6 +23,16 @@ impl Focusing {
         match self.current() {
             Focus::Overlay(Overlay::CommandLine) => Mode::Command,
             Focus::Overlay(Overlay::Float(buffer)) if inserting(buffer) => Mode::Terminal,
+            // The composer is a place to type, so its keys resolve where typing does.
+            Focus::Agent => {
+                let composing = zgui::reactive::use_local_context::<zdt_agentui::AgentUi>()
+                    .is_some_and(|agent| agent.wants() == zdt_agentui::Want::Composer);
+                if composing {
+                    Mode::Insert
+                } else {
+                    Mode::Normal
+                }
+            }
             Focus::Overlay(_) | Focus::Tree => Mode::Normal,
             Focus::Window(window) => {
                 let Some(buffer) = workspace

@@ -17,12 +17,18 @@ impl Completion {
         let Some(language) = self.inner.language.clone() else {
             return;
         };
-        let Some(path) = workspace.current_buffer().and_then(|buffer| buffer.path) else {
+        let Some(entry) = workspace.current_buffer() else {
+            return;
+        };
+        let Some(path) = entry.path.clone() else {
             return;
         };
         let Some(mut client) = language.client_for(&path) else {
             return;
         };
+        // The server answers about the text it has. Anything still waiting in the sync debounce
+        // goes first, or the answer's ranges describe the text before the word being completed.
+        language.flush_changes(entry.id);
 
         let prefix = prefix_at(&handle);
         let (query, replaces) = match prefix {
@@ -59,13 +65,20 @@ impl Completion {
                 return;
             }
             match found {
-                Ok(items) if items.is_empty() => completion.close(),
+                // An empty answer closes nothing that is open: while an answer is in flight,
+                // every keystroke asks again, and the server cancels the raced ones with
+                // nothing. The popup a real answer opened stays; the next keystroke re-ranks
+                // it, and leaving the word closes it.
+                Ok(items) if items.is_empty() => {
+                    if !completion.is_open() {
+                        completion.close();
+                    }
+                }
                 Ok(items) => completion.arrived(items, &query, replaces, caret),
-                // Silently: a completion that could not be fetched is a completion that does not
-                // appear, and a toast for every failed keystroke would be unusable.
+                // Silently, and without closing, for the same reason: a cancelled request is
+                // not the server saying "nothing matches".
                 Err(error) => {
                     tracing::debug!("completion: {error}");
-                    completion.close();
                 }
             }
         });
@@ -196,7 +209,14 @@ impl Completion {
             })
             .unwrap_or_default();
 
-        let (range, text) = replacement(&item, open.replaces.clone(), handle, encoding);
+        let (mut range, text) = replacement(&item, open.replaces.clone(), handle, encoding);
+        // The item is as old as the request it answered, and the person kept typing while the
+        // answer was on its way. What was typed since sits between the range's end and the
+        // caret, and it belongs to the word being completed: accepting replaces it too.
+        let caret = handle.query(|snapshot| snapshot.selections().primary().head);
+        if caret > range.end && caret - range.end <= 64 {
+            range.end = caret;
+        }
 
         // The item's own edit and everything else it asks for, in one command: an auto-import that
         // arrived as an additional edit has to land in the same undo step as the word it is for,

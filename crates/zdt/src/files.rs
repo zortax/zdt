@@ -112,6 +112,58 @@ fn go_to_line(workspace: &Workspace, buffer: BufferId, line: Option<u64>) {
     std::mem::forget(handle);
 }
 
+/// Re-reads open files whose bytes moved on disk under a clean buffer.
+///
+/// What a settled agent turn asks for: the agent writes files under the session, and a buffer
+/// with no unsaved work follows the disk. A dirty buffer is left alone and keeps the editor's
+/// save-time conflict handling. The gutter's signs are worked out again either way.
+pub fn refresh_from_disk(workspace: &Workspace) {
+    let git = zgui::reactive::use_local_context::<crate::git::Git>();
+    if let Some(status) = zgui::reactive::use_local_context::<crate::git::Status>() {
+        status.refresh_soon();
+    }
+    for id in workspace.order_untracked() {
+        let Some(entry) = workspace.buffer_untracked(id) else {
+            continue;
+        };
+        let Some(path) = entry.path.clone() else {
+            continue;
+        };
+        let Some(document) = entry.document().cloned() else {
+            continue;
+        };
+        if entry.is_dirty() || entry.lossy {
+            continue;
+        }
+        let workspace = workspace.clone();
+        let git = git.clone();
+        zdt_view::detached(async move {
+            let reading = path.clone();
+            let Ok(file) = blocking(move || zdt_core::fs::load(&reading)).await else {
+                return;
+            };
+            if file.text != document.text() {
+                // Checked again on this thread: a keystroke while the read ran makes the buffer
+                // dirty, and a dirty buffer is never overwritten.
+                let Some(entry) = workspace.buffer_untracked(id) else {
+                    return;
+                };
+                if entry.is_dirty() {
+                    return;
+                }
+                let whole = 0..document.len_bytes();
+                if document.apply(vec![(whole, file.text)]) {
+                    entry.revision.set(document.revision());
+                    entry.mark_saved();
+                }
+            }
+            if let Some(git) = &git {
+                git.refresh_soon(id);
+            }
+        });
+    }
+}
+
 /// Opens `path` when it is a file, or says why it cannot.
 ///
 /// What the command line hands over. A directory is the project, and a path that is not there yet

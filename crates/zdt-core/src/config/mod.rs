@@ -23,8 +23,8 @@ mod schema;
 use std::path::{Path, PathBuf};
 
 pub use crate::config::schema::{
-    Config, Editor, Keys, Leap, LineNumbers, Lsp, Picker, Scheme, Server, Sessions, Terminal, Tree,
-    Ui,
+    Config, Editor, Instance, Keys, Leap, LineNumbers, Lsp, Picker, Scheme, Server, Sessions,
+    Terminal, Tree, Ui,
 };
 
 /// `text` as a path, with a leading `~` replaced by the home directory.

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO threads\n               (project_id, title, state, mode, worktree, branch, base_branch,\n                instance, provider, created_at_ms, updated_at_ms)\n           VALUES (?, ?, 'idle', ?, ?, ?, ?, ?, ?, ?, ?)\n           RETURNING id AS \"id!: i64\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "threads",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 10
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9b23d068eca6cdc8d2b63adb8af8f355aa8d1f0a7ba489ab60b582cfd4c90435"
+}

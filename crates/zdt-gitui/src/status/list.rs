@@ -9,7 +9,7 @@ use crate::use_gitui;
 use crate::panel::List;
 use crate::panel::ROW;
 use crate::status::FileRowProps;
-use crate::visible::keep_visible;
+use zdt_view::keep_visible;
 
 /// One of the two file lists.
 #[component]
