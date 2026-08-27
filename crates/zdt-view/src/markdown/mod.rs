@@ -6,16 +6,17 @@
 //! fenced block, a rule, a paragraph of prose, and a bulleted list of the trait bounds. Shown as
 //! plain text, those four things look like one thing.
 //!
-//! So this parses it. It parses the subset that language servers emit, which is a much smaller
-//! language than CommonMark: fenced code, ATX headings, thematic breaks, bullet and numbered
-//! lists, and paragraphs. Inside them: code spans, emphasis, strong emphasis and links. Tables,
-//! block quotes, reference links, footnotes, HTML and setext headings are absent. No server has
-//! sent one in a hover, and a parser has to be correct before it is complete.
+//! So this parses it. It parses the subset that language servers, agents and files on disk hold,
+//! which is a much smaller language than CommonMark: fenced code, ATX headings, thematic breaks,
+//! bullet and numbered lists, block quotes, GitHub alerts, `<details>` blocks, pipe tables,
+//! images and paragraphs. Inside them: code spans, emphasis, strong emphasis, strikethrough,
+//! links and images. Reference links, footnotes, general HTML and setext headings are absent. A
+//! parser has to be correct before it is complete.
 //!
 //! # The parser
 //!
-//! `pulldown-cmark` returns an event stream. This module must still make blocks, spans and views
-//! from it, and that work is two thirds of the code below. The parser is the other third.
+//! Hand-rolled and line-based. It must still make blocks, spans and views, and that work is two
+//! thirds of the code below. The parser is the other third.
 //!
 //! # The code blocks
 //!
@@ -26,5 +27,7 @@
 mod parse;
 mod view;
 
-pub use crate::markdown::parse::{Align, Block, ListItem, Span, Table, parse, spans};
-pub use crate::markdown::view::{Markdown, MarkdownProps};
+pub use crate::markdown::parse::{Align, Block, Callout, ListItem, Span, Table, parse, spans};
+pub use crate::markdown::view::{
+    Base, Markdown, MarkdownProps, Remote, provide_base, provide_remote,
+};

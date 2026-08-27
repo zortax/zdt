@@ -1,0 +1,64 @@
+# The rich view's own keys.
+#
+# Read as an overlay in front of the ordinary keymap, while a split shows its buffer in rich
+# form and has the keyboard. The keys are the ones for reading something: vim's scrolling. The
+# base map layers underneath, so `<Leader>up` toggles back and `]b`, `<C-h>` and the rest keep
+# working.
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "preview.down"
+desc = "Down a line"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "preview.up"
+desc = "Up a line"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "preview.down"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "preview.up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "preview.half_down"
+desc = "Down half a page"
+
+[[map]]
+mode = ["n"]
+keys = "<C-u>"
+action = "preview.half_up"
+desc = "Up half a page"
+
+[[map]]
+mode = ["n"]
+keys = "<C-f>"
+action = "preview.page_down"
+desc = "Down a page"
+
+[[map]]
+mode = ["n"]
+keys = "<C-b>"
+action = "preview.page_up"
+desc = "Up a page"
+
+[[map]]
+mode = ["n"]
+keys = "gg"
+action = "preview.top"
+desc = "To the top"
+
+[[map]]
+mode = ["n"]
+keys = "G"
+action = "preview.bottom"
+desc = "To the bottom"

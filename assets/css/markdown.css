@@ -20,6 +20,8 @@
 
 .md__paragraph {
     display: block;
+    /* `<br>` comes through as a newline; everything else collapses as prose always has. */
+    white-space: pre-line;
 }
 
 /* Headings are a weight and a tone, not a size. Three sizes of heading inside a panel this small
@@ -163,9 +165,8 @@
 /* ---- Fenced blocks ------------------------------------------------------------------------ */
 
 /* A mounted editor, so the fence is highlighted as the language it says it is — which for a hover
- * is the whole value of the hover. Sized by its own line count rather than by its parent: an
- * editor stretched to fit would clip a six-line signature and leave four blank lines under a
- * one-line one. What scrolls is the panel around it. */
+ * is the whole value of the hover. The editor draws through a line window over every line, so it
+ * sizes itself to exactly its content and never scrolls. What scrolls is the panel around it. */
 .md__block {
     flex: none;
     display: flex;
@@ -178,11 +179,98 @@
 .md__editor {
     flex: 1 1 auto;
     min-width: 0;
-    /* One line per line of content, plus nothing: the block is its text and no more. */
-    height: calc(var(--md-block-lines, 1) * var(--md-block-line, 17px));
     --editor-bg: transparent;
     --editor-gutter-bg: transparent;
     --editor-current-line: transparent;
     --editor-cursor: transparent;
     --zdt-editor-size: 12px;
+}
+
+/* ---- Callouts ----------------------------------------------------------------------------- */
+
+/* A quote with a mark: a tinted title row over ordinary blocks, held off the text by a border in
+ * the same tint. */
+.md__callout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+    padding-left: calc(var(--zui-space-base) * 3);
+    border-left: 2px solid var(--md-callout, var(--zui-color-border));
+}
+
+.md__callout-title {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    font-weight: 600;
+    color: var(--md-callout, var(--zui-color-foreground));
+}
+
+.md__callout[data-kind="note"]      { --md-callout: var(--zdt-doc-note, #4493f8); }
+.md__callout[data-kind="tip"]       { --md-callout: var(--zdt-doc-tip, #3fb950); }
+.md__callout[data-kind="important"] { --md-callout: var(--zdt-doc-important, #ab7df8); }
+.md__callout[data-kind="warning"]   { --md-callout: var(--zdt-doc-warning, #d29922); }
+.md__callout[data-kind="caution"]   { --md-callout: var(--zdt-doc-caution, #f85149); }
+
+/* ---- Details ------------------------------------------------------------------------------ */
+
+.md__details {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zui-space-base);
+}
+
+.md__details-summary {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--zui-space-base) * 2);
+    color: var(--zui-color-foreground);
+}
+
+.md__details-summary:hover {
+    color: var(--zdt-doc-heading, var(--zui-color-foreground));
+}
+
+.md__details-chevron {
+    color: var(--zui-color-muted-foreground);
+}
+
+.md__details-body {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--zui-space-base) * 2);
+    padding-left: calc(var(--zui-space-base) * 4);
+}
+
+/* ---- Images ------------------------------------------------------------------------------- */
+
+/* Never wider than the column; the box keeps the picture's own proportions. */
+.md__image {
+    max-width: 100%;
+    object-fit: contain;
+    border-radius: calc(var(--zui-radius-base) - 2px);
+}
+
+/* In a line of prose, no taller than the line's neighbours. */
+.md__image--inline {
+    max-height: 20px;
+    vertical-align: middle;
+}
+
+/* An image whose picture cannot be read: an address on the network, or a document from nowhere.
+ * The words stand in, marked as standing in. */
+.md__image-words {
+    color: var(--zui-color-muted-foreground);
+    font-style: italic;
+}
+
+/* A key the user presses: a small cap, the way GitHub draws `<kbd>`. */
+.md__kbd {
+    font-family: var(--zdt-editor-font, "Mononoki Nerd Font"), monospace;
+    font-size: 0.85em;
+    padding: 0 4px;
+    border: 1px solid var(--zui-color-border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    background-color: var(--zdt-doc-block, var(--zui-color-muted));
 }

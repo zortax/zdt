@@ -13,12 +13,14 @@ pub mod markdown;
 
 mod clock;
 mod erase;
+mod settle;
 mod task;
 mod visible;
 mod watch;
 
 pub use crate::clock::{Clock, Job, Pending};
 pub use crate::erase::{Erase, leaving_state};
+pub use crate::settle::settled;
 pub use crate::task::detached;
 pub use crate::visible::keep_visible;
 pub use crate::watch::{Watcher, watch};

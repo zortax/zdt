@@ -10,12 +10,14 @@
 use super::*;
 
 /// One split, as a session wrote it down.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Restored {
     /// Which buffer it was showing, by its place in the restored buffer list.
     pub current: Option<usize>,
     /// How much larger its text was than the setting says.
     pub font_step: i32,
+    /// Which buffers it showed rich, by their places in the restored buffer list.
+    pub rich: Vec<usize>,
 }
 
 impl Workspace {
@@ -52,6 +54,11 @@ impl Workspace {
                             // document to exist before the first frame.
                             mounted: current.into_iter().collect(),
                             font_step: window.font_step,
+                            rich: window
+                                .rich
+                                .iter()
+                                .filter_map(|at| buffers.get(*at).copied())
+                                .collect(),
                         })
                     })
                     .collect();

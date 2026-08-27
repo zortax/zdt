@@ -51,8 +51,9 @@ impl Focusing {
                 };
                 if buffer.is_terminal() {
                     terminal(buffer.id)
-                } else if buffer.is_panel() {
-                    // A panel is a page: no caret, and the engine is not answering for it.
+                } else if buffer.is_panel() || workspace.is_rich(window, buffer.id) {
+                    // A panel and a rich view are pages: no caret, and the engine is not
+                    // answering for them.
                     Mode::Normal
                 } else {
                     vim.mode()

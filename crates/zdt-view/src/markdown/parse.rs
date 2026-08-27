@@ -1,9 +1,10 @@
-//! The markdown a language server or an agent actually emits.
+//! The markdown a language server, an agent or a file on disk actually holds.
 //!
 //! Fenced code, ATX headings, thematic breaks, nested bullet and numbered lists with task marks,
-//! block quotes, pipe tables and paragraphs. Inside them: code spans, emphasis, strong emphasis,
-//! strikethrough and links. Reference links, footnotes, HTML and setext headings are absent. A
-//! parser has to be correct before it is complete, and anything unrecognized reads as prose.
+//! block quotes, GitHub alerts, `<details>` blocks, pipe tables, images and paragraphs. Inside
+//! them: code spans, emphasis, strong emphasis, strikethrough, links and images. Reference links,
+//! footnotes, general HTML and setext headings are absent. A parser has to be correct before it
+//! is complete, and anything unrecognized reads as prose.
 
 /// One thing in a document.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -23,10 +24,83 @@ pub enum Block {
     List(Vec<ListItem>),
     /// Quoted blocks.
     Quote(Vec<Block>),
+    /// A quote that opens with an alert mark, the way GitHub writes `> [!WARNING]`.
+    Callout {
+        /// Which alert it is.
+        kind: Callout,
+        /// What it says.
+        blocks: Vec<Block>,
+    },
+    /// A `<details>` block: a summary line, and the blocks it folds away.
+    Details {
+        /// What the closed block shows, from `<summary>`. Empty reads as "Details".
+        summary: Vec<Span>,
+        /// What opening it reveals.
+        blocks: Vec<Block>,
+        /// Whether it starts open, which `<details open>` asks for.
+        open: bool,
+    },
+    /// An image standing alone as its own block.
+    Image {
+        /// The words shown when the picture cannot be.
+        alt: String,
+        /// Where the picture is, as the document wrote it.
+        src: String,
+        /// The width an `<img>` tag asked for, in pixels.
+        width: Option<u32>,
+    },
     /// A pipe table.
     Table(Table),
     /// A rule across the panel.
     Rule,
+}
+
+/// Which alert a callout is.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Callout {
+    Note,
+    Tip,
+    Important,
+    Warning,
+    Caution,
+}
+
+impl Callout {
+    /// The callout a quote's first line names, when it names one.
+    fn of(line: &str) -> Option<Self> {
+        match line.trim() {
+            "[!NOTE]" => Some(Self::Note),
+            "[!TIP]" => Some(Self::Tip),
+            "[!IMPORTANT]" => Some(Self::Important),
+            "[!WARNING]" => Some(Self::Warning),
+            "[!CAUTION]" => Some(Self::Caution),
+            _ => None,
+        }
+    }
+
+    /// The word the title row shows.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Note => "Note",
+            Self::Tip => "Tip",
+            Self::Important => "Important",
+            Self::Warning => "Warning",
+            Self::Caution => "Caution",
+        }
+    }
+
+    /// The name the style sheet selects on.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Note => "note",
+            Self::Tip => "tip",
+            Self::Important => "important",
+            Self::Warning => "warning",
+            Self::Caution => "caution",
+        }
+    }
 }
 
 /// One item of a list, and the items nested under it.
@@ -87,6 +161,19 @@ pub enum Span {
         /// Where it points.
         href: String,
     },
+    /// A picture in the line.
+    Image {
+        /// The words shown when the picture cannot be.
+        alt: String,
+        /// Where the picture is, as the document wrote it.
+        src: String,
+        /// The width an `<img>` tag asked for, in pixels.
+        width: Option<u32>,
+    },
+    /// A key the user presses, the way `<kbd>` writes one.
+    Kbd(Vec<Span>),
+    /// A line break the document asked for, the way `<br>` does.
+    Break,
 }
 
 /// Reads `markdown` into the blocks it is made of.
@@ -131,22 +218,82 @@ pub fn parse(markdown: &str) -> Vec<Block> {
             while at < lines.len() && lines[at].trim_start().starts_with('>') {
                 at += 1;
             }
-            let inner = lines[start..at]
+            let bare: Vec<&str> = lines[start..at]
                 .iter()
                 .map(|line| {
                     let bare = line.trim_start();
                     let bare = bare.strip_prefix('>').unwrap_or(bare);
                     bare.strip_prefix(' ').unwrap_or(bare)
                 })
-                .collect::<Vec<_>>()
-                .join("\n");
-            blocks.push(Block::Quote(parse(&inner)));
+                .collect();
+            // An alert mark on the first line makes the quote a callout, the way GitHub reads
+            // `> [!WARNING]`. The mark's line carries no words of its own.
+            if let Some(kind) = bare.first().and_then(|line| Callout::of(line)) {
+                blocks.push(Block::Callout {
+                    kind,
+                    blocks: parse(&bare[1..].join("\n")),
+                });
+            } else {
+                blocks.push(Block::Quote(parse(&bare.join("\n"))));
+            }
             continue;
         }
 
-        if is_rule(trimmed) {
+        // A `<details>` block, and everything up to the tag that closes it. The closing tag is
+        // optional for the same reason a closing fence is.
+        if let Some(open) = details_of(trimmed) {
+            at += 1;
+            let mut summary = Vec::new();
+            // The summary is the first thing inside, when it is written on one line.
+            while at < lines.len() {
+                let inside = lines[at].trim();
+                if inside.is_empty() {
+                    at += 1;
+                    continue;
+                }
+                if let Some(text) = summary_of(inside) {
+                    summary = spans(text);
+                    at += 1;
+                }
+                break;
+            }
+            let start = at;
+            let mut depth = 0usize;
+            while at < lines.len() {
+                let inside = lines[at].trim();
+                if details_of(inside).is_some() {
+                    depth += 1;
+                } else if inside == "</details>" {
+                    if depth == 0 {
+                        break;
+                    }
+                    depth -= 1;
+                }
+                at += 1;
+            }
+            let inner = lines[start..at].join("\n");
+            at = (at + 1).min(lines.len());
+            blocks.push(Block::Details {
+                summary,
+                blocks: parse(&inner),
+                open,
+            });
+            continue;
+        }
+
+        if is_rule(trimmed) || trimmed == "<hr>" || trimmed == "<hr/>" || trimmed == "<hr />" {
             blocks.push(Block::Rule);
             at += 1;
+            continue;
+        }
+
+        // A comment is not content. One that closes on a later line takes its lines with it;
+        // one inside a line is [`spans`]' business.
+        if trimmed.starts_with("<!--") && !trimmed.contains("-->") {
+            while at < lines.len() && !lines[at].contains("-->") {
+                at += 1;
+            }
+            at = (at + 1).min(lines.len());
             continue;
         }
 
@@ -233,6 +380,7 @@ pub fn parse(markdown: &str) -> Vec<Block> {
                 || heading_of(next).is_some()
                 || item_of(next).is_some()
                 || next.starts_with('>')
+                || details_of(next).is_some()
                 || (next.contains('|')
                     && lines
                         .get(at + 1)
@@ -254,10 +402,41 @@ pub fn parse(markdown: &str) -> Vec<Block> {
             .map(|line| line.trim())
             .collect::<Vec<_>>()
             .join(" ");
-        blocks.push(Block::Paragraph(spans(&text)));
+        let inside = spans(&text);
+        // A picture standing alone is a block of its own, so it can stand at the page's width
+        // rather than inside a line of prose. Wrapper tags leave blank text around it.
+        let meat: Vec<&Span> = inside
+            .iter()
+            .filter(|span| !matches!(span, Span::Text(text) if text.trim().is_empty()))
+            .collect();
+        if let [Span::Image { alt, src, width }] = meat.as_slice() {
+            blocks.push(Block::Image {
+                alt: alt.clone(),
+                src: src.clone(),
+                width: *width,
+            });
+        } else if !meat.is_empty() {
+            blocks.push(Block::Paragraph(inside));
+        }
     }
 
     blocks
+}
+
+/// Whether a line opens a `<details>` block, and whether it asks to start open.
+fn details_of(line: &str) -> Option<bool> {
+    match line {
+        "<details>" => Some(false),
+        "<details open>" => Some(true),
+        _ => None,
+    }
+}
+
+/// The words of a one-line `<summary>`, when the line is one.
+fn summary_of(line: &str) -> Option<&str> {
+    line.strip_prefix("<summary>")?
+        .strip_suffix("</summary>")
+        .map(str::trim)
 }
 
 /// One list line before nesting: how deep it sits, and what it says.
@@ -469,6 +648,21 @@ pub fn spans(text: &str) -> Vec<Span> {
             }
         }
 
+        // An image before a link, because an image is a link with a mark in front of it.
+        if here == '!'
+            && bytes.get(at + 1) == Some(&'[')
+            && let Some((alt, src, end)) = link_at(&bytes, at + 1)
+        {
+            flush!();
+            out.push(Span::Image {
+                alt,
+                src,
+                width: None,
+            });
+            at = end;
+            continue;
+        }
+
         if here == '['
             && let Some((text, href, end)) = link_at(&bytes, at)
         {
@@ -520,6 +714,62 @@ pub fn spans(text: &str) -> Vec<Span> {
             }
         }
 
+        // The HTML GitHub keeps: formatting pairs, images, links, breaks, and wrappers that
+        // carry nothing of their own.
+        if here == '<'
+            && let Some(html) = html_at(&bytes, at)
+        {
+            match html {
+                Html::Skip { end } => {
+                    at = end;
+                }
+                Html::Break { end } => {
+                    flush!();
+                    out.push(Span::Break);
+                    at = end;
+                }
+                Html::Image {
+                    alt,
+                    src,
+                    width,
+                    end,
+                } => {
+                    flush!();
+                    out.push(Span::Image { alt, src, width });
+                    at = end;
+                }
+                Html::Link { inner, href, end } => {
+                    flush!();
+                    out.push(Span::Link {
+                        text: spans(&inner),
+                        href,
+                    });
+                    at = end;
+                }
+                Html::Wrap { kind, inner, end } => {
+                    flush!();
+                    out.push(match kind {
+                        Pair::Strong => Span::Strong(spans(&inner)),
+                        Pair::Emphasis => Span::Emphasis(spans(&inner)),
+                        Pair::Strike => Span::Strike(spans(&inner)),
+                        Pair::Code => Span::Code(inner.trim().to_owned()),
+                        Pair::Kbd => Span::Kbd(spans(&inner)),
+                    });
+                    at = end;
+                }
+            }
+            continue;
+        }
+
+        // The handful of entities GitHub prose actually holds.
+        if here == '&'
+            && let Some((decoded, end)) = entity_at(&bytes, at)
+        {
+            plain.push(decoded);
+            at = end;
+            continue;
+        }
+
         // A backslash makes the next character literal, which is how a server writes an asterisk
         // it means as an asterisk.
         if here == '\\' && at + 1 < bytes.len() {
@@ -534,6 +784,244 @@ pub fn spans(text: &str) -> Vec<Span> {
 
     flush!();
     out
+}
+
+/// What a piece of HTML asks the line to hold.
+enum Html {
+    /// A tag with nothing of its own to draw. Its content, when it has any, flows on as text.
+    Skip { end: usize },
+    /// A `<br>`.
+    Break { end: usize },
+    /// An `<img>`.
+    Image {
+        alt: String,
+        src: String,
+        width: Option<u32>,
+        end: usize,
+    },
+    /// An `<a href>` and what it wraps.
+    Link {
+        inner: String,
+        href: String,
+        end: usize,
+    },
+    /// A formatting pair and what it wraps.
+    Wrap {
+        kind: Pair,
+        inner: String,
+        end: usize,
+    },
+}
+
+/// Which span a formatting pair makes.
+enum Pair {
+    Strong,
+    Emphasis,
+    Strike,
+    Code,
+    Kbd,
+}
+
+/// The HTML starting at `at`, when this parser knows the tag. Anything else stays literal.
+fn html_at(chars: &[char], at: usize) -> Option<Html> {
+    // A comment, dropped whole. One nobody closed drops the rest of the line.
+    if chars[at..].starts_with(&['<', '!', '-', '-']) {
+        let end = find_str(chars, at + 4, "-->").map_or(chars.len(), |found| found + 3);
+        return Some(Html::Skip { end });
+    }
+
+    let (name, attrs, closing, end) = tag_at(chars, at)?;
+    if closing {
+        // A closer on its own: the opener was transparent, or never there. Known names drop;
+        // anything else stays literal.
+        return known(&name).then_some(Html::Skip { end });
+    }
+
+    match name.as_str() {
+        "br" => Some(Html::Break { end }),
+        "img" => {
+            let src = attr_of(&attrs, "src")?;
+            Some(Html::Image {
+                alt: attr_of(&attrs, "alt").unwrap_or_default(),
+                width: attr_of(&attrs, "width").and_then(|width| width.parse().ok()),
+                src,
+                end,
+            })
+        }
+        "a" => {
+            let (inner, past) = enclosed(chars, end, "a")?;
+            Some(Html::Link {
+                inner,
+                href: attr_of(&attrs, "href").unwrap_or_default(),
+                end: past,
+            })
+        }
+        "strong" | "b" => pair(chars, end, &name, Pair::Strong),
+        "em" | "i" => pair(chars, end, &name, Pair::Emphasis),
+        "s" | "strike" | "del" => pair(chars, end, &name, Pair::Strike),
+        "code" | "tt" | "samp" | "var" => pair(chars, end, &name, Pair::Code),
+        "kbd" => pair(chars, end, &name, Pair::Kbd),
+        // Wrappers whose content flows on as ordinary text, and voids with nothing to draw.
+        "p" | "div" | "center" | "span" | "picture" | "source" | "blockquote" | "sub" | "sup"
+        | "mark" | "ins" | "u" | "q" | "cite" | "abbr" | "small" | "input" | "details"
+        | "summary" => Some(Html::Skip { end }),
+        _ => None,
+    }
+}
+
+/// Whether `name` is a tag this parser handles at all.
+fn known(name: &str) -> bool {
+    matches!(
+        name,
+        "br" | "img"
+            | "a"
+            | "strong"
+            | "b"
+            | "em"
+            | "i"
+            | "s"
+            | "strike"
+            | "del"
+            | "code"
+            | "tt"
+            | "samp"
+            | "var"
+            | "kbd"
+            | "p"
+            | "div"
+            | "center"
+            | "span"
+            | "picture"
+            | "source"
+            | "blockquote"
+            | "sub"
+            | "sup"
+            | "mark"
+            | "ins"
+            | "u"
+            | "q"
+            | "cite"
+            | "abbr"
+            | "small"
+            | "input"
+            | "details"
+            | "summary"
+    )
+}
+
+/// A formatting pair: the content up to the closer, wrapped. A pair nobody closed drops its tag.
+fn pair(chars: &[char], from: usize, name: &str, kind: Pair) -> Option<Html> {
+    match enclosed(chars, from, name) {
+        Some((inner, end)) => Some(Html::Wrap { kind, inner, end }),
+        None => Some(Html::Skip { end: from }),
+    }
+}
+
+/// The content between `from` and the matching `</name>`, and where the closer ends.
+///
+/// Same-name openers nest, so `<kbd><kbd>a</kbd></kbd>` closes at the right one.
+fn enclosed(chars: &[char], from: usize, name: &str) -> Option<(String, usize)> {
+    let mut depth = 0usize;
+    let mut at = from;
+    while at < chars.len() {
+        if chars[at] == '<'
+            && let Some((found, _, closing, end)) = tag_at(chars, at)
+        {
+            if found == name {
+                if closing {
+                    if depth == 0 {
+                        let inner: String = chars[from..at].iter().collect();
+                        return Some((inner, end));
+                    }
+                    depth -= 1;
+                } else {
+                    depth += 1;
+                }
+            }
+            at = end;
+            continue;
+        }
+        at += 1;
+    }
+    None
+}
+
+/// The tag starting at `at`: its name lowercased, its attribute text, whether it closes, and
+/// where it ends.
+fn tag_at(chars: &[char], at: usize) -> Option<(String, String, bool, usize)> {
+    let mut i = at + 1;
+    let closing = chars.get(i) == Some(&'/');
+    if closing {
+        i += 1;
+    }
+    let start = i;
+    while i < chars.len() && (chars[i].is_ascii_alphanumeric()) {
+        i += 1;
+    }
+    if i == start || !chars[start].is_ascii_alphabetic() {
+        return None;
+    }
+    let name: String = chars[start..i].iter().collect::<String>().to_lowercase();
+    let close = chars[i..].iter().position(|c| *c == '>')? + i;
+    // A `<` before the `>` is no tag: `a < b and c > d` is prose.
+    if chars[i..close].contains(&'<') {
+        return None;
+    }
+    let attrs: String = chars[i..close].iter().collect();
+    let attrs = attrs.trim().trim_end_matches('/').trim().to_owned();
+    Some((name, attrs, closing, close + 1))
+}
+
+/// The value of `name` inside a tag's attribute text, quotes shed.
+fn attr_of(attrs: &str, name: &str) -> Option<String> {
+    let lower = attrs.to_lowercase();
+    let mut from = 0;
+    loop {
+        let hit = lower[from..].find(name)? + from;
+        let before = lower[..hit].chars().next_back();
+        let after = lower[hit + name.len()..].chars().next();
+        // A whole word followed by `=`, so `width` does not match inside `data-width-hint`.
+        if before.is_none_or(|c| c.is_whitespace())
+            && after.is_some_and(|c| c == '=' || c.is_whitespace())
+        {
+            let rest = attrs[hit + name.len()..].trim_start();
+            let rest = rest.strip_prefix('=')?.trim_start();
+            let value = match rest.chars().next() {
+                Some('"') => rest[1..].split('"').next(),
+                Some('\'') => rest[1..].split('\'').next(),
+                _ => rest.split_whitespace().next(),
+            };
+            return value.map(str::to_owned);
+        }
+        from = hit + name.len();
+    }
+}
+
+/// Where `needle` starts at or after `from`, over characters.
+fn find_str(chars: &[char], from: usize, needle: &str) -> Option<usize> {
+    let want: Vec<char> = needle.chars().collect();
+    (from..chars.len().saturating_sub(want.len() - 1))
+        .find(|&at| chars[at..at + want.len()] == want[..])
+}
+
+/// The character an entity names, when the text at `at` is one this parser knows.
+fn entity_at(chars: &[char], at: usize) -> Option<(char, usize)> {
+    const KNOWN: &[(&str, char)] = &[
+        ("&amp;", '&'),
+        ("&lt;", '<'),
+        ("&gt;", '>'),
+        ("&quot;", '"'),
+        ("&apos;", '\''),
+        ("&#39;", '\''),
+        ("&nbsp;", '\u{A0}'),
+    ];
+    for (written, meant) in KNOWN {
+        let want: Vec<char> = written.chars().collect();
+        if chars[at..].starts_with(&want) {
+            return Some((*meant, at + want.len()));
+        }
+    }
+    None
 }
 
 /// How many of `mark` there are in a row starting at `at`.
@@ -875,6 +1363,141 @@ mod tests {
         assert!(parse("\n\n\n").is_empty());
         // An empty fence is a fence about nothing, which is worth less than the space it takes.
         assert!(parse("```\n```").is_empty());
+    }
+
+    #[test]
+    fn a_quote_with_an_alert_mark_is_a_callout() {
+        // The shape GitHub renders as an alert, and the zgui README opens with.
+        let blocks = parse("> [!WARNING]\n> mind the gap\n> across lines");
+        assert_eq!(
+            blocks,
+            vec![Block::Callout {
+                kind: super::Callout::Warning,
+                blocks: vec![Block::Paragraph(line("mind the gap across lines"))],
+            }]
+        );
+        // A quote that only talks about alerts is still a quote.
+        assert!(matches!(
+            parse("> words first\n> [!NOTE]").as_slice(),
+            [Block::Quote(_)]
+        ));
+    }
+
+    #[test]
+    fn a_details_block_folds_its_summary_and_its_content() {
+        let blocks = parse("<details>\n<summary>More</summary>\n\nhidden words\n\n</details>");
+        assert_eq!(
+            blocks,
+            vec![Block::Details {
+                summary: line("More"),
+                blocks: vec![Block::Paragraph(line("hidden words"))],
+                open: false,
+            }]
+        );
+        // `open` starts it open, and a missing summary is not a missing block.
+        assert!(matches!(
+            parse("<details open>\nwords\n</details>").as_slice(),
+            [Block::Details { open: true, .. }]
+        ));
+    }
+
+    #[test]
+    fn a_details_block_nobody_closed_runs_to_the_end() {
+        let blocks = parse("<details>\n<summary>More</summary>\n\nwords");
+        assert!(matches!(blocks.as_slice(), [Block::Details { .. }]));
+    }
+
+    #[test]
+    fn an_image_on_its_own_line_is_a_block_and_in_prose_a_span() {
+        assert_eq!(
+            parse("![a diagram](images/diagram.png)"),
+            vec![Block::Image {
+                alt: "a diagram".to_owned(),
+                src: "images/diagram.png".to_owned(),
+                width: None,
+            }]
+        );
+        assert_eq!(
+            spans("see ![the icon](icon.png) here"),
+            vec![
+                Span::Text("see ".to_owned()),
+                Span::Image {
+                    alt: "the icon".to_owned(),
+                    src: "icon.png".to_owned(),
+                    width: None,
+                },
+                Span::Text(" here".to_owned()),
+            ]
+        );
+        // A bang that opens no image is a bang.
+        assert_eq!(
+            spans("wow! [x] done"),
+            vec![Span::Text("wow! [x] done".to_owned())]
+        );
+    }
+
+    #[test]
+    fn the_html_github_keeps_reads_as_its_markdown() {
+        assert_eq!(
+            spans("a <strong>bold</strong> and <em>leaning</em> word"),
+            spans("a **bold** and *leaning* word")
+        );
+        assert_eq!(
+            spans("press <kbd>Ctrl</kbd> now"),
+            vec![
+                Span::Text("press ".to_owned()),
+                Span::Kbd(vec![Span::Text("Ctrl".to_owned())]),
+                Span::Text(" now".to_owned()),
+            ]
+        );
+        assert_eq!(
+            spans("one<br>two"),
+            vec![
+                Span::Text("one".to_owned()),
+                Span::Break,
+                Span::Text("two".to_owned()),
+            ]
+        );
+        assert_eq!(
+            spans("<a href=\"https://x.dev\">docs</a>"),
+            vec![Span::Link {
+                text: vec![Span::Text("docs".to_owned())],
+                href: "https://x.dev".to_owned(),
+            }]
+        );
+        // Wrappers carry nothing; comments are not content; entities decode.
+        assert_eq!(spans("<sub>small words</sub>"), line("small words"));
+        assert_eq!(spans("kept <!-- dropped --> kept"), line("kept  kept"));
+        assert_eq!(spans("a &amp; b"), line("a & b"));
+        // Prose with angle brackets stays prose.
+        assert_eq!(spans("a < b and c > d"), line("a < b and c > d"));
+    }
+
+    #[test]
+    fn an_img_tag_is_an_image_and_keeps_its_width() {
+        let blocks = parse(
+            "<p align=\"center\">\n<img src=\"shot.png\" alt=\"a shot\" width=\"420\">\n</p>",
+        );
+        assert_eq!(
+            blocks,
+            vec![Block::Image {
+                alt: "a shot".to_owned(),
+                src: "shot.png".to_owned(),
+                width: Some(420),
+            }]
+        );
+    }
+
+    #[test]
+    fn an_hr_tag_is_a_rule_and_a_comment_block_is_nothing() {
+        assert_eq!(parse("<hr>"), vec![Block::Rule]);
+        assert_eq!(
+            parse("before\n\n<!--\nhidden\n-->\n\nafter"),
+            vec![
+                Block::Paragraph(line("before")),
+                Block::Paragraph(line("after")),
+            ]
+        );
     }
 
     #[test]

@@ -68,7 +68,16 @@ pub(super) fn ThinkRow(
         }
     };
 
-    let full = move || row.with(|item| item.text.clone());
+    // The whole thought is cloned only while somebody is reading it. A closed row's binding
+    // still wakes on every streamed word, and a clone of a growing thought on each would be a
+    // busy turn spent copying.
+    let full = move || {
+        if opened.get() {
+            row.with(|item| item.text.clone())
+        } else {
+            String::new()
+        }
+    };
     // A model that keeps its reasoning back leaves nothing to open.
     let text_shown =
         move || (!opened.get() || row.with(|item| item.text.is_empty())).then(|| "none".to_owned());

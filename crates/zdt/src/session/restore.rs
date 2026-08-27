@@ -124,6 +124,12 @@ pub fn apply(session: &Session, snapshot: &Snapshot, views: &mut Views) -> Repor
                 .and_then(|at| made.get(at as usize).copied().flatten())
                 .and_then(|id| live.iter().position(|held| *held == id)),
             font_step: window.font_step,
+            rich: window
+                .rich
+                .iter()
+                .filter_map(|at| made.get(*at as usize).copied().flatten())
+                .filter_map(|id| live.iter().position(|held| *held == id))
+                .collect(),
         })
         .collect();
 

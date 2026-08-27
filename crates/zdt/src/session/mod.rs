@@ -498,6 +498,7 @@ fn follow_structure(session: &Session) -> zgui::reactive::RenderEffect<()> {
         let _ = workspace.shape();
         let _ = workspace.focused();
         let _ = workspace.mounted_revision();
+        workspace.track_windows();
         // The first run is the state that was just restored, which is already on disk.
         if previous.is_some() {
             session.touched();

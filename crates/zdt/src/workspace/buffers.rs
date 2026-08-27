@@ -196,6 +196,7 @@ impl Workspace {
         self.inner.windows.update(|windows| {
             for state in windows.values_mut() {
                 state.mounted.retain(|held| *held != id);
+                state.rich.retain(|held| *held != id);
                 if state.current == Some(id) {
                     state.current = replacement;
                     if let Some(replacement) = replacement

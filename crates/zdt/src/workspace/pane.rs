@@ -18,6 +18,7 @@ use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::leap::view::LeapLabelsProps;
+use crate::rich::{MarkdownPreviewProps, ViewPillProps};
 use crate::settings::use_settings;
 use crate::settings::view::ConfigPanelProps;
 use crate::terminals::view::EmulatorProps;
@@ -140,6 +141,9 @@ fn BufferView(
 
     match &entry.kind {
         BufferKind::Text { document } => {
+            // Whether this buffer has a rich form at all. Decided once: the file type is fixed
+            // when the buffer is made.
+            let rich_kind = crate::rich::RichKind::of(&entry);
             let settings = use_settings();
             let config = settings.with(|held| EditorConfig {
                 gutter: gutter_of(held.editor.line_numbers),
@@ -351,11 +355,70 @@ fn BufferView(
                 },
             );
 
+            // While the split shows the rich form, the editor is out of the flow the same way a
+            // buffer not being shown is: hidden and warm, with its handle still filed.
+            let editor_display = {
+                let workspace = workspace.clone();
+                move || workspace.is_rich(window, buffer).then(|| "none".to_owned())
+            };
+
+            // The rich view mounts on the first toggle and stays for the pane's life, so its
+            // parse and its reading position survive a toggle back. The latch moves once, which
+            // is what keeps the hole below from rebuilding the view on every toggle.
+            let preview = if rich_kind.is_some() {
+                let latched: zgui::reactive::RwSignal<bool, zgui::reactive::LocalStorage> =
+                    zgui::reactive::RwSignal::new_local(
+                        workspace.is_rich_untracked(window, buffer),
+                    );
+                {
+                    let workspace = workspace.clone();
+                    let arming = RenderEffect::new(move |_| {
+                        if workspace.is_rich(window, buffer) && !latched.get_untracked() {
+                            latched.set(true);
+                        }
+                    });
+                    on_cleanup_local(move || drop(arming));
+                }
+                let workspace = workspace.clone();
+                view! {
+                    {(move || {
+                        if !latched.get() {
+                            return ().any();
+                        }
+                        let workspace = workspace.clone();
+                        view! {
+                            box(
+                                class = "pane__preview",
+                                style:display = move || {
+                                    (!workspace.is_rich(window, buffer))
+                                        .then(|| "none".to_owned())
+                                }
+                            ) {
+                                MarkdownPreview(window = window, buffer = buffer)
+                            }
+                        }
+                        .any()
+                    })}
+                }
+                .any()
+            } else {
+                ().any()
+            };
+            let pill = if rich_kind.is_some() {
+                view! { ViewPill(window = window, buffer = buffer) }.any()
+            } else {
+                ().any()
+            };
+
             view! {
                 box(
                     class = "pane__buffer",
                     style:display = move || (!current()).then(|| "none".to_owned())
                 ) {
+                    // The braced children first: a braced child after a parenthesised element
+                    // would read as that element's children block.
+                    {preview}
+                    {pill}
                     LeapLabels(window = window, buffer = buffer)
                     Editor(
                         class = "pane__editor",
@@ -364,6 +427,7 @@ fn BufferView(
                         // metrics off the computed style, and the sheet decides what to do with
                         // the number.
                         style:--zdt-pane-font-step = font_step,
+                        style:display = editor_display,
                         document = document.clone(),
                         config = config,
                         autofocus = false,

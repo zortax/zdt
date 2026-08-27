@@ -18,6 +18,7 @@ mod leap;
 pub mod lsp;
 mod picker;
 mod popups;
+mod preview;
 mod session;
 mod terminal;
 mod tree;
@@ -52,6 +53,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "cmdline" => self::cmdline::run(workspace, leaf, args),
         "diagnostic" => lsp::diagnostic(workspace, leaf, handle),
         "hover" => self::popups::hover(leaf),
+        "preview" => self::preview::run(workspace, vim, leaf),
         "completion" => self::popups::completion(workspace, leaf, handle),
         "gitpanel" => zdt_gitui::actions::run(leaf),
         "agent" => self::agent::run(workspace, vim, leaf),

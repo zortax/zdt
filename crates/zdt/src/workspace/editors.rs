@@ -121,6 +121,48 @@ impl Workspace {
             .with(|windows| windows.get(window).map_or(0, |state| state.font_step))
     }
 
+    /// Subscribes to every window's state: what it shows, its text size, its rich buffers.
+    ///
+    /// For a watcher that writes the session down: the layout and the order have signals of
+    /// their own, and what is *inside* a window changes without either of them moving.
+    pub fn track_windows(&self) {
+        self.inner.windows.with(|_| ());
+    }
+
+    /// Whether `window` shows `buffer` in its rich form. Tracked.
+    #[must_use]
+    pub fn is_rich(&self, window: WindowId, buffer: BufferId) -> bool {
+        self.inner.windows.with(|windows| {
+            windows
+                .get(window)
+                .is_some_and(|state| state.rich.contains(&buffer))
+        })
+    }
+
+    /// The same, without subscribing.
+    #[must_use]
+    pub fn is_rich_untracked(&self, window: WindowId, buffer: BufferId) -> bool {
+        self.inner.windows.with_untracked(|windows| {
+            windows
+                .get(window)
+                .is_some_and(|state| state.rich.contains(&buffer))
+        })
+    }
+
+    /// Flips which form `window` shows `buffer` in.
+    pub fn toggle_rich(&self, window: WindowId, buffer: BufferId) {
+        self.inner.windows.update(|windows| {
+            let Some(state) = windows.get_mut(window) else {
+                return;
+            };
+            if state.rich.contains(&buffer) {
+                state.rich.retain(|held| *held != buffer);
+            } else {
+                state.rich.push(buffer);
+            }
+        });
+    }
+
     pub fn focus_direction(&self, direction: crate::workspace::Direction) -> bool {
         let from = self.focused_untracked();
         let Some(next) = self

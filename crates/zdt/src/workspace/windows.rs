@@ -13,10 +13,18 @@ impl Workspace {
             .inner
             .windows
             .try_update(|windows| {
+                // The new split shows what the old one shows, in the same form.
+                let rich = windows
+                    .get(focused)
+                    .is_some_and(|state| state.rich.contains(&current))
+                    .then_some(current)
+                    .into_iter()
+                    .collect();
                 windows.insert(WindowState {
                     current: Some(current),
                     mounted: vec![current],
                     font_step: 0,
+                    rich,
                 })
             })
             .expect("the window map is writable");

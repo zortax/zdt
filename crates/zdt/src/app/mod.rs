@@ -238,6 +238,14 @@ fn SessionShell(
     crate::explorer::menu::provide();
     crate::explorer::field::provide(crate::explorer::field::Field::new());
     crate::hover::provide(Hover::new());
+    crate::rich::provide(crate::rich::Previews::new());
+    {
+        // Every markdown view in the window fetches its remote images through one registry.
+        let images = crate::rich::images::Images::new();
+        zdt_view::markdown::provide_remote(zdt_view::markdown::Remote(std::rc::Rc::new(
+            move |url: &str| images.fetch(url),
+        )));
+    }
     crate::rename::provide(crate::rename::Rename::new());
     crate::tabpick::provide(TabPick::new(session.workspace().clone()));
     crate::picker::provide(Picker::new(session.workspace().clone(), settings.clone()));

@@ -156,6 +156,11 @@ fn describe_windows(
         windows.push(WindowSnapshot {
             current: state.current.and_then(|held| buffers.get(&held).copied()),
             font_step: state.font_step,
+            rich: state
+                .rich
+                .iter()
+                .filter_map(|held| buffers.get(held).copied())
+                .collect(),
         });
     }
     (windows, index_of)

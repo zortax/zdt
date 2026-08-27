@@ -18,6 +18,9 @@ use super::work::WorkRowProps;
 use crate::use_agent;
 
 /// What one member of a card is, as far as the head is concerned.
+///
+/// Deliberately without the member's text: the facts feed a memo that holds the head still, and
+/// a streamed word must not move it.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub(super) struct Facts {
     /// Whether it is a tool, a subagent, or a thought.
@@ -28,10 +31,6 @@ pub(super) struct Facts {
     pub status: ItemStatus,
     /// Whether it is finished.
     pub done: bool,
-    /// The tool's name, or the subagent's description.
-    pub name: String,
-    /// What it says in one line.
-    pub text: String,
     /// How long a thought took.
     pub elapsed_ms: u64,
 }
@@ -55,69 +54,64 @@ pub(super) fn ActivityCard(
     anchor: i64,
     /// Which cards are open, by anchor.
     opened: RwSignal<HashSet<i64>, LocalStorage>,
+    /// The thread's shape, shared by every card so a delta is judged once.
+    shape: RwSignal<Vec<(i64, ItemKind)>, LocalStorage>,
 ) -> impl IntoView {
     let agent = use_agent();
 
     // The run re-derives itself from its anchor. The keyed list holds the card mounted while the
     // run grows, so a member list handed in at construction would never catch up.
-    let ids = {
+    let ids = zdt_view::settled(move || shape.with(|rows| super::run_at(rows, anchor)));
+
+    // The head's facts, settled. The rows stream, and every word notifies the whole row; the
+    // facts leave the words out, so the value moves only when a step lands, finishes or fails —
+    // and the head's closures below run then, and only then.
+    let facts: RwSignal<Vec<Facts>, LocalStorage> = {
         let agent = agent.clone();
-        move || super::run_at(&super::kinds(&agent), anchor)
-    };
-    let facts = {
-        let agent = agent.clone();
-        let ids = ids.clone();
-        move || {
-            ids()
-                .into_iter()
-                .filter_map(|id| agent.client().row(id))
-                .map(|row| {
-                    row.with(|item| Facts {
-                        kind: item.kind,
-                        tool: item.tool,
-                        status: item.status,
-                        done: item.done,
-                        name: item.name.clone(),
-                        text: item.text.clone(),
-                        elapsed_ms: item.elapsed_ms,
+        zdt_view::settled(move || {
+            ids.with(|ids| {
+                ids.iter()
+                    .filter_map(|id| agent.client().row(*id))
+                    .map(|row| {
+                        row.with(|item| Facts {
+                            kind: item.kind,
+                            tool: item.tool,
+                            status: item.status,
+                            done: item.done,
+                            elapsed_ms: item.elapsed_ms,
+                        })
                     })
-                })
-                .collect::<Vec<_>>()
-        }
+                    .collect::<Vec<_>>()
+            })
+        })
     };
 
-    let counter = {
-        let facts = facts.clone();
-        move || summarize(&facts())
-    };
-    let glyph = {
-        let facts = facts.clone();
-        move || card_glyph(&facts())
-    };
-    let state = {
-        let facts = facts.clone();
-        move || Some(card_state(&facts()).to_owned())
-    };
+    let counter = move || facts.with(|facts| summarize(facts));
+    let glyph = move || facts.with(|facts| card_glyph(facts));
+    let state = move || Some(facts.with(|facts| card_state(facts)).to_owned());
+
     // What is happening right now, beside the counter. A thought says so in the counter already,
-    // so only a running tool puts its name here.
-    let now = {
-        let facts = facts.clone();
-        move || {
-            facts()
-                .iter()
-                .find(|one| one.running() && one.kind != ItemKind::Thinking)
-                .map(|one| (one.name.clone(), one.text.clone()))
-        }
+    // so only a running tool puts its name here. Settled on its own, because it does read the
+    // running tool's words, and those move more often than they change what one line shows.
+    let now: RwSignal<Option<(String, String)>, LocalStorage> = {
+        let agent = agent.clone();
+        zdt_view::settled(move || {
+            ids.with(|ids| {
+                ids.iter()
+                    .filter_map(|id| agent.client().row(*id))
+                    .find_map(|row| {
+                        row.with(|item| {
+                            let running = item.kind != ItemKind::Thinking
+                                && item.status == ItemStatus::Running;
+                            running.then(|| (item.name.clone(), item.text.clone()))
+                        })
+                    })
+            })
+        })
     };
-    let now_name = {
-        let now = now.clone();
-        move || now().map(|(name, _)| name).unwrap_or_default()
-    };
-    let now_text = {
-        let now = now.clone();
-        move || now().map(|(_, text)| text).unwrap_or_default()
-    };
-    let now_shown = move || now().is_none().then(|| "none".to_owned());
+    let now_name = move || now.with(|now| now.clone().map(|(name, _)| name).unwrap_or_default());
+    let now_text = move || now.with(|now| now.clone().map(|(_, text)| text).unwrap_or_default());
+    let now_shown = move || now.with(Option::is_none).then(|| "none".to_owned());
 
     let is_open = move || opened.with(|held| held.contains(&anchor));
     let chevron = move || {
@@ -137,11 +131,8 @@ pub(super) fn ActivityCard(
         });
     };
 
-    let steps = {
-        let ids = ids.clone();
-        // Only what is open is built. A closed card is one line whatever it holds.
-        move || if is_open() { ids() } else { Vec::new() }
-    };
+    // Only what is open is built. A closed card is one line whatever it holds.
+    let steps = move || if is_open() { ids.get() } else { Vec::new() };
     let step = {
         let agent = agent.clone();
         move |id: i64| {

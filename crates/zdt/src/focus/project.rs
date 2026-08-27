@@ -117,11 +117,15 @@ fn sink_of(wanted: Focus, focus: &Focusing, workspace: &Workspace) -> Option<Sin
         Focus::Window(window) => {
             let buffer = workspace.buffer_in_untracked(window)?;
             // An editor is already filed with the workspace, which every action reads it from. A
-            // terminal or a panel says how it takes the keyboard itself.
-            workspace
-                .handle_for(window, buffer)
-                .map(Sink::Editor)
-                .or_else(|| focus.sink_for(Spot::Buffer(window, buffer)))
+            // terminal or a panel says how it takes the keyboard itself. A buffer shown rich has
+            // *both* mounted: the editor is hidden and keeps its state, and the rich view has
+            // the keys.
+            let editor = || workspace.handle_for(window, buffer).map(Sink::Editor);
+            if workspace.is_rich_untracked(window, buffer) {
+                focus.sink_for(Spot::Buffer(window, buffer)).or_else(editor)
+            } else {
+                editor().or_else(|| focus.sink_for(Spot::Buffer(window, buffer)))
+            }
         }
     }
 }

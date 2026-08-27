@@ -107,6 +107,17 @@ fn kinds(agent: &AgentUi) -> Vec<(i64, ItemKind)> {
         .collect()
 }
 
+/// The thread's shape, deduplicated.
+///
+/// [`kinds`] subscribes to every row, so it recomputes on every streamed word. The settled
+/// value is what stops the wave there: it moves only when a row arrives, leaves, or changes
+/// kind, and the list and every card hang off it. Without it, a thread of many cards walked
+/// every row of the whole thread several times per delta, and a busy turn pinned the processor.
+fn shape_of(agent: &AgentUi) -> RwSignal<Vec<(i64, ItemKind)>, LocalStorage> {
+    let agent = agent.clone();
+    zdt_view::settled(move || kinds(&agent))
+}
+
 /// Every row, newest at the bottom.
 // The list macro takes a closure by construction, so the one it is handed here is not redundant.
 #[allow(clippy::redundant_closure)]
@@ -123,9 +134,10 @@ pub fn Timeline(
     // never unmounted for a thread change, so what somebody opened stays open.
     let opened: RwSignal<HashSet<i64>, LocalStorage> = RwSignal::new_local(HashSet::new());
 
+    let shape = shape_of(&agent);
     let segments = {
         let agent = agent.clone();
-        move || segment(&kinds(&agent), agent.host().groups_activity())
+        move || shape.with(|rows| segment(rows, agent.host().groups_activity()))
     };
 
     let empty = {
@@ -256,7 +268,7 @@ pub fn Timeline(
                         Seg::One(id) => view! { LogRow(id = id) }.any(),
                         Seg::Card(anchor) => view! {
                             box(class = "agent-log__row agent-log__row--card") {
-                                ActivityCard(anchor = anchor, opened = opened)
+                                ActivityCard(anchor = anchor, opened = opened, shape = shape)
                             }
                         }
                         .any(),

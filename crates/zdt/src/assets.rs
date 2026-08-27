@@ -18,6 +18,7 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/picker.css"),
     include_str!("../../../assets/css/terminal.css"),
     include_str!("../../../assets/css/markdown.css"),
+    include_str!("../../../assets/css/rich.css"),
     include_str!("../../../assets/css/toast.css"),
     include_str!("../../../assets/css/completion.css"),
     include_str!("../../../assets/css/settings.css"),
@@ -51,6 +52,11 @@ pub const OVERLAYS: &[(&str, &str, &str)] = &[
         "completion",
         include_str!("../../../assets/keymap-completion.toml"),
         "keymap-completion.toml",
+    ),
+    (
+        crate::rich::REGION,
+        include_str!("../../../assets/keymap-preview.toml"),
+        "keymap-preview.toml",
     ),
     (
         crate::vim::surface::TERMINAL,

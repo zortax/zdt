@@ -138,6 +138,8 @@ pub struct WindowSnapshot {
     pub current: Option<u32>,
     /// How much larger its text was than the setting says.
     pub font_step: i32,
+    /// Which buffers it showed in their rich form.
+    pub rich: Vec<u32>,
 }
 
 /// Where one editor was looking: one per split-and-buffer that had an editor mounted.
@@ -550,6 +552,26 @@ mod tests {
         assert_eq!(back.format, FORMAT);
         assert!(back.buffers.is_empty());
         assert_eq!(back.focused, 0);
+    }
+
+    #[test]
+    fn a_window_snapshot_keeps_its_rich_buffers() {
+        let snapshot = WindowSnapshot {
+            current: Some(0),
+            font_step: 2,
+            rich: vec![0, 3],
+        };
+        let back = round(&snapshot);
+        assert_eq!(back.rich, vec![0, 3]);
+
+        // A file an older release wrote has no such field, and reads as none.
+        #[derive(Serialize)]
+        struct Older {
+            current: Option<u32>,
+        }
+        let bytes = rmp_serde::to_vec_named(&Older { current: Some(1) }).expect("it encodes");
+        let back: WindowSnapshot = rmp_serde::from_slice(&bytes).expect("it decodes");
+        assert!(back.rich.is_empty());
     }
 
     #[test]

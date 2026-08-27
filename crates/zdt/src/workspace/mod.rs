@@ -62,6 +62,12 @@ pub struct WindowState {
     /// Per window, and never per application. `<C-+>` in a split asks to read *this* file more
     /// comfortably, and shrinking the status line along with it answers a different question.
     pub font_step: i32,
+    /// Which buffers this window shows in their rich form. See [`crate::rich`].
+    ///
+    /// Per window and per buffer: the same file can be source in one split and a page in
+    /// another, and toggling one markdown buffer leaves the next one alone. A `Vec`, because it
+    /// can hold at most as many entries as `mounted`.
+    pub rich: Vec<BufferId>,
 }
 
 /// Everything that is open.
@@ -143,6 +149,7 @@ impl Workspace {
             current: Some(scratch),
             mounted: vec![scratch],
             font_step: 0,
+            rich: Vec::new(),
         });
 
         Self {

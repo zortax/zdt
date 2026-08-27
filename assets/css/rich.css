@@ -1,0 +1,131 @@
+/* Rich buffer views: the markdown preview, and the pill that switches a split's form.
+ *
+ * The `.md` proportions in markdown.css are chosen for a hover panel three hundred pixels wide.
+ * A page fills a split, so the overrides here give it a real heading scale, room between blocks,
+ * and a measure the eye can follow. */
+
+.pane__preview {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.mdpreview {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    /* The editor's surface, so a toggle changes the drawing and never the ground it sits on.
+     * The token colours answer when no theme has said what an editor looks like. */
+    background-color: var(--editor-bg, var(--zui-color-background));
+    color: var(--editor-fg, var(--zui-color-foreground));
+}
+
+/* One scroll axis, stated. A scroll container with no stated overflow measures its content
+ * against no width at all: lines stop wrapping, and what hangs past the scrollport is painted
+ * once and never moves with the scroll. The shape here is the chat timeline's, which wraps and
+ * scrolls correctly: a centred column, and a page of one stated width. */
+.mdpreview__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* The page: a stated measure, with air on every side. The width is a length and never a
+ * percentage: inside scroll content there is nothing definite for a percentage to resolve
+ * against, and an indefinite page is one whose text wraps anywhere. */
+.mdpreview__page {
+    flex: 0 0 auto;
+    width: 720px;
+    max-width: calc(100% - 24px);
+    min-width: 0;
+    padding: calc(var(--zui-space-base) * 8) calc(var(--zui-space-base) * 6);
+}
+
+.mdpreview .md {
+    gap: calc(var(--zui-space-base) * 4);
+    font-size: calc(var(--zdt-ui-size, 12px) + 2px);
+    line-height: 22px;
+}
+
+/* A tighter line for code than for prose. The editor sizes itself to its lines. */
+.mdpreview .md__block {
+    line-height: 19px;
+}
+
+/* The measurer wraps inline text at any width it is probed with; a cell told to be the width of
+ * its own content keeps its line, so the columns fit and the wrapper scrolls only past the
+ * page's edge. */
+.mdpreview .md__th,
+.mdpreview .md__td {
+    width: max-content;
+}
+
+/* Headings earn their sizes back at page scale. The largest also earns a rule under it, which
+ * is what says "a new part starts here" on a page tall enough to need saying. */
+.mdpreview .md__heading[data-depth="1"] {
+    font-size: calc(var(--zdt-ui-size, 12px) + 10px);
+    line-height: 30px;
+    margin-top: calc(var(--zui-space-base) * 2);
+    padding-bottom: calc(var(--zui-space-base) * 2);
+    border-bottom: 1px solid var(--zui-color-border);
+}
+
+.mdpreview .md__heading[data-depth="2"] {
+    font-size: calc(var(--zdt-ui-size, 12px) + 6px);
+    line-height: 26px;
+    margin-top: calc(var(--zui-space-base) * 2);
+}
+
+.mdpreview .md__heading[data-depth="3"] {
+    font-size: calc(var(--zdt-ui-size, 12px) + 3px);
+    line-height: 24px;
+}
+
+.mdpreview .md__rule {
+    margin: calc(var(--zui-space-base) * 2) 0;
+}
+
+.mdpreview .md__tablewrap {
+    margin: var(--zui-space-base) 0;
+}
+
+/* The form toggle: two pills in one quiet capsule, floated into the split's corner, above the
+ * leap labels. */
+.viewpill {
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    z-index: 30;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: 999px;
+    background: var(--zui-color-muted);
+}
+
+.viewpill__face {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.viewpill__face:hover {
+    color: var(--zui-color-foreground);
+}
+
+.viewpill__face[data-on="true"] {
+    background: var(--zui-color-background);
+    color: var(--zui-color-foreground);
+}

@@ -35,6 +35,7 @@ pub mod picker;
 pub mod prompt;
 pub mod reload;
 pub mod rename;
+pub mod rich;
 pub mod session;
 pub mod settings;
 pub mod tabpick;

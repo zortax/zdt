@@ -1840,6 +1840,12 @@ desc = "Toggle inlay hints"
 
 [[map]]
 mode = ["n"]
+keys = "<Leader>up"
+action = "preview.toggle"
+desc = "Toggle rich view"
+
+[[map]]
+mode = ["n"]
 keys = "<Leader>uf"
 action = "ui.toggle"
 args = { setting = "format_on_save" }
