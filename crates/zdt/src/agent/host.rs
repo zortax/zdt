@@ -231,4 +231,10 @@ impl zdt_agentui::Host for Editor {
         // Tracked, so flipping `[agent] stream` in the configuration takes effect in place.
         crate::settings::use_settings().with(|config| config.agent.stream)
     }
+
+    fn groups_activity(&self) -> bool {
+        use zdt_core::config::Activity;
+        // Tracked, so the thread redraws the moment `[agent] activity` changes.
+        crate::settings::use_settings().with(|config| config.agent.activity == Activity::Grouped)
+    }
 }

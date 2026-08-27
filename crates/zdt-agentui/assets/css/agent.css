@@ -630,25 +630,105 @@
     color: var(--zui-color-muted-foreground);
 }
 
-/* ---- Folds and work rows ---------------------------------------------------------------- */
+/* ---- Activity cards and work rows -------------------------------------------------------- */
 
-.agent-log__fold {
+/* One run of work and thought, as one card. The card exists from its first step and only ever
+ * grows, so a step finishing changes what the head says and never how tall the thread is.
+ *
+ * Half-strength accent, because the user's own bubble is the full strength: the card has to read
+ * as raised without competing with the one thing in the thread a person wrote themselves. Said as
+ * a mix rather than as `--zui-color-muted`, which seven of the themes set equal to accent. */
+.agent-card {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: var(--zui-radius-base);
+    background: color-mix(in oklab, var(--zui-color-accent) 45%, transparent);
+}
+
+.agent-card__head {
     align-items: center;
     gap: 6px;
-    padding: 1px 2px;
+    padding: 4px 8px;
+    min-width: 0;
+    font-size: var(--zdt-ui-size-small);
+}
+
+.agent-card:hover {
+    background: color-mix(in oklab, var(--zui-color-accent) 70%, transparent);
+}
+
+.agent-card__glyph {
+    flex: 0 0 auto;
     color: var(--zui-color-muted-foreground);
-    border-radius: var(--zui-radius-base);
 }
 
-.agent-log__fold:hover {
-    background: var(--zui-color-accent);
+.agent-card[data-state="running"] .agent-card__glyph {
+    color: var(--zui-color-primary);
 }
 
-.agent-log__fold[data-failed="true"] {
+.agent-card[data-state="failed"] .agent-card__glyph,
+.agent-card[data-state="failed"] .agent-card__count {
     color: var(--zdt-danger, #d06060);
 }
 
-.agent-log__row--work {
+/* The breath of something still going. Switched by the card's word, the way the sidebar's glyph
+ * is switched by its row's tone. The resting `opacity` is stated for the same reason a spinner
+ * states its resting rotation: an animation must never bring a property into existence. */
+.agent-card__glyph {
+    opacity: 1;
+}
+
+.agent-card[data-state="running"] .agent-card__glyph {
+    animation-name: zdt-breathe;
+    animation-duration: 1400ms;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+
+.agent-card__count {
+    flex: 0 0 auto;
+    font-weight: 500;
+}
+
+/* What is happening right now, beside the counter. It shrinks before the counter does: the count
+ * is what the card is, and the running step is what it happens to be doing. */
+.agent-card__now {
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-card__dot {
+    flex: 0 0 auto;
+}
+
+.agent-card__name {
+    flex: 0 0 auto;
+}
+
+.agent-card__summary {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-family: var(--zdt-ui-font, "Mononoki Nerd Font"), monospace;
+}
+
+.agent-card__chevron {
+    flex: 0 0 auto;
+    color: var(--zui-color-muted-foreground);
+}
+
+/* Open, the steps sit under a hairline rather than in a box of their own: two stacked panels
+ * would say the card is two things. */
+.agent-card__steps {
+    padding: 4px 8px 6px 8px;
+    border-top: 1px solid var(--zui-color-border);
+    gap: 1px;
+}
+
+.agent-log__row--work,
+.agent-log__row--card {
     padding: 0;
 }
 
@@ -668,6 +748,13 @@
 .agent-work:hover .agent-work__head {
     background: var(--zui-color-accent);
     border-radius: var(--zui-radius-base);
+}
+
+/* Inside a card the row already sits on half an accent, so its own detail block takes the whole
+ * one and stays legible against it. */
+.agent-card .agent-work__detail,
+.agent-card .agent-think__text {
+    background: var(--zui-color-accent);
 }
 
 .agent-work__glyph {
@@ -1027,7 +1114,10 @@
 
 /* ---- The diff card ----------------------------------------------------------------------- */
 
+/* The same ground as an activity card: what a turn changed is the other thing in the thread that
+ * is a card rather than a line. */
 .agent-diffcard {
+    background: color-mix(in oklab, var(--zui-color-accent) 45%, transparent);
     flex: 1 1 auto;
     min-width: 0;
     border-radius: var(--zui-radius-base);
@@ -1036,22 +1126,22 @@
 .agent-diffcard__head {
     align-items: center;
     gap: 6px;
-    padding: 1px 2px;
+    padding: 4px 8px;
     min-width: 0;
+    font-size: var(--zdt-ui-size-small);
 }
 
-.agent-diffcard:hover .agent-diffcard__head {
-    background: var(--zui-color-accent);
-    border-radius: var(--zui-radius-base);
+.agent-diffcard:hover {
+    background: color-mix(in oklab, var(--zui-color-accent) 70%, transparent);
 }
 
-.agent-diffcard__glyph {
+.agent-diffcard__glyph,
+.agent-diffcard__chevron {
     flex: 0 0 auto;
     color: var(--zui-color-muted-foreground);
 }
 
 .agent-diffcard__word {
-    font-size: var(--zdt-ui-size-small);
     font-weight: 500;
 }
 
@@ -1072,11 +1162,9 @@
 }
 
 .agent-diffcard__files {
-    margin: 2px 0 4px 20px;
-    padding: 4px 8px;
+    padding: 4px 8px 6px 8px;
+    border-top: 1px solid var(--zui-color-border);
     gap: 1px;
-    border-radius: var(--zui-radius-base);
-    background: var(--zui-color-accent);
 }
 
 .agent-diffcard__file {

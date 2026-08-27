@@ -361,6 +361,8 @@ pub struct Agent {
     /// Whether assistant prose is shown while it streams. Off shows each message whole, once it
     /// is done, so half-arrived markdown is never drawn.
     pub stream: bool,
+    /// How tool calls and thoughts are drawn in the thread.
+    pub activity: Activity,
     /// Where agent worktrees are made. Empty means under the state directory.
     pub worktrees: String,
     /// Whether a new worktree fetches its base branch from `origin` and starts from the
@@ -403,6 +405,7 @@ impl Default for Agent {
             binary: String::new(),
             default_mode: "supervised".to_owned(),
             stream: false,
+            activity: Activity::Grouped,
             worktrees: String::new(),
             start_from_origin: true,
             instance: String::new(),
@@ -417,6 +420,17 @@ impl Default for Agent {
             instances: BTreeMap::new(),
         }
     }
+}
+
+/// How tool calls and thoughts are drawn in the thread.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Activity {
+    /// A run of them is one card that counts what it did.
+    #[default]
+    Grouped,
+    /// Every call and thought is a row of its own.
+    Verbose,
 }
 
 /// One configured account of a provider.

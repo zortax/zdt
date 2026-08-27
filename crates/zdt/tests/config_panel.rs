@@ -110,6 +110,33 @@ fn a_switch_changes_the_setting_it_is_bound_to() {
     );
 }
 
+#[test]
+fn the_agent_page_is_bound_to_the_agent_settings() {
+    // The page is new, and a pane's children are only built once it is shown, so the tab has to
+    // be pressed before there is anything on it to press.
+    let (window, settings) = panel();
+    let pages = every(&window, "Tab");
+    let agent = pages
+        .get(7)
+        .copied()
+        .expect("the agent page is in the list");
+    press(&window, agent);
+
+    let choosers = every(&window, "ComboBox");
+    assert_eq!(
+        choosers.len(),
+        2,
+        "the activity mode and what a new agent may do unasked"
+    );
+
+    let switches = every(&window, "Switch");
+    let before = settings.with_untracked(|config| config.agent.stream);
+    // The first switch on the page is the one for streaming prose.
+    press(&window, switches[0]);
+    let after = settings.with_untracked(|config| config.agent.stream);
+    assert_ne!(before, after, "the streaming switch moves what it names");
+}
+
 /// Every surface that floats over the window and holds something worth pressing.
 const FLOATING: &[&str] = &[
     ".config__modal",

@@ -67,6 +67,11 @@ pub trait Host {
     ///
     /// Off holds each message back until it is done, so half-arrived markdown is never drawn.
     fn streams_text(&self) -> bool;
+
+    /// Whether a run of tool calls and thoughts folds into one card. Tracked.
+    ///
+    /// Off draws every call and every thought as a row of its own.
+    fn groups_activity(&self) -> bool;
 }
 
 /// A hand on the picker: title, rows, and what to do with the chosen index.
@@ -120,5 +125,9 @@ impl Host for Nowhere {
 
     fn streams_text(&self) -> bool {
         false
+    }
+
+    fn groups_activity(&self) -> bool {
+        true
     }
 }

@@ -20,6 +20,7 @@
 //! this application's density. That lives in `assets/css/settings.css`. The library exposes stable
 //! classes for every part, so the compact restyle is a style sheet and nothing is forked.
 
+mod agent;
 mod appearance;
 mod editing;
 mod keys;
@@ -35,6 +36,7 @@ mod tree;
 pub use crate::settings::view::modal::{ConfigModal, ConfigModalProps};
 pub use crate::settings::view::panel::{ConfigPanel, ConfigPanelProps};
 
+pub(crate) use crate::settings::view::agent::AgentProps;
 pub(crate) use crate::settings::view::appearance::AppearanceProps;
 pub(crate) use crate::settings::view::editing::EditingProps;
 pub(crate) use crate::settings::view::keys::KeysProps;
@@ -189,10 +191,28 @@ fn line_numbers_of(name: &str) -> zdt_core::config::LineNumbers {
     }
 }
 
+/// How a way of drawing tool calls is written in the settings file.
+const fn activity_name(activity: zdt_core::config::Activity) -> &'static str {
+    match activity {
+        zdt_core::config::Activity::Grouped => "grouped",
+        zdt_core::config::Activity::Verbose => "verbose",
+    }
+}
+
+/// The reverse, defaulting to grouped for anything unrecognised.
+fn activity_of(name: &str) -> zdt_core::config::Activity {
+    match name {
+        "verbose" => zdt_core::config::Activity::Verbose,
+        _ => zdt_core::config::Activity::Grouped,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{line_numbers_name, line_numbers_of, scheme_name, scheme_of};
-    use zdt_core::config::{LineNumbers, Scheme};
+    use super::{
+        activity_name, activity_of, line_numbers_name, line_numbers_of, scheme_name, scheme_of,
+    };
+    use zdt_core::config::{Activity, LineNumbers, Scheme};
 
     #[test]
     fn every_scheme_survives_the_round_trip() {
@@ -215,6 +235,13 @@ mod tests {
     }
 
     #[test]
+    fn every_way_of_drawing_tool_calls_survives_it_too() {
+        for activity in [Activity::Grouped, Activity::Verbose] {
+            assert_eq!(activity_of(activity_name(activity)), activity);
+        }
+    }
+
+    #[test]
     fn the_names_are_the_ones_the_file_uses() {
         // Which is what makes the panel and a hand-written config.toml agree.
         assert_eq!(scheme_name(Scheme::System), "system");
@@ -223,5 +250,7 @@ mod tests {
         let written = toml::to_string(&zdt_core::Config::default()).expect("it writes");
         assert!(written.contains("scheme = \"dark\""), "{written}");
         assert!(written.contains("line_numbers = \"relative\""), "{written}");
+        assert_eq!(activity_name(Activity::Grouped), "grouped");
+        assert!(written.contains("activity = \"grouped\""), "{written}");
     }
 }

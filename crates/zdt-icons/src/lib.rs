@@ -33,6 +33,7 @@ icons! {
     BOOK_OPEN => "book-open",
     BOT => "bot",
     BRACES => "braces",
+    BRAIN => "brain",
     CHECK => "check",
     CHEVRON_DOWN => "chevron-down",
     CHEVRON_LEFT => "chevron-left",

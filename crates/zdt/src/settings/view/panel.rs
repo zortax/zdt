@@ -46,6 +46,10 @@ pub fn ConfigPanel() -> impl IntoView {
                     Icon(icon = icons::TERMINAL, class = "config__page-icon")
                     "Terminal"
                 }
+                SettingsPage(value = "agent") {
+                    Icon(icon = icons::BOT, class = "config__page-icon")
+                    "Agent"
+                }
                 SettingsPage(value = "keys") {
                     Icon(icon = icons::KEYBOARD, class = "config__page-icon")
                     "Keys"
@@ -62,6 +66,7 @@ pub fn ConfigPanel() -> impl IntoView {
             SettingsPane(value = "picker") { Pickers() }
             SettingsPane(value = "sessions") { Sessions() }
             SettingsPane(value = "terminal") { Terminal() }
+            SettingsPane(value = "agent") { Agent() }
             SettingsPane(value = "keys") { Keys() }
         }
     }
