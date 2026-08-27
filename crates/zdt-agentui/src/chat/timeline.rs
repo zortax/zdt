@@ -120,21 +120,31 @@ pub fn Timeline(
     // Following the bottom. `pinned` says the reader is there; content growing while pinned
     // glides the view down, and only an upward scroll of the reader's own unpins it. The two
     // are told apart by what moved: growth changes the extent, a wheel changes the offset.
+    //
+    // A window resize moves the extent as well — the port itself, and the content as its text
+    // re-wraps — and it arrives once per frame of a drag. Chasing that with the glide re-targets
+    // an animation on every step and the bottom visibly falls behind the pointer, so a step whose
+    // *port* moved pins the bottom where it stands and the glide is kept for what it was made
+    // for: new content arriving in a port that is holding still. A width-only drag is still a
+    // port move — the content re-wraps because the port changed shape — which is why both of the
+    // port's axes are watched and the content's height alone means growth.
     let position = node.observe_scroll();
     let pinned = std::rc::Rc::new(std::cell::Cell::new(true));
     let following = {
         let pinned = std::rc::Rc::clone(&pinned);
-        let extent = std::cell::Cell::new((0.0f32, 0.0f32));
+        let extent = std::cell::Cell::new((0.0f32, 0.0f32, 0.0f32));
         let offset_seen = std::cell::Cell::new(0.0f32);
         zgui::reactive::RenderEffect::new(move |_| {
             let at = position.get();
             let content = at.content_size.height.0;
-            let port = at.scrollport.height.0;
-            let limit = (content - port).max(0.0);
+            let port = (at.scrollport.width.0, at.scrollport.height.0);
+            let limit = (content - port.1).max(0.0);
             let offset = at.offset.y.0;
 
-            let grew = (content, port) != extent.get();
-            extent.set((content, port));
+            let (content_seen, port_seen_w, port_seen_h) = extent.get();
+            let resized = port != (port_seen_w, port_seen_h);
+            let grew = resized || content != content_seen;
+            extent.set((content, port.0, port.1));
             let up = offset < offset_seen.get() - 0.5;
             offset_seen.set(offset);
 
@@ -145,7 +155,11 @@ pub fn Timeline(
                             zgui::geom::DevicePx(0.0),
                             zgui::geom::DevicePx(limit),
                         )),
-                        ScrollBehavior::Smooth,
+                        if resized {
+                            ScrollBehavior::Instant
+                        } else {
+                            ScrollBehavior::Smooth
+                        },
                     );
                 }
             } else if up {
