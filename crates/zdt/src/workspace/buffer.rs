@@ -32,6 +32,17 @@ pub enum BufferKind {
         /// What the program running in it calls itself, once it says.
         title: RwSignal<Option<String>, LocalStorage>,
     },
+    /// A picture on disk, drawn by the image preview.
+    ///
+    /// The file is never read into a document: the preview's image element decodes it off the
+    /// interface thread at the size it is shown at.
+    Image {
+        /// The bytes shown in place of the file after a save.
+        ///
+        /// A fresh registration is a fresh `src`, which is what makes every view of this buffer
+        /// decode the new picture: the loader keys its cache by the `src` string alone.
+        shown: RwSignal<Option<zgui_image::ImageBytes>, LocalStorage>,
+    },
     /// The settings, as a page.
     ///
     /// A buffer, so it is a tab like any other. `]b` walks onto it, `<Leader>c` closes it, and it
@@ -163,6 +174,29 @@ impl Buffer {
         }
     }
 
+    /// An image buffer over the file at `path`.
+    ///
+    /// The path is all it holds. The preview decodes from disk, and the edit tools write back to
+    /// disk, so there is no text to fingerprint and nothing for the save machinery to do.
+    pub fn image(id: BufferId, path: PathBuf) -> Self {
+        let file_type = zdt_core::language::of(&path);
+        Self {
+            id,
+            path: Some(path),
+            kind: BufferKind::Image {
+                shown: RwSignal::new_local(None),
+            },
+            file_type,
+            encoding: Encoding::default(),
+            line_ending: LineEnding::default(),
+            lossy: false,
+            revision: RwSignal::new_local(0),
+            saved_revision: RwSignal::new_local(0),
+            saved_text: RwSignal::new_local(Fingerprint::default()),
+            dirty: RwSignal::new_local(false),
+        }
+    }
+
     /// A terminal buffer called `name`.
     pub fn terminal(id: BufferId, name: &str) -> Self {
         Self {
@@ -220,6 +254,11 @@ impl Buffer {
         matches!(self.kind, BufferKind::Terminal { .. })
     }
 
+    /// Whether this is an image.
+    pub fn is_image(&self) -> bool {
+        matches!(self.kind, BufferKind::Image { .. })
+    }
+
     /// Whether this is a panel. Something being edited otherwise.
     ///
     /// What the things that only make sense over text ask before doing anything: saving, telling a
@@ -249,6 +288,8 @@ impl Buffer {
             (None, BufferKind::Settings) => "settings".to_owned(),
             (None, BufferKind::Git) => "git".to_owned(),
             (None, BufferKind::Text { .. }) => "[no name]".to_owned(),
+            // Unreachable: an image buffer is made from a path.
+            (None, BufferKind::Image { .. }) => "[image]".to_owned(),
         }
     }
 

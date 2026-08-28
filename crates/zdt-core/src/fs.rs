@@ -211,7 +211,14 @@ pub fn save(
     line_ending: LineEnding,
 ) -> Result<(), FileError> {
     let bytes = encode(text, encoding, line_ending);
+    save_bytes(path, &bytes)
+}
 
+/// Writes `bytes` to `path`, atomically, through the same temporary-and-rename dance as
+/// [`save`].
+///
+/// Blocking. Called from a worker.
+pub fn save_bytes(path: &Path, bytes: &[u8]) -> Result<(), FileError> {
     let directory = path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(directory).map_err(|error| FileError::io(path, error))?;
 

@@ -193,3 +193,47 @@ fn moving_a_buffer_reorders_the_line_and_stops_at_the_ends() {
         assert_eq!(space.order()[0], b, "it does not fall off the front");
     });
 }
+
+#[test]
+fn an_image_buffer_is_rich_everywhere_and_stays_so() {
+    in_scope(|| {
+        let space = workspace();
+        let picture =
+            space.open_buffer(|id| zdt::workspace::Buffer::image(id, "/project/photo.png".into()));
+        let window = space.focused();
+
+        assert!(space.is_rich(window, picture), "an image has only one form");
+        space.toggle_rich(window, picture);
+        assert!(space.is_rich(window, picture), "a toggle changes nothing");
+        assert!(
+            space
+                .buffer_untracked(picture)
+                .is_some_and(|held| held.document().is_none()),
+            "no text was ever read"
+        );
+    });
+}
+
+#[test]
+fn an_svg_buffer_starts_rich_and_toggles_to_source() {
+    in_scope(|| {
+        let space = workspace();
+        let drawing = space.open_document(
+            Some("/project/logo.svg".into()),
+            zgui_editor::Document::new("<svg/>"),
+        );
+        let window = space.focused();
+
+        assert!(space.is_rich(window, drawing), "a drawing opens as itself");
+        space.toggle_rich(window, drawing);
+        assert!(!space.is_rich(window, drawing));
+        space.toggle_rich(window, drawing);
+        assert!(space.is_rich(window, drawing));
+
+        // A window that never showed it still answers the default.
+        let other = space
+            .split(zdt::workspace::Axis::Horizontal)
+            .expect("it split");
+        assert!(space.is_rich(other, drawing));
+    });
+}

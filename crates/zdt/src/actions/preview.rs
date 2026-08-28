@@ -17,11 +17,15 @@ fn toggle(workspace: &Workspace, vim: &Vim) {
     let Some(buffer) = workspace.buffer_in_untracked(window) else {
         return;
     };
-    let has_rich = workspace
+    let kind = workspace
         .buffer_untracked(buffer)
-        .is_some_and(|entry| RichKind::of(&entry).is_some());
-    if !has_rich {
+        .and_then(|entry| RichKind::of(&entry));
+    let Some(kind) = kind else {
         workspace.say("this buffer has no rich view");
+        return;
+    };
+    if !kind.has_source() {
+        workspace.say("this buffer has only a rich view");
         return;
     }
     if !workspace.is_rich_untracked(window, buffer) {

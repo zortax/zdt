@@ -31,6 +31,13 @@ pub fn open_at(workspace: &Workspace, path: impl Into<PathBuf>, line: Option<u64
         return;
     }
 
+    // A kind with no text source opens from the path alone. The preview decodes the file off the
+    // interface thread itself, so there is nothing to read here.
+    if crate::rich::RichKind::for_path(&path).is_some_and(|kind| !kind.has_source()) {
+        workspace.open_buffer(|id| crate::workspace::Buffer::image(id, path));
+        return;
+    }
+
     let workspace = workspace.clone();
     // Detached: opening a file is often what closes the picker that asked for it, and a read
     // belonging to the picker would be cancelled before the buffer ever appeared.
@@ -271,6 +278,11 @@ pub fn save(workspace: &Workspace, buffer: BufferId) {
         workspace.complain("no file name; use :w <path>");
         return;
     };
+    // An image is written by applying its pending edits; there is no text to encode.
+    if entry.is_image() {
+        crate::rich::image::save(workspace, buffer);
+        return;
+    }
     let Some(document) = entry.document().cloned() else {
         return;
     };

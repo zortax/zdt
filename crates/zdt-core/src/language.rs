@@ -89,7 +89,7 @@ types! {
     "png"      => (None, "\u{f1c5}", "zdt-icon-image"),
     "jpg"      => (None, "\u{f1c5}", "zdt-icon-image"),
     "jpeg"     => (None, "\u{f1c5}", "zdt-icon-image"),
-    "svg"      => (None, "\u{f1c5}", "zdt-icon-image"),
+    "svg"      => (Some("svg"), "\u{f1c5}", "zdt-icon-image"),
     "gif"      => (None, "\u{f1c5}", "zdt-icon-image"),
     "webp"     => (None, "\u{f1c5}", "zdt-icon-image"),
 }

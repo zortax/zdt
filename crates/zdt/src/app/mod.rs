@@ -239,6 +239,9 @@ fn SessionShell(
     crate::explorer::field::provide(crate::explorer::field::Field::new());
     crate::hover::provide(Hover::new());
     crate::rich::provide(crate::rich::Previews::new());
+    crate::rich::stage::provide(crate::rich::stage::Stages::new());
+    crate::rich::image::provide(crate::rich::image::ImageViews::new());
+    crate::rich::svg::provide(crate::rich::svg::SvgViews::new());
     {
         // Every markdown view in the window fetches its remote images through one registry.
         let images = crate::rich::images::Images::new();

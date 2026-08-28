@@ -18,3 +18,5 @@ zgui-testkit-view = { path = "/home/leo/Projects/zgui/crates/zgui-testkit-view" 
 zgui-testkit-scene = { path = "/home/leo/Projects/zgui/crates/zgui-testkit-scene" }
 zgui-platform-headless = { path = "/home/leo/Projects/zgui/crates/zgui-platform-headless" }
 zgui-layout = { path = "/home/leo/Projects/zgui/crates/zgui-layout" }
+zgui-image = { path = "/home/leo/Projects/zgui/crates/zgui-image" }
+zgui-svg = { path = "/home/leo/Projects/zgui/crates/zgui-svg" }

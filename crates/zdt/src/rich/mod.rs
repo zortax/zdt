@@ -9,8 +9,12 @@
 //! its reading position in a [`Reading`], filed with [`Previews`] the way editors are filed with
 //! the workspace, so the keys can reach the one under the keyboard.
 
+pub mod image;
 pub mod images;
 mod pill;
+pub mod stage;
+pub mod svg;
+pub mod toolbar;
 mod view;
 
 pub use pill::{ViewPill, ViewPillProps};
@@ -33,6 +37,10 @@ pub const REGION: &str = "preview";
 pub enum RichKind {
     /// Markdown, drawn as a document.
     Markdown,
+    /// A raster picture, drawn by the image preview.
+    Image,
+    /// A vector drawing, drawn by the SVG preview and edited in place.
+    Svg,
 }
 
 impl RichKind {
@@ -41,25 +49,43 @@ impl RichKind {
     pub fn of(buffer: &Buffer) -> Option<Self> {
         match (&buffer.kind, buffer.language()) {
             (BufferKind::Text { .. }, Some("markdown")) => Some(Self::Markdown),
+            (BufferKind::Text { .. }, Some("svg")) => Some(Self::Svg),
+            (BufferKind::Image { .. }, _) => Some(Self::Image),
             _ => None,
         }
     }
 
-    /// Whether the buffer also has a text source to show. An image would have none.
+    /// The rich presentation a file at `path` would open with, when it has one.
+    ///
+    /// For the open path: a kind with no text source is opened from the path alone, and the file
+    /// is never read as text.
+    #[must_use]
+    pub fn for_path(path: &std::path::Path) -> Option<Self> {
+        let extension = path.extension()?.to_str()?.to_ascii_lowercase();
+        match extension.as_str() {
+            "png" | "jpg" | "jpeg" | "gif" | "webp" => Some(Self::Image),
+            _ => None,
+        }
+    }
+
+    /// Whether the buffer also has a text source to show. An image has none.
     #[must_use]
     pub const fn has_source(self) -> bool {
         match self {
-            Self::Markdown => true,
+            Self::Markdown | Self::Svg => true,
+            Self::Image => false,
         }
     }
 
     /// Which presentation a fresh view starts in.
+    ///
+    /// An SVG opens as the drawing: the drawing is what the file is for, and the source is one
+    /// toggle away.
     #[must_use]
     pub const fn starts_in(self) -> Presentation {
-        if self.has_source() {
-            Presentation::Source
-        } else {
-            Presentation::Rich
+        match self {
+            Self::Markdown => Presentation::Source,
+            Self::Image | Self::Svg => Presentation::Rich,
         }
     }
 }
@@ -271,6 +297,41 @@ mod tests {
             );
             assert_eq!(RichKind::of(&rust), None);
         });
+    }
+
+    #[test]
+    fn pictures_and_drawings_have_their_own_kinds() {
+        let window = zgui_testkit_view::Window::open();
+        window.scope.with(|| {
+            let picture = Buffer::image(BufferId::default(), "/tmp/photo.png".into());
+            assert_eq!(RichKind::of(&picture), Some(RichKind::Image));
+            assert!(!RichKind::Image.has_source());
+            assert_eq!(RichKind::Image.starts_in(), Presentation::Rich);
+
+            let drawing = Buffer::text(
+                BufferId::default(),
+                Some("/tmp/logo.svg".into()),
+                zgui_editor::Document::new("<svg/>"),
+            );
+            assert_eq!(RichKind::of(&drawing), Some(RichKind::Svg));
+            assert!(RichKind::Svg.has_source());
+            assert_eq!(RichKind::Svg.starts_in(), Presentation::Rich);
+        });
+    }
+
+    #[test]
+    fn the_open_path_knows_a_picture_from_its_name() {
+        use std::path::Path;
+        assert_eq!(
+            RichKind::for_path(Path::new("a/photo.PNG")),
+            Some(RichKind::Image)
+        );
+        assert_eq!(
+            RichKind::for_path(Path::new("a/photo.webp")),
+            Some(RichKind::Image)
+        );
+        assert_eq!(RichKind::for_path(Path::new("a/logo.svg")), None);
+        assert_eq!(RichKind::for_path(Path::new("a/main.rs")), None);
     }
 
     #[test]

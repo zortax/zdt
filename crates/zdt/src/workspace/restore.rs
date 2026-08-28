@@ -18,6 +18,8 @@ pub struct Restored {
     pub font_step: i32,
     /// Which buffers it showed rich, by their places in the restored buffer list.
     pub rich: Vec<usize>,
+    /// Which buffers it showed as source although their kind starts rich.
+    pub plain: Vec<usize>,
 }
 
 impl Workspace {
@@ -56,6 +58,11 @@ impl Workspace {
                             font_step: window.font_step,
                             rich: window
                                 .rich
+                                .iter()
+                                .filter_map(|at| buffers.get(*at).copied())
+                                .collect(),
+                            plain: window
+                                .plain
                                 .iter()
                                 .filter_map(|at| buffers.get(*at).copied())
                                 .collect(),

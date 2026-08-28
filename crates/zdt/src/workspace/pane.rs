@@ -18,6 +18,8 @@ use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::leap::view::LeapLabelsProps;
+use crate::rich::image::ImagePreviewProps;
+use crate::rich::svg::SvgPreviewProps;
 use crate::rich::{MarkdownPreviewProps, ViewPillProps};
 use crate::settings::use_settings;
 use crate::settings::view::ConfigPanelProps;
@@ -386,6 +388,12 @@ fn BufferView(
                             return ().any();
                         }
                         let workspace = workspace.clone();
+                        let page = match rich_kind {
+                            Some(crate::rich::RichKind::Svg) => {
+                                view! { SvgPreview(window = window, buffer = buffer) }.any()
+                            }
+                            _ => view! { MarkdownPreview(window = window, buffer = buffer) }.any(),
+                        };
                         view! {
                             box(
                                 class = "pane__preview",
@@ -394,7 +402,7 @@ fn BufferView(
                                         .then(|| "none".to_owned())
                                 }
                             ) {
-                                MarkdownPreview(window = window, buffer = buffer)
+                                {page}
                             }
                         }
                         .any()
@@ -439,6 +447,16 @@ fn BufferView(
             }
             .any()
         }
+        // An image has only its rich form: no editor, no pill, and the preview is the buffer.
+        BufferKind::Image { .. } => view! {
+            box(
+                class = "pane__buffer",
+                style:display = move || (!current()).then(|| "none".to_owned())
+            ) {
+                ImagePreview(window = window, buffer = buffer)
+            }
+        }
+        .any(),
         // The emulator hides itself when its window is showing something else, for the same
         // reason an editor does: a terminal taken out of the tree is a program shut down.
         BufferKind::Terminal { .. } => view! {

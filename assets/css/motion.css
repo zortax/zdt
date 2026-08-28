@@ -212,6 +212,22 @@
     transition-timing-function: var(--zdt-ease);
 }
 
+/* A zoom on the stage glides to its new placement, so a wheel notch reads as movement toward
+ * the pointer and never as a cut. The picture inside carries the same glide, because its box is
+ * computed from the same camera and the two have to arrive together. A drag stands the glide
+ * down: a pan that trailed the pointer would read as lag rather than as a gesture. */
+.stage__plane,
+.imgview__picture {
+    transition-property: left, top, width, height;
+    transition-duration: var(--zdt-quick);
+    transition-timing-function: var(--zdt-ease);
+}
+
+.stage[data-dragging="true"] .stage__plane,
+.stage[data-dragging="true"] .imgview__picture {
+    transition-property: none;
+}
+
 /* ---- Things that keep moving --------------------------------------------------------------- */
 
 /* The turn every spinner shares. Linear, because it repeats: an eased rotation hesitates every

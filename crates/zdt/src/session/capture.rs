@@ -123,6 +123,7 @@ fn describe(buffer: &crate::workspace::Buffer) -> Option<BufferSnapshot> {
         BufferKind::Terminal { .. } => BufferSort::Terminal,
         BufferKind::Settings => BufferSort::Settings,
         BufferKind::Git => BufferSort::Git,
+        BufferKind::Image { .. } => BufferSort::Image,
     };
     Some(BufferSnapshot {
         kind,
@@ -158,6 +159,11 @@ fn describe_windows(
             font_step: state.font_step,
             rich: state
                 .rich
+                .iter()
+                .filter_map(|held| buffers.get(held).copied())
+                .collect(),
+            plain: state
+                .plain
                 .iter()
                 .filter_map(|held| buffers.get(held).copied())
                 .collect(),

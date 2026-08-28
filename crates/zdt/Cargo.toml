@@ -53,6 +53,10 @@ zdt-agentui.workspace = true
 
 zgui.workspace = true
 zgui-editor.workspace = true
+zgui-image.workspace = true
+zgui-svg.workspace = true
+image.workspace = true
+roxmltree.workspace = true
 portable-pty.workspace = true
 zgui-terminal.workspace = true
 zgui-ui.workspace = true

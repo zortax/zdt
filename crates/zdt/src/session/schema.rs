@@ -140,6 +140,8 @@ pub struct WindowSnapshot {
     pub font_step: i32,
     /// Which buffers it showed in their rich form.
     pub rich: Vec<u32>,
+    /// Which buffers it showed as source although their kind starts rich.
+    pub plain: Vec<u32>,
 }
 
 /// Where one editor was looking: one per split-and-buffer that had an editor mounted.
@@ -178,6 +180,8 @@ pub enum BufferSort {
     Terminal,
     Settings,
     Git,
+    /// A picture, reopened from its path.
+    Image,
     /// A kind a later zdt has and this one does not. The buffer is left out.
     #[serde(other)]
     Unknown,
@@ -560,11 +564,13 @@ mod tests {
             current: Some(0),
             font_step: 2,
             rich: vec![0, 3],
+            plain: vec![1],
         };
         let back = round(&snapshot);
         assert_eq!(back.rich, vec![0, 3]);
+        assert_eq!(back.plain, vec![1]);
 
-        // A file an older release wrote has no such field, and reads as none.
+        // A file an older release wrote has no such fields, and reads as none.
         #[derive(Serialize)]
         struct Older {
             current: Option<u32>,
@@ -572,6 +578,7 @@ mod tests {
         let bytes = rmp_serde::to_vec_named(&Older { current: Some(1) }).expect("it encodes");
         let back: WindowSnapshot = rmp_serde::from_slice(&bytes).expect("it decodes");
         assert!(back.rich.is_empty());
+        assert!(back.plain.is_empty());
     }
 
     #[test]

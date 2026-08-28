@@ -17,6 +17,8 @@ zgui-ui = { git = "https://github.com/zortax/zgui" }
 zgui-ui-tokens = { git = "https://github.com/zortax/zgui" }
 zgui-ui-icons = { git = "https://github.com/zortax/zgui" }
 zgui-ui-primitives = { git = "https://github.com/zortax/zgui" }
+zgui-image = { git = "https://github.com/zortax/zgui" }
+zgui-svg = { git = "https://github.com/zortax/zgui" }
 zgui-editor = { path = "/home/leo/Projects/zgui-editor", features = ["serde"] }
 zgui-terminal = { path = "/home/leo/Projects/zgui-terminal", features = ["pty"] }
 portable-pty = "0.9"
@@ -105,6 +107,10 @@ sqlx = { version = "0.9", default-features = false, features = [
     "migrate",
 ] }
 uuid = { version = "1", features = ["v4"] }
+
+# --- media -------------------------------------------------------------------------------
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif"] }
+roxmltree = "0.21"
 
 # --- data --------------------------------------------------------------------------------
 serde = { version = "1", features = ["derive"] }

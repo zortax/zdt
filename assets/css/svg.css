@@ -1,0 +1,133 @@
+/* The SVG preview and its editor: the drawing on the stage, the overlay the editor paints on,
+ * and the paint panel. The stage, the tool row and the readout come from image.css. */
+
+.svgview {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    background-color: var(--editor-bg, var(--zui-color-background));
+    color: var(--editor-fg, var(--zui-color-foreground));
+}
+
+.svgview__drawing {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* What could not be read or drawn, quietly in the corner. */
+.svgview__notice {
+    position: absolute;
+    left: 10px;
+    bottom: 8px;
+    z-index: 30;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-muted);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small);
+}
+
+/* The editor's two layers cover the stage: the canvas paints, the surface listens. */
+.svgedit {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+}
+
+.svgedit__canvas,
+.svgedit__surface {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* The paint panel, under the tool row. */
+.svgpaint {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
+    z-index: 30;
+    padding: 8px 10px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: var(--zui-radius-lg, 8px);
+    background: var(--zui-color-muted);
+}
+
+.svgpaint__title {
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+    margin-top: 4px;
+}
+
+.svgpaint__row {
+    align-items: center;
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.svgpaint__swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--zui-color-border);
+}
+
+.svgpaint__swatch[data-on="true"] {
+    border: 2px solid var(--zui-color-primary);
+}
+
+/* No paint: a hollow face with a strike. */
+.svgpaint__swatch[data-none="true"] {
+    background:
+        linear-gradient(
+            to top right,
+            transparent 44%,
+            #e11d48 46%,
+            #e11d48 54%,
+            transparent 56%
+        )
+        var(--zui-color-background);
+}
+
+.svgpaint__step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-background);
+}
+
+.svgpaint__step:hover {
+    color: var(--zui-color-foreground);
+    border-color: var(--zui-color-primary);
+}
+
+.svgpaint__width {
+    min-width: 48px;
+    text-align: center;
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+}
+
+.svgpaint__hint {
+    font-size: var(--zdt-ui-size-small);
+    color: var(--zui-color-muted-foreground);
+    padding: 2px 0;
+}

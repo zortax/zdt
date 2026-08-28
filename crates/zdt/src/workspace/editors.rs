@@ -2,6 +2,24 @@
 
 use super::*;
 
+/// How a buffer's kind holds its rich form.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Held {
+    /// The rich form is the only form.
+    Only,
+    /// Rich by default; the window records the splits shown as source.
+    Rich,
+    /// Source by default; the window records the splits shown rich.
+    Source,
+}
+
+/// Which list a toggle writes.
+#[derive(Clone, Copy)]
+enum Departures {
+    Rich,
+    Plain,
+}
+
 impl Workspace {
     // ---- The editors themselves -------------------------------------------------------------
 
@@ -130,35 +148,81 @@ impl Workspace {
     }
 
     /// Whether `window` shows `buffer` in its rich form. Tracked.
+    ///
+    /// The default comes from the buffer's kind, and the window records only departures from
+    /// it: `rich` for a kind that starts in the source, `plain` for one that starts rich. The
+    /// kind is fixed when the buffer is made, so asking for it subscribes to nothing.
     #[must_use]
     pub fn is_rich(&self, window: WindowId, buffer: BufferId) -> bool {
-        self.inner.windows.with(|windows| {
-            windows
-                .get(window)
-                .is_some_and(|state| state.rich.contains(&buffer))
-        })
+        match self.rich_default(buffer) {
+            Some(Held::Only) => true,
+            Some(Held::Rich) => self.inner.windows.with(|windows| {
+                windows
+                    .get(window)
+                    .is_some_and(|state| !state.plain.contains(&buffer))
+            }),
+            Some(Held::Source) => self.inner.windows.with(|windows| {
+                windows
+                    .get(window)
+                    .is_some_and(|state| state.rich.contains(&buffer))
+            }),
+            None => false,
+        }
     }
 
     /// The same, without subscribing.
     #[must_use]
     pub fn is_rich_untracked(&self, window: WindowId, buffer: BufferId) -> bool {
-        self.inner.windows.with_untracked(|windows| {
-            windows
-                .get(window)
-                .is_some_and(|state| state.rich.contains(&buffer))
+        match self.rich_default(buffer) {
+            Some(Held::Only) => true,
+            Some(Held::Rich) => self.inner.windows.with_untracked(|windows| {
+                windows
+                    .get(window)
+                    .is_some_and(|state| !state.plain.contains(&buffer))
+            }),
+            Some(Held::Source) => self.inner.windows.with_untracked(|windows| {
+                windows
+                    .get(window)
+                    .is_some_and(|state| state.rich.contains(&buffer))
+            }),
+            None => false,
+        }
+    }
+
+    /// How the buffer's kind holds its rich form, when it has one.
+    fn rich_default(&self, buffer: BufferId) -> Option<Held> {
+        let entry = self.buffer_untracked(buffer)?;
+        let kind = crate::rich::RichKind::of(&entry)?;
+        Some(if !kind.has_source() {
+            Held::Only
+        } else if kind.starts_in() == crate::rich::Presentation::Rich {
+            Held::Rich
+        } else {
+            Held::Source
         })
     }
 
     /// Flips which form `window` shows `buffer` in.
+    ///
+    /// Does nothing for a buffer with only one form.
     pub fn toggle_rich(&self, window: WindowId, buffer: BufferId) {
+        let departures = match self.rich_default(buffer) {
+            Some(Held::Rich) => Departures::Plain,
+            Some(Held::Source) => Departures::Rich,
+            _ => return,
+        };
         self.inner.windows.update(|windows| {
             let Some(state) = windows.get_mut(window) else {
                 return;
             };
-            if state.rich.contains(&buffer) {
-                state.rich.retain(|held| *held != buffer);
+            let held = match departures {
+                Departures::Rich => &mut state.rich,
+                Departures::Plain => &mut state.plain,
+            };
+            if held.contains(&buffer) {
+                held.retain(|kept| *kept != buffer);
             } else {
-                state.rich.push(buffer);
+                held.push(buffer);
             }
         });
     }

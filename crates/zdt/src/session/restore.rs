@@ -25,7 +25,7 @@ use crate::session::schema::{
     SplitAxis, ViewSnapshot,
 };
 use crate::session::store;
-use crate::workspace::{Axis, BufferId, BufferKind, Layout, Restored, WindowId};
+use crate::workspace::{Axis, Buffer, BufferId, BufferKind, Layout, Restored, WindowId};
 
 /// What a restore could not do, for one line in the status line.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -105,6 +105,11 @@ pub fn apply(session: &Session, snapshot: &Snapshot, views: &mut Views) -> Repor
             }),
             BufferSort::Settings => Some(workspace.open_panel(BufferKind::Settings)),
             BufferSort::Git => Some(workspace.open_panel(BufferKind::Git)),
+            // The path is all an image buffer holds, so the path is all a restore needs.
+            BufferSort::Image => buffer
+                .path
+                .clone()
+                .map(|path| workspace.open_buffer(|id| Buffer::image(id, path))),
             // Something a later release writes. The buffer is left out rather than guessed at.
             BufferSort::Unknown => None,
         };
@@ -126,6 +131,12 @@ pub fn apply(session: &Session, snapshot: &Snapshot, views: &mut Views) -> Repor
             font_step: window.font_step,
             rich: window
                 .rich
+                .iter()
+                .filter_map(|at| made.get(*at as usize).copied().flatten())
+                .filter_map(|id| live.iter().position(|held| *held == id))
+                .collect(),
+            plain: window
+                .plain
                 .iter()
                 .filter_map(|at| made.get(*at as usize).copied().flatten())
                 .filter_map(|id| live.iter().position(|held| *held == id))

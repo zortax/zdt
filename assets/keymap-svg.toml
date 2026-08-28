@@ -1,0 +1,99 @@
+# The SVG preview's own keys.
+#
+# Read as an overlay in front of the ordinary keymap, while a split shows an SVG drawing and has
+# the keyboard. The camera keys are the stage's; the tool keys are the editor's. The base map
+# layers underneath, so `<Leader>up` toggles back to the source and `]b`, `<C-h>` and the rest
+# keep working.
+
+[[map]]
+mode = ["n"]
+keys = "+"
+action = "stage.zoom_in"
+desc = "Zoom in"
+
+[[map]]
+mode = ["n"]
+keys = "="
+action = "stage.zoom_in"
+
+[[map]]
+mode = ["n"]
+keys = "-"
+action = "stage.zoom_out"
+desc = "Zoom out"
+
+[[map]]
+mode = ["n"]
+keys = "0"
+action = "stage.fit"
+desc = "Fit to the split"
+
+[[map]]
+mode = ["n"]
+keys = "1"
+action = "stage.actual"
+desc = "Actual size"
+
+[[map]]
+mode = ["n"]
+keys = "h"
+action = "stage.pan_left"
+desc = "Pan left"
+
+[[map]]
+mode = ["n"]
+keys = "l"
+action = "stage.pan_right"
+desc = "Pan right"
+
+[[map]]
+mode = ["n"]
+keys = "k"
+action = "stage.pan_up"
+desc = "Pan up"
+
+[[map]]
+mode = ["n"]
+keys = "j"
+action = "stage.pan_down"
+desc = "Pan down"
+
+[[map]]
+mode = ["n"]
+keys = "e"
+action = "svg.edit"
+desc = "Toggle the edit tools"
+
+[[map]]
+mode = ["n"]
+keys = "v"
+action = "svg.select_tool"
+desc = "Select tool"
+
+[[map]]
+mode = ["n"]
+keys = "n"
+action = "svg.node_tool"
+desc = "Node tool"
+
+[[map]]
+mode = ["n"]
+keys = "f"
+action = "svg.paint"
+desc = "Fill and stroke"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "svg.delete"
+desc = "Delete the selection"
+
+[[map]]
+mode = ["n"]
+keys = "<Del>"
+action = "svg.delete"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "svg.escape"

@@ -67,7 +67,12 @@ pub struct WindowState {
     /// Per window and per buffer: the same file can be source in one split and a page in
     /// another, and toggling one markdown buffer leaves the next one alone. A `Vec`, because it
     /// can hold at most as many entries as `mounted`.
+    ///
+    /// Only for kinds that start in the source. A kind that starts rich records its exceptions
+    /// in `plain`, so a buffer this window has never shown still opens in the right form.
     pub rich: Vec<BufferId>,
+    /// Which buffers this window shows as source although their kind starts rich.
+    pub plain: Vec<BufferId>,
 }
 
 /// Everything that is open.
@@ -150,6 +155,7 @@ impl Workspace {
             mounted: vec![scratch],
             font_step: 0,
             rich: Vec::new(),
+            plain: Vec::new(),
         });
 
         Self {

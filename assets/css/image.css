@@ -1,0 +1,140 @@
+/* The image preview: a stage the camera places a plane on, the floating tool row, the crop
+ * overlay, and the readout. The SVG preview shares the stage and the tool row. */
+
+.imgview {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    background-color: var(--editor-bg, var(--zui-color-background));
+    color: var(--editor-fg, var(--zui-color-foreground));
+}
+
+/* The stage clips the plane; the plane is placed and sized by the camera, so `left` and `top`
+ * have to move it against the stage's corner. */
+.stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.stage__plane {
+    position: absolute;
+}
+
+/* The picture is laid out at its own footprint and turned into place; the plane wears the
+ * turned footprint. A hidden plane lays out no fragments, so it demands no decode. */
+.imgview__picture {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+}
+
+/* The tool row: one quiet capsule at the top centre, clear of the pill's corner. */
+.richbar {
+    position: absolute;
+    top: 6px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    width: max-content;
+    z-index: 30;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--zui-color-border);
+    border-radius: 999px;
+    background: var(--zui-color-muted);
+}
+
+.richbar__tool {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: var(--zui-color-muted-foreground);
+}
+
+.richbar__tool:hover {
+    color: var(--zui-color-foreground);
+}
+
+.richbar__tool[data-on="true"] {
+    background: var(--zui-color-background);
+    color: var(--zui-color-foreground);
+}
+
+.richbar__divider {
+    width: 1px;
+    height: 14px;
+    margin: 0 3px;
+    background: var(--zui-color-border);
+}
+
+/* The crop overlay fills the plane. The kept rectangle is a border; the rest is shaded. */
+.imgcrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}
+
+.imgcrop__shade {
+    position: absolute;
+    background: rgb(0 0 0 / 45%);
+}
+
+.imgcrop__rect {
+    position: absolute;
+    border: 1px solid var(--zui-color-primary);
+}
+
+.imgcrop__grip {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--zui-color-primary);
+    background: var(--zui-color-background);
+}
+
+.imgcrop__grip[data-at="nw"] {
+    left: -4px;
+    top: -4px;
+}
+
+.imgcrop__grip[data-at="ne"] {
+    right: -4px;
+    top: -4px;
+}
+
+.imgcrop__grip[data-at="sw"] {
+    left: -4px;
+    bottom: -4px;
+}
+
+.imgcrop__grip[data-at="se"] {
+    right: -4px;
+    bottom: -4px;
+}
+
+/* What is being looked at, quietly, out of the picture's way. */
+.imgview__readout {
+    position: absolute;
+    right: 10px;
+    bottom: 8px;
+    z-index: 30;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--zui-color-border);
+    background: var(--zui-color-muted);
+    color: var(--zui-color-muted-foreground);
+    font-size: var(--zdt-ui-size-small);
+}
