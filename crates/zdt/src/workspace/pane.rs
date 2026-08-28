@@ -18,6 +18,7 @@ use zgui::{component, view};
 use zgui_editor::{EditorConfig, EditorHandle, EditorProps, GutterMode};
 
 use crate::leap::view::LeapLabelsProps;
+use crate::rich::excalidraw::ExcalidrawPreviewProps;
 use crate::rich::image::ImagePreviewProps;
 use crate::rich::svg::SvgPreviewProps;
 use crate::rich::{MarkdownPreviewProps, ViewPillProps};
@@ -392,6 +393,10 @@ fn BufferView(
                             Some(crate::rich::RichKind::Svg) => {
                                 view! { SvgPreview(window = window, buffer = buffer) }.any()
                             }
+                            Some(crate::rich::RichKind::Excalidraw) => view! {
+                                ExcalidrawPreview(window = window, buffer = buffer)
+                            }
+                            .any(),
                             _ => view! { MarkdownPreview(window = window, buffer = buffer) }.any(),
                         };
                         view! {

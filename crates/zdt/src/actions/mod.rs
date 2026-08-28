@@ -57,6 +57,7 @@ pub fn run(workspace: &Workspace, vim: &Vim, action: &Action, handle: Option<&Ed
         "stage" => crate::rich::stage::run(workspace, leaf),
         "image" => crate::rich::image::run(workspace, leaf),
         "svg" => crate::rich::svg::run(workspace, leaf),
+        "excalidraw" => crate::rich::excalidraw::run(workspace, leaf),
         "completion" => self::popups::completion(workspace, leaf, handle),
         "gitpanel" => zdt_gitui::actions::run(leaf),
         "agent" => self::agent::run(workspace, vim, leaf),

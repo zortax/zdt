@@ -21,6 +21,7 @@ const SHEETS: &[&str] = &[
     include_str!("../../../assets/css/rich.css"),
     include_str!("../../../assets/css/image.css"),
     include_str!("../../../assets/css/svg.css"),
+    zdt_excalidraw::STYLE,
     include_str!("../../../assets/css/toast.css"),
     include_str!("../../../assets/css/completion.css"),
     include_str!("../../../assets/css/settings.css"),
@@ -69,6 +70,11 @@ pub const OVERLAYS: &[(&str, &str, &str)] = &[
         crate::rich::svg::REGION,
         include_str!("../../../assets/keymap-svg.toml"),
         "keymap-svg.toml",
+    ),
+    (
+        crate::rich::excalidraw::REGION,
+        zdt_excalidraw::KEYMAP,
+        "keymap-excalidraw.toml",
     ),
     (
         crate::vim::surface::TERMINAL,

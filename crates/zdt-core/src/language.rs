@@ -60,6 +60,7 @@ types! {
     "md"       => (Some("markdown"), "\u{e73e}", "zdt-icon-doc"),
     "markdown" => (Some("markdown"), "\u{e73e}", "zdt-icon-doc"),
     "json"     => (Some("json"), "\u{e60b}", "zdt-icon-config"),
+    "excalidraw" => (Some("json"), "\u{f1c5}", "zdt-icon-image"),
     "jsonc"    => (Some("json"), "\u{e60b}", "zdt-icon-config"),
     "yaml"     => (Some("yaml"), "\u{e615}", "zdt-icon-config"),
     "yml"      => (Some("yaml"), "\u{e615}", "zdt-icon-config"),

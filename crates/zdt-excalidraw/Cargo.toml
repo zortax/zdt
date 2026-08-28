@@ -1,0 +1,26 @@
+[package]
+name = "zdt-excalidraw"
+description = "The Excalidraw editor: the drawing on a plane, the tools over it, and the keys that work them"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+excalidraw.workspace = true
+excalidraw-rough.workspace = true
+kurbo.workspace = true
+rustc-hash.workspace = true
+serde_json.workspace = true
+
+zdt-icons.workspace = true
+zdt-view.workspace = true
+zgui.workspace = true
+zgui-image.workspace = true
+
+[dev-dependencies]
+zgui-platform-headless = { git = "https://github.com/zortax/zgui" }
+zgui-testkit-view = { git = "https://github.com/zortax/zgui" }

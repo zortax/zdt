@@ -89,7 +89,13 @@ fn run(open: Open, listener: Option<std::os::unix::net::UnixListener>) -> anyhow
     // the setup closure is built before it runs.
     let listener = RefCell::new(listener);
 
+    // The faces a drawing is written in. Registered before the first window, because that is the
+    // last moment the application may decide what it draws with.
+    let fonts = zgui::app::Fonts::system();
+    zdt_excalidraw::fonts::register(&fonts);
+
     app()
+        .with_fonts(fonts)
         .with_application_id("dev.zdt.Editor")
         .with_title(title)
         .with_size(1280.0, 800.0)

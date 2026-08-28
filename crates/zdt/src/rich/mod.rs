@@ -9,6 +9,7 @@
 //! its reading position in a [`Reading`], filed with [`Previews`] the way editors are filed with
 //! the workspace, so the keys can reach the one under the keyboard.
 
+pub mod excalidraw;
 pub mod image;
 pub mod images;
 mod pill;
@@ -41,12 +42,23 @@ pub enum RichKind {
     Image,
     /// A vector drawing, drawn by the SVG preview and edited in place.
     Svg,
+    /// A hand-drawn diagram, drawn by the Excalidraw editor.
+    Excalidraw,
 }
 
 impl RichKind {
     /// The rich presentation of `buffer`, when it has one.
     #[must_use]
     pub fn of(buffer: &Buffer) -> Option<Self> {
+        // By the name, before the language: a drawing is JSON, and a plain `.json` file has no
+        // rich form.
+        if buffer
+            .path
+            .as_deref()
+            .is_some_and(|path| has_extension(path, "excalidraw"))
+        {
+            return Some(Self::Excalidraw);
+        }
         match (&buffer.kind, buffer.language()) {
             (BufferKind::Text { .. }, Some("markdown")) => Some(Self::Markdown),
             (BufferKind::Text { .. }, Some("svg")) => Some(Self::Svg),
@@ -72,7 +84,7 @@ impl RichKind {
     #[must_use]
     pub const fn has_source(self) -> bool {
         match self {
-            Self::Markdown | Self::Svg => true,
+            Self::Markdown | Self::Svg | Self::Excalidraw => true,
             Self::Image => false,
         }
     }
@@ -85,7 +97,7 @@ impl RichKind {
     pub const fn starts_in(self) -> Presentation {
         match self {
             Self::Markdown => Presentation::Source,
-            Self::Image | Self::Svg => Presentation::Rich,
+            Self::Image | Self::Svg | Self::Excalidraw => Presentation::Rich,
         }
     }
 }
@@ -98,6 +110,13 @@ pub enum Presentation {
     Source,
     /// The rich form.
     Rich,
+}
+
+/// Whether `path` ends in `extension`, whatever case it was written in.
+fn has_extension(path: &std::path::Path, extension: &str) -> bool {
+    path.extension()
+        .and_then(|held| held.to_str())
+        .is_some_and(|held| held.eq_ignore_ascii_case(extension))
 }
 
 /// A density made safe to divide by: one of nothing would turn a length into infinity.
@@ -316,6 +335,28 @@ mod tests {
             assert_eq!(RichKind::of(&drawing), Some(RichKind::Svg));
             assert!(RichKind::Svg.has_source());
             assert_eq!(RichKind::Svg.starts_in(), Presentation::Rich);
+        });
+    }
+
+    #[test]
+    fn a_drawing_is_known_by_its_name_and_a_plain_json_file_is_not() {
+        let window = zgui_testkit_view::Window::open();
+        window.scope.with(|| {
+            let drawing = Buffer::text(
+                BufferId::default(),
+                Some("/tmp/plan.excalidraw".into()),
+                zgui_editor::Document::new("{}"),
+            );
+            assert_eq!(RichKind::of(&drawing), Some(RichKind::Excalidraw));
+            assert!(RichKind::Excalidraw.has_source());
+            assert_eq!(RichKind::Excalidraw.starts_in(), Presentation::Rich);
+
+            let plain = Buffer::text(
+                BufferId::default(),
+                Some("/tmp/data.json".into()),
+                zgui_editor::Document::new("{}"),
+            );
+            assert_eq!(RichKind::of(&plain), None);
         });
     }
 

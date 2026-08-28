@@ -1,0 +1,343 @@
+# The drawing editor's own keys.
+#
+# Read as an overlay in front of the ordinary keymap, while a split shows a drawing and has the
+# keyboard. The base map layers underneath, so `]b`, `<C-h>` and the rest keep working.
+
+# --- the tools -----------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "v"
+action = "excalidraw.select"
+desc = "Select"
+
+[[map]]
+mode = ["n"]
+keys = "1"
+action = "excalidraw.select"
+
+[[map]]
+mode = ["n"]
+keys = "2"
+action = "excalidraw.rectangle"
+
+[[map]]
+mode = ["n"]
+keys = "3"
+action = "excalidraw.diamond"
+
+[[map]]
+mode = ["n"]
+keys = "4"
+action = "excalidraw.ellipse"
+
+[[map]]
+mode = ["n"]
+keys = "5"
+action = "excalidraw.arrow"
+
+[[map]]
+mode = ["n"]
+keys = "6"
+action = "excalidraw.line"
+
+[[map]]
+mode = ["n"]
+keys = "7"
+action = "excalidraw.freedraw"
+
+[[map]]
+mode = ["n"]
+keys = "8"
+action = "excalidraw.text"
+
+[[map]]
+mode = ["n"]
+keys = "9"
+action = "excalidraw.image"
+
+[[map]]
+mode = ["n"]
+keys = "0"
+action = "excalidraw.eraser"
+
+[[map]]
+mode = ["n"]
+keys = "h"
+action = "excalidraw.hand"
+desc = "Pan"
+
+[[map]]
+mode = ["n"]
+keys = "r"
+action = "excalidraw.rectangle"
+desc = "Rectangle"
+
+[[map]]
+mode = ["n"]
+keys = "d"
+action = "excalidraw.diamond"
+desc = "Diamond"
+
+[[map]]
+mode = ["n"]
+keys = "o"
+action = "excalidraw.ellipse"
+desc = "Ellipse"
+
+[[map]]
+mode = ["n"]
+keys = "a"
+action = "excalidraw.arrow"
+desc = "Arrow"
+
+[[map]]
+mode = ["n"]
+keys = "l"
+action = "excalidraw.line"
+desc = "Line"
+
+[[map]]
+mode = ["n"]
+keys = "n"
+action = "excalidraw.freedraw"
+desc = "Draw by hand"
+
+[[map]]
+mode = ["n"]
+keys = "t"
+action = "excalidraw.text"
+desc = "Write"
+
+[[map]]
+mode = ["n"]
+keys = "i"
+action = "excalidraw.image"
+desc = "Place a picture"
+
+[[map]]
+mode = ["n"]
+keys = "f"
+action = "excalidraw.frame"
+desc = "Frame"
+
+[[map]]
+mode = ["n"]
+keys = "e"
+action = "excalidraw.eraser"
+desc = "Rub out"
+
+# --- the view ------------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "+"
+action = "excalidraw.zoom_in"
+desc = "Zoom in"
+
+[[map]]
+mode = ["n"]
+keys = "="
+action = "excalidraw.zoom_in"
+
+[[map]]
+mode = ["n"]
+keys = "-"
+action = "excalidraw.zoom_out"
+desc = "Zoom out"
+
+[[map]]
+mode = ["n"]
+keys = "!"
+action = "excalidraw.fit"
+desc = "Fit the drawing"
+
+[[map]]
+mode = ["n"]
+keys = "<C-0>"
+action = "excalidraw.actual"
+desc = "Actual size"
+
+[[map]]
+mode = ["n"]
+keys = "<C-h>"
+action = "excalidraw.pan_left"
+
+[[map]]
+mode = ["n"]
+keys = "<C-l>"
+action = "excalidraw.pan_right"
+
+[[map]]
+mode = ["n"]
+keys = "<C-k>"
+action = "excalidraw.pan_up"
+
+[[map]]
+mode = ["n"]
+keys = "<C-j>"
+action = "excalidraw.pan_down"
+
+# --- the selection -------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<C-a>"
+action = "excalidraw.select_all"
+desc = "Select everything"
+
+[[map]]
+mode = ["n"]
+keys = "x"
+action = "excalidraw.delete"
+desc = "Delete the selection"
+
+[[map]]
+mode = ["n"]
+keys = "<Del>"
+action = "excalidraw.delete"
+
+[[map]]
+mode = ["n"]
+keys = "<C-d>"
+action = "excalidraw.duplicate"
+desc = "Duplicate"
+
+[[map]]
+mode = ["n"]
+keys = "<C-g>"
+action = "excalidraw.group"
+desc = "Group"
+
+[[map]]
+mode = ["n"]
+keys = "<C-S-g>"
+action = "excalidraw.ungroup"
+desc = "Ungroup"
+
+[[map]]
+mode = ["n"]
+keys = "]"
+action = "excalidraw.forward"
+desc = "Bring forward"
+
+[[map]]
+mode = ["n"]
+keys = "["
+action = "excalidraw.backward"
+desc = "Send backward"
+
+[[map]]
+mode = ["n"]
+keys = "}"
+action = "excalidraw.to_front"
+desc = "Bring to front"
+
+[[map]]
+mode = ["n"]
+keys = "{"
+action = "excalidraw.to_back"
+desc = "Send to back"
+
+[[map]]
+mode = ["n"]
+keys = "<C-S-l>"
+action = "excalidraw.lock"
+desc = "Lock the selection"
+
+[[map]]
+mode = ["n"]
+keys = "<C-S-u>"
+action = "excalidraw.unlock"
+desc = "Unlock"
+
+# --- moving what is selected ---------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "<Left>"
+action = "excalidraw.nudge_left"
+
+[[map]]
+mode = ["n"]
+keys = "<Right>"
+action = "excalidraw.nudge_right"
+
+[[map]]
+mode = ["n"]
+keys = "<Up>"
+action = "excalidraw.nudge_up"
+
+[[map]]
+mode = ["n"]
+keys = "<Down>"
+action = "excalidraw.nudge_down"
+
+[[map]]
+mode = ["n"]
+keys = "<S-Left>"
+action = "excalidraw.shove_left"
+
+[[map]]
+mode = ["n"]
+keys = "<S-Right>"
+action = "excalidraw.shove_right"
+
+[[map]]
+mode = ["n"]
+keys = "<S-Up>"
+action = "excalidraw.shove_up"
+
+[[map]]
+mode = ["n"]
+keys = "<S-Down>"
+action = "excalidraw.shove_down"
+
+# --- the clipboard ---------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "y"
+action = "excalidraw.copy"
+desc = "Copy the selection"
+
+[[map]]
+mode = ["n"]
+keys = "<C-c>"
+action = "excalidraw.copy"
+
+[[map]]
+mode = ["n"]
+keys = "<C-x>"
+action = "excalidraw.cut"
+desc = "Cut the selection"
+
+[[map]]
+mode = ["n"]
+keys = "p"
+action = "excalidraw.paste"
+desc = "Paste"
+
+[[map]]
+mode = ["n"]
+keys = "<C-v>"
+action = "excalidraw.paste"
+
+# --- the panels ----------------------------------------------------------------------------
+
+[[map]]
+mode = ["n"]
+keys = "s"
+action = "excalidraw.style"
+desc = "Style"
+
+[[map]]
+mode = ["n"]
+keys = "<CR>"
+action = "excalidraw.edit_text"
+desc = "Write in the selection"
+
+[[map]]
+mode = ["n"]
+keys = "<Esc>"
+action = "excalidraw.escape"

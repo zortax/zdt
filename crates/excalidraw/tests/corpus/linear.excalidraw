@@ -1,0 +1,188 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "line1",
+      "type": "line",
+      "x": 100,
+      "y": 600,
+      "width": 180,
+      "height": 60,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b0",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 1590278022,
+      "version": 42,
+      "versionNonce": 1972238841,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1756304871234,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          90,
+          -60
+        ],
+        [
+          180,
+          0
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": null,
+      "polygon": false
+    },
+    {
+      "id": "arrow1",
+      "type": "arrow",
+      "x": 553,
+      "y": 280,
+      "width": 176,
+      "height": 42,
+      "angle": 0,
+      "strokeColor": "#e03131",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b1",
+      "roundness": {
+        "type": 2
+      },
+      "seed": 884517263,
+      "version": 42,
+      "versionNonce": 1972238841,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1756304871234,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          92,
+          -26
+        ],
+        [
+          176,
+          16
+        ]
+      ],
+      "lastCommittedPoint": null,
+      "startBinding": {
+        "elementId": "rect-adaptive",
+        "fixedPoint": [
+          1.0227,
+          0.5001
+        ],
+        "mode": "orbit"
+      },
+      "endBinding": null,
+      "startArrowhead": "circle",
+      "endArrowhead": "triangle",
+      "elbowed": false
+    },
+    {
+      "id": "elbow1",
+      "type": "arrow",
+      "x": 800,
+      "y": 300,
+      "width": 120,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "b2",
+      "roundness": null,
+      "seed": 66127410,
+      "version": 42,
+      "versionNonce": 1972238841,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1756304871234,
+      "link": null,
+      "locked": false,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          60,
+          0
+        ],
+        [
+          60,
+          80
+        ],
+        [
+          120,
+          80
+        ]
+      ],
+      "startBinding": null,
+      "endBinding": null,
+      "startArrowhead": null,
+      "endArrowhead": "arrow",
+      "elbowed": true,
+      "fixedSegments": [
+        {
+          "start": [
+            60,
+            0
+          ],
+          "end": [
+            60,
+            80
+          ],
+          "index": 1
+        }
+      ],
+      "startIsSpecial": null,
+      "endIsSpecial": null
+    }
+  ],
+  "appState": {
+    "gridSize": 20,
+    "gridStep": 5,
+    "gridModeEnabled": false,
+    "viewBackgroundColor": "#ffffff",
+    "lockedMultiSelections": {}
+  },
+  "files": {}
+}

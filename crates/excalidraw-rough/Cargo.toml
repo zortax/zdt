@@ -1,0 +1,17 @@
+[package]
+name = "excalidraw-rough"
+description = "The hand-drawn geometry an Excalidraw drawing is made of: rough.js shapes and perfect-freehand outlines"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+kurbo.workspace = true
+smallvec.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

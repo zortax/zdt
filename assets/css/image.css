@@ -56,7 +56,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3px 7px;
+    padding: 4px 7px;
     border-radius: 999px;
     color: var(--zui-color-muted-foreground);
 }
@@ -72,7 +72,7 @@
 
 .richbar__divider {
     width: 1px;
-    height: 14px;
+    height: 16px;
     margin: 0 3px;
     background: var(--zui-color-border);
 }

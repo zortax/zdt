@@ -237,3 +237,31 @@ fn an_svg_buffer_starts_rich_and_toggles_to_source() {
         assert!(space.is_rich(other, drawing));
     });
 }
+
+/// A drawing is a rich buffer by its name, and a plain `.json` file beside it is not.
+#[test]
+fn an_excalidraw_buffer_starts_rich_and_a_json_one_does_not() {
+    in_scope(|| {
+        let space = workspace();
+        let drawing = space.open_document(
+            Some("/project/plan.excalidraw".into()),
+            zgui_editor::Document::new(r#"{"type":"excalidraw","elements":[]}"#),
+        );
+        let window = space.focused();
+        assert!(space.is_rich(window, drawing), "a drawing opens as itself");
+
+        space.toggle_rich(window, drawing);
+        assert!(!space.is_rich(window, drawing), "and toggles to its source");
+        space.toggle_rich(window, drawing);
+        assert!(space.is_rich(window, drawing));
+
+        let plain = space.open_document(
+            Some("/project/data.json".into()),
+            zgui_editor::Document::new("{}"),
+        );
+        assert!(
+            !space.is_rich(window, plain),
+            "a plain JSON file has no rich form"
+        );
+    });
+}
