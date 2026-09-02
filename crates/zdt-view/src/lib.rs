@@ -13,6 +13,7 @@ pub mod markdown;
 
 mod clock;
 mod erase;
+mod panel_width;
 mod settle;
 mod task;
 mod visible;
@@ -20,6 +21,7 @@ mod watch;
 
 pub use crate::clock::{Clock, Job, Pending};
 pub use crate::erase::{Erase, leaving_state};
+pub use crate::panel_width::PanelWidth;
 pub use crate::settle::settled;
 pub use crate::task::detached;
 pub use crate::visible::keep_visible;

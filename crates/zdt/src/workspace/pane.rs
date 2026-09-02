@@ -77,8 +77,8 @@ pub fn Pane(
             // which window draws one is told to the editor, because a colour that changes because
             // an attribute changed on an ancestor reaches it on no frame at all.
             attr:data-cursorline = {
-                let settings = use_settings();
-                move || (!settings.with(|config| config.editor.cursorline)).then(|| "off".to_owned())
+                let cursorline = use_settings().select(|config| config.editor.cursorline);
+                move || (!cursorline.get()).then(|| "off".to_owned())
             },
             on:pointer_down = {
                 let workspace = workspace.clone();
@@ -148,7 +148,7 @@ fn BufferView(
             // when the buffer is made.
             let rich_kind = crate::rich::RichKind::of(&entry);
             let settings = use_settings();
-            let config = settings.with(|held| EditorConfig {
+            let config = settings.with_untracked(|held| EditorConfig {
                 gutter: gutter_of(held.editor.line_numbers),
                 cursor_style: zgui_editor::CursorStyle::Block,
                 scrolloff: held.editor.scrolloff,
@@ -321,8 +321,9 @@ fn BufferView(
                 let settings = settings.clone();
                 let workspace = workspace.clone();
                 let vim = use_vim();
+                let line_numbers = settings.select(|config| config.editor.line_numbers);
                 let following = RenderEffect::new(move |previous: Option<()>| {
-                    let _ = settings.with(|config| config.editor.line_numbers);
+                    let _ = line_numbers.get();
                     // The first run is the config the editor was just built with.
                     if previous.is_some()
                         && let Some(handle) = workspace.handle_for(window, buffer)

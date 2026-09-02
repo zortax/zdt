@@ -62,6 +62,7 @@ fn Box(
 ) -> impl IntoView {
     let field = use_field();
     let explorer = use_explorer();
+    let width = explorer.width().clone();
     let leaving = use_presence();
     let node = NodeRef::new();
     let value = RwSignal::new_local(asking.start.clone());
@@ -116,6 +117,7 @@ fn Box(
             style:left = placed.left_px(),
             style:top = placed.top_px(),
             style:visibility = placed.visibility(),
+            style:min-width = move || Some(width.inset_px(16)),
             a11y:role = Role::Dialog,
             a11y:label = about.label()
         ) {

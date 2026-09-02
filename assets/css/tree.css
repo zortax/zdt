@@ -4,7 +4,7 @@
  * them. Rows are 22px, which is the same as every other row in the application. */
 
 .tree {
-    width: var(--tree-width, 260px);
+    width: 260px;
     min-width: 160px;
     max-width: 480px;
     flex: 0 0 auto;
@@ -250,7 +250,7 @@
     align-items: center;
     gap: calc(var(--zui-space-base) * 2);
     padding: 0 calc(var(--zui-space-base) * 2);
-    min-width: calc(var(--tree-width, 260px) - 16px);
+    min-width: 244px;
     height: 26px;
     border: 1px solid var(--zui-color-border);
     border-radius: var(--zui-radius-base);
@@ -294,7 +294,7 @@
     pointer-events: none;
     transform: translate(var(--ghost-x, 0px), var(--ghost-y, 0px));
     min-width: 120px;
-    max-width: calc(var(--tree-width, 260px) - 16px);
+    max-width: 244px;
     padding: var(--zui-space-base) 0;
     border: 1px solid var(--zui-color-border);
     border-radius: var(--zui-radius-base);

@@ -135,6 +135,22 @@ impl Settings {
         self.inner.config.with_untracked(read)
     }
 
+    /// One value out of the settings, notifying only when that value moves.
+    ///
+    /// [`with`](Self::with) narrows the value and not the subscription: every reader of it wakes
+    /// on every write, whatever was written. This puts a comparison between the two, so a width
+    /// dragged at one edge of the window wakes nothing that reads a font at the other.
+    ///
+    /// Made inside an owner, because the derivation lives with the scope it is called in.
+    #[must_use]
+    pub fn select<T: PartialEq + 'static>(
+        &self,
+        read: impl Fn(&Config) -> T + 'static,
+    ) -> RwSignal<T, LocalStorage> {
+        let settings = self.clone();
+        zdt_view::settled(move || settings.with(&read))
+    }
+
     /// Puts a whole new configuration in place, which is what a file changing on disk does.
     pub fn replace(&self, config: Config) {
         if self.inner.config.with_untracked(|held| *held != config) {

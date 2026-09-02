@@ -424,14 +424,16 @@ fn restore_tree(session: &Session, snapshot: &Snapshot) {
     let explorer = session.explorer();
     // The panel's visibility, and never the keyboard: a session coming back with its tree open is
     // not a session somebody asked to type in the tree.
-    if let Some(open) = snapshot.tree.open {
-        explorer.set_open(open);
-    }
+    // The expanded directories first: the tree runs one worker at a time, so the read that opens
+    // the panel queues behind this one and finds its directories already cached.
     explorer.restore_session(
         snapshot.tree.expanded.clone(),
         snapshot.tree.at.clone(),
         snapshot.tree.marked.clone(),
     );
+    if let Some(open) = snapshot.tree.open {
+        explorer.set_open(open);
+    }
 }
 
 /// Vim's memory, with every place pointed back at the buffer it was in.

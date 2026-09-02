@@ -249,6 +249,10 @@ pub fn Explorer() -> impl IntoView {
             attr:data-focused = focused,
             attr:data-dragging = dragging,
             attr:data-refused = refused,
+            style:width = {
+                let explorer = explorer.clone();
+                move || Some(explorer.width().px())
+            },
             a11y:role = Role::Tree,
             a11y:label = "Files",
             on:key_down = on_key,

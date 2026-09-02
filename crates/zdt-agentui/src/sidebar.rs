@@ -137,14 +137,23 @@ pub fn AgentSidebar(
     // The shared beats every row draws from. Each interval is armed only while a row needs it.
     let now: RwSignal<u64, LocalStorage> = RwSignal::new_local(zdt_core::state::now_ms());
 
-    // The age tick: half a minute, while the sidebar is open and has rows.
+    // The order the rows stand in, settled once for every row to read.
+    let order = agent.visible_order();
+
+    // The age tick: half a minute, while the sidebar is open and has rows. Armed on the edge
+    // alone: a thread changing must not re-arm the interval or move the beat, or every push
+    // from the daemon would wake every age in the list a second time.
     let ticking_slot: std::rc::Rc<std::cell::RefCell<Option<zgui::view::time::IntervalHandle>>> =
         std::rc::Rc::new(std::cell::RefCell::new(None));
+    let has_rows = {
+        let agent = agent.clone();
+        zdt_view::settled(move || agent.client().has_threads())
+    };
     let ticking = {
         let agent = agent.clone();
         let slot = std::rc::Rc::clone(&ticking_slot);
         zgui::reactive::RenderEffect::new(move |_| {
-            let on = agent.is_open() && !agent.client().threads().is_empty();
+            let on = agent.is_open() && has_rows.get();
             *slot.borrow_mut() = (on && zgui::view::time::Timers::current().is_some()).then(|| {
                 zgui::view::time::set_interval(std::time::Duration::from_secs(30), move || {
                     now.set(zdt_core::state::now_ms());
@@ -202,6 +211,10 @@ pub fn AgentSidebar(
             tabindex = Focus::Programmatic,
             attr:data-open = open,
             attr:data-focused = focused,
+            style:width = {
+                let agent = agent.clone();
+                move || Some(agent.side_width().px())
+            },
             a11y:role = Role::List,
             a11y:label = "Agent threads",
             on:key_down = on_key,
@@ -236,7 +249,7 @@ pub fn AgentSidebar(
             SideTools()
             scroll(class = "agent-side__rows") {
                 for row in move || rows(), key = |row: &SideRow| row.key() {
-                    SideRowView(row = row.clone(), now = now)
+                    SideRowView(row = row.clone(), now = now, order = order)
                 }
             }
             box(class = "fill") {}
@@ -530,6 +543,8 @@ fn SideRowView(
     row: SideRow,
     /// The moment the ages are measured against.
     now: RwSignal<u64, LocalStorage>,
+    /// The order the rows stand in, shared by every row.
+    order: RwSignal<Vec<zdt_agent::thread::ThreadId>, LocalStorage>,
 ) -> impl IntoView {
     use zdt_view::Erase;
     match row {
@@ -540,7 +555,7 @@ fn SideRowView(
         }
         .any(),
         SideRow::Thread(shell) => view! {
-            AgentRow(thread = shell.id, now = now)
+            AgentRow(thread = shell.id, now = now, order = order)
         }
         .any(),
     }
@@ -556,17 +571,19 @@ fn AgentRow(
     thread: zdt_agent::thread::ThreadId,
     /// The moment the ages are measured against.
     now: RwSignal<u64, LocalStorage>,
+    /// The order the rows stand in, shared by every row.
+    order: RwSignal<Vec<zdt_agent::thread::ThreadId>, LocalStorage>,
 ) -> impl IntoView {
     let agent = use_agent();
 
-    let shell = {
+    // This thread's shell, settled: the list notifies on every change to any thread, and what a
+    // row draws must move only when its own thread does.
+    let held = {
         let agent = agent.clone();
-        move || agent.client().thread(thread)
+        zdt_view::settled(move || agent.client().thread(thread))
     };
-    let index = {
-        let agent = agent.clone();
-        move || agent.visible().iter().position(|held| held.id == thread)
-    };
+    let shell = move || held.get();
+    let index = move || order.with(|order| order.iter().position(|id| *id == thread));
     let selected = {
         let agent = agent.clone();
         move || (agent.selected() == Some(thread)).then(|| "true".to_owned())

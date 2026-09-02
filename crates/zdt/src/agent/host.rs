@@ -7,6 +7,7 @@
 
 use std::path::Path;
 
+use zgui::reactive::prelude::*;
 use zgui::vocab::{KeyEvent, Modifiers};
 
 use crate::session::SessionKey;
@@ -15,13 +16,26 @@ use crate::session::host::SessionHost;
 /// The editor, as the surface sees it.
 pub struct Editor {
     sessions: SessionHost,
+    /// `[agent] stream`, notifying only when it moves.
+    stream: zgui::reactive::RwSignal<bool, zgui::reactive::LocalStorage>,
+    /// Whether `[agent] activity` groups the work, notifying only when it moves.
+    grouped: zgui::reactive::RwSignal<bool, zgui::reactive::LocalStorage>,
 }
 
 impl Editor {
-    /// A host over the session registry.
+    /// A host over the session registry, reading the two settings the surface follows.
+    ///
+    /// Made inside an owner: the settings are selected once here and held for the host's life,
+    /// so the surface's closures wake when one of them moves and never when anything else in
+    /// the settings does.
     #[must_use]
-    pub fn new(sessions: SessionHost) -> Self {
-        Self { sessions }
+    pub fn new(sessions: SessionHost, settings: &crate::settings::Settings) -> Self {
+        use zdt_core::config::Activity;
+        Self {
+            sessions,
+            stream: settings.select(|config| config.agent.stream),
+            grouped: settings.select(|config| config.agent.activity == Activity::Grouped),
+        }
     }
 
     /// The session the calling subtree draws, or the one a window is showing.
@@ -229,12 +243,11 @@ impl zdt_agentui::Host for Editor {
 
     fn streams_text(&self) -> bool {
         // Tracked, so flipping `[agent] stream` in the configuration takes effect in place.
-        crate::settings::use_settings().with(|config| config.agent.stream)
+        self.stream.get()
     }
 
     fn groups_activity(&self) -> bool {
-        use zdt_core::config::Activity;
         // Tracked, so the thread redraws the moment `[agent] activity` changes.
-        crate::settings::use_settings().with(|config| config.agent.activity == Activity::Grouped)
+        self.grouped.get()
     }
 }

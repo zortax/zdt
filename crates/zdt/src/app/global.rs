@@ -70,8 +70,8 @@ impl Global {
     /// Which surface the theme is presented on.
     #[must_use]
     pub fn scheme(&self) -> Signal<ColorScheme, LocalStorage> {
-        let settings = self.settings.clone();
-        Signal::derive_local(move || match settings.with(|config| config.ui.scheme) {
+        let scheme = self.settings.select(|config| config.ui.scheme);
+        Signal::derive_local(move || match scheme.get() {
             Scheme::Light => ColorScheme::Light,
             Scheme::Dark => ColorScheme::Dark,
             Scheme::System => ColorScheme::System,
@@ -177,11 +177,14 @@ pub fn use_global() -> Global {
 /// cannot live in the application's scope even though what they are made of does.
 pub fn install_window_styles(global: &Global) {
     // The settings that are style, in the cascade between the theme and a person's own sheet.
+    // Selected as the sheet's text, so a setting that is not style — a width, a delay — wakes
+    // nothing here.
     let styling = {
-        let settings = global.settings.clone();
+        let css = global.settings.select(crate::app::theme::settings_sheet);
         RenderEffect::new(move |_| {
-            let css = settings.with(crate::app::theme::settings_sheet);
-            zgui::view::sheet::install_stylesheet(crate::app::theme::SETTINGS_SHEET, &css);
+            css.with(|css| {
+                zgui::view::sheet::install_stylesheet(crate::app::theme::SETTINGS_SHEET, css);
+            });
         })
     };
     on_cleanup_local(move || drop(styling));

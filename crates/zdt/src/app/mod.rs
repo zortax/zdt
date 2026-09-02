@@ -374,10 +374,11 @@ pub(crate) fn follow_buffer(
     space: &Workspace,
     settings: &Settings,
 ) -> RenderEffect<()> {
-    let (explorer, space, settings) = (explorer.clone(), space.clone(), settings.clone());
+    let (explorer, space) = (explorer.clone(), space.clone());
+    let follow = settings.select(|config| config.tree.follow);
     RenderEffect::new(move |_| {
         let path = space.current_buffer().and_then(|buffer| buffer.path);
-        if !explorer.is_open() || !settings.with(|config| config.tree.follow) {
+        if !explorer.is_open() || !follow.get() {
             return;
         }
         // Never while the keyboard is in the panel. A caret that jumps out from under somebody
@@ -385,20 +386,34 @@ pub(crate) fn follow_buffer(
         if explorer.is_focused_untracked() {
             return;
         }
-        if let Some(path) = path {
+        // A file already in view has nothing left to open.
+        if let Some(path) = path
+            && !explorer.is_revealed(&path)
+        {
             explorer.reveal(&path);
         }
     })
 }
 
+/// Keeps the panel's drawn width in step with the setting.
+///
+/// The setting follows the width, too: a drag writes it once, on release. This is the other
+/// direction, for the settings page and a file changed on disk.
+pub(crate) fn follow_tree_width(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
+    let explorer = explorer.clone();
+    let width = settings.select(|config| config.tree.width);
+    RenderEffect::new(move |_| explorer.width().follow(width.get()))
+}
+
 /// Keeps what the tree shows in step with the settings.
 pub(crate) fn follow_filter(explorer: &Explorer, settings: &Settings) -> RenderEffect<()> {
-    let (explorer, settings) = (explorer.clone(), settings.clone());
+    let explorer = explorer.clone();
+    let filter = settings.select(|config| zdt_core::tree::Filter {
+        hidden: config.tree.hidden,
+        ignored: config.tree.ignored,
+    });
     RenderEffect::new(move |_| {
-        let wanted = settings.with(|config| zdt_core::tree::Filter {
-            hidden: config.tree.hidden,
-            ignored: config.tree.ignored,
-        });
+        let wanted = filter.get();
         if explorer.filter() != wanted {
             explorer.set_filter(wanted);
         }
@@ -416,9 +431,7 @@ pub(crate) fn follow_status(explorer: &Explorer, status: &crate::git::Status) ->
 
 /// The keys leap labels are drawn from, and again whenever the settings change.
 pub(crate) fn follow_alphabet(vim: &Vim, settings: &Settings) -> RenderEffect<()> {
-    let (vim, settings) = (vim.clone(), settings.clone());
-    RenderEffect::new(move |_| {
-        let alphabet = settings.with(|config| config.leap.alphabet.clone());
-        vim.leaping().set_alphabet(&alphabet);
-    })
+    let vim = vim.clone();
+    let alphabet = settings.select(|config| config.leap.alphabet.clone());
+    RenderEffect::new(move |_| alphabet.with(|alphabet| vim.leaping().set_alphabet(alphabet)))
 }

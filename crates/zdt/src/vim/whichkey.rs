@@ -67,7 +67,8 @@ pub fn WhichKey() -> impl IntoView {
             let Some(timers) = timers.as_ref() else {
                 return;
             };
-            let delay = Duration::from_millis(settings.with(|config| config.ui.whichkey_delay));
+            let delay =
+                Duration::from_millis(settings.with_untracked(|config| config.ui.whichkey_delay));
             let vim = vim.clone();
             *waiting.borrow_mut() = Some(timers.set_timeout(delay, move || {
                 let pending = vim.pending();

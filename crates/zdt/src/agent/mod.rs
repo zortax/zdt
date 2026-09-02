@@ -9,6 +9,7 @@ pub mod resize;
 pub mod view;
 
 use zgui::reactive::RenderEffect;
+use zgui::reactive::prelude::*;
 
 use crate::session::host::SessionHost;
 
@@ -18,8 +19,16 @@ use crate::session::host::SessionHost;
 /// all. The two effects started here are held by the application's scope on purpose.
 pub fn install(sessions: &SessionHost, settings: &crate::settings::Settings) {
     let client = zdt_agent_client::AgentClient::install();
-    let editor = std::rc::Rc::new(host::Editor::new(sessions.clone()));
+    let editor = std::rc::Rc::new(host::Editor::new(sessions.clone(), settings));
     let agent = zdt_agentui::AgentUi::new(client.clone(), editor);
+
+    // The drawn width follows the setting; a drag writes the setting once, on release.
+    let widening = {
+        let agent = agent.clone();
+        let width = settings.select(|config| config.agent.width);
+        RenderEffect::new(move |_| agent.side_width().follow(width.get()))
+    };
+    std::mem::forget(widening);
 
     // Whether the sidebar starts open: what the starting session last showed, and the
     // configuration for a session that never wrote it down.

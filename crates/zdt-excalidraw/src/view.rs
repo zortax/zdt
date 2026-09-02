@@ -136,7 +136,13 @@ pub fn Editor(
                     }
                 },
                 on:pointer_move = move |ev: &mut EventCx<'_, events::PointerMove>| {
-                    pointer::moved(&board, local(ev.position), held(ev.modifiers, ev.button));
+                    // Every sample the frame folded into this move, oldest first: a stroke
+                    // drawn by hand follows the pointer's path and not only where it ended.
+                    let held_keys = held(ev.modifiers, ev.button);
+                    for sample in ev.coalesced() {
+                        pointer::moved(&board, local(sample.position), held_keys);
+                    }
+                    pointer::moved(&board, local(ev.position), held_keys);
                 },
                 on:pointer_up = move |ev: &mut EventCx<'_, events::PointerUp>| {
                     ev.release_pointer();

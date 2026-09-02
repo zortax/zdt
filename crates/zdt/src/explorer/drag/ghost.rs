@@ -107,6 +107,10 @@ pub fn TreeGhost() -> impl IntoView {
             var:--ghost-y = ghost_y,
             style:left = left,
             style:top = top,
+            style:max-width = {
+                let explorer = explorer.clone();
+                move || Some(explorer.width().inset_px(16))
+            },
             a11y:hidden = true,
             on:transition_end = move |_: &mut EventCx<'_, events::TransitionEnd>| drag.settled()
         ) {

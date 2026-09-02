@@ -13,13 +13,23 @@ pub mod leap;
 pub mod menu;
 pub mod tree;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use zdt_core::tree::{Filter, Row, Tree};
 use zgui::reactive::prelude::*;
 use zgui::reactive::{LocalStorage, RwSignal};
+
+/// How narrow and how wide the panel may be, matching what `tree.css` will honour.
+pub const NARROWEST: u32 = 160;
+pub const WIDEST: u32 = 480;
+
+/// Work waiting for the tree while a worker holds it.
+type TreeWork = Box<dyn FnOnce(&mut Tree) + Send>;
+/// What runs on the interface thread once that work's rows are published.
+type TreeThen = Box<dyn FnOnce(&Explorer)>;
 
 /// What a cut or a copy left waiting.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -71,7 +81,16 @@ struct Inner {
     ///
     /// Reading a directory that nobody is looking at is work for nothing, so a change to a closed
     /// panel is remembered instead and read when it opens.
-    stale: std::cell::Cell<bool>,
+    stale: Cell<bool>,
+    /// How wide the panel is drawn, live while its edge is dragged.
+    width: zdt_view::PanelWidth,
+    /// Whether a worker holds the tree.
+    ///
+    /// While it does, the model holds a placeholder that must never be worked on or published:
+    /// an operation that took the placeholder would put an empty tree on screen.
+    busy: Cell<bool>,
+    /// Work that arrived while a worker held the tree, in order.
+    pending: RefCell<VecDeque<(TreeWork, TreeThen)>>,
 }
 
 impl Explorer {
@@ -89,9 +108,18 @@ impl Explorer {
                 marked: RwSignal::new_local(Vec::new()),
                 drag: crate::explorer::drag::Drag::new(),
                 viewport: RefCell::new(None),
-                stale: std::cell::Cell::new(false),
+                stale: Cell::new(false),
+                width: zdt_view::PanelWidth::new(260, NARROWEST, WIDEST),
+                busy: Cell::new(false),
+                pending: RefCell::new(VecDeque::new()),
             }),
         }
+    }
+
+    /// How wide the panel is drawn.
+    #[must_use]
+    pub fn width(&self) -> &zdt_view::PanelWidth {
+        &self.inner.width
     }
 
     /// The rows. Tracked.
@@ -491,6 +519,17 @@ impl Explorer {
         }
     }
 
+    /// Whether `path` is on screen with every directory above it open. Untracked.
+    ///
+    /// Answered before a reveal, because opening the way to a file reads every directory along it
+    /// and a file already in view has nothing left to open.
+    #[must_use]
+    pub fn is_revealed(&self, path: &Path) -> bool {
+        self.inner
+            .rows
+            .with_untracked(|rows| rows.iter().any(|row| row.entry.path == path))
+    }
+
     /// Opens the way to `path` and puts the caret on it.
     pub fn reveal(&self, path: &Path) {
         let path = path.to_path_buf();
@@ -585,12 +624,30 @@ impl Explorer {
     /// The same, and then `after` on the interface thread once the rows are published.
     ///
     /// The tree is taken out, worked on elsewhere and put back, because reading a directory is
-    /// blocking and the interface thread must not wait on one.
+    /// blocking and the interface thread must not wait on one. One worker at a time: work that
+    /// arrives while the tree is away waits its turn, so it runs on the real tree and never on
+    /// the placeholder left in its place.
     fn with_tree_then(
         &self,
         work: impl FnOnce(&mut Tree) + Send + 'static,
         after: impl FnOnce(&Explorer) + 'static,
     ) {
+        self.inner
+            .pending
+            .borrow_mut()
+            .push_back((Box::new(work), Box::new(after)));
+        if !self.inner.busy.get() {
+            self.run_pending();
+        }
+    }
+
+    /// Sends the next waiting piece of work to a worker, when there is one.
+    fn run_pending(&self) {
+        let Some((work, after)) = self.inner.pending.borrow_mut().pop_front() else {
+            self.inner.busy.set(false);
+            return;
+        };
+        self.inner.busy.set(true);
         let root = self.root();
         let filter = self.filter();
         let taken = std::mem::replace(&mut *self.inner.tree.borrow_mut(), Tree::new(root, filter));
@@ -609,6 +666,7 @@ impl Explorer {
             *explorer.inner.tree.borrow_mut() = tree;
             explorer.publish();
             after(&explorer);
+            explorer.run_pending();
         });
     }
 

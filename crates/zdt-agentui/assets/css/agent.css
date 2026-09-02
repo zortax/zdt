@@ -2,7 +2,7 @@
 
 .agent-side {
     flex: 0 0 auto;
-    width: var(--agent-width, 280px);
+    width: 280px;
     height: 100%;
     min-height: 0;
     background: var(--zui-color-sidebar);
@@ -1365,14 +1365,25 @@
     color: var(--zui-color-muted-foreground);
 }
 
-/* Parked rows recede: what sleeps or is put away must not compete with what works. */
+/* Parked rows recede: what sleeps or is put away must not compete with what works. Colour and
+ * never opacity: an opacity below one is a compositing group, and a hover that starts or ends
+ * one re-sorts the painting order. */
 .agent-side__row[data-parked="true"] {
-    opacity: 0.55;
+    color: var(--zui-color-muted-foreground);
+}
+
+.agent-side__row[data-parked="true"] .agent-side__name,
+.agent-side__row[data-parked="true"] .icon {
+    color: var(--zui-color-muted-foreground);
 }
 
 .agent-side__row[data-parked="true"]:hover,
-.agent-side__row[data-parked="true"][data-caret="true"] {
-    opacity: 1;
+.agent-side__row[data-parked="true"][data-caret="true"],
+.agent-side__row[data-parked="true"]:hover .agent-side__name,
+.agent-side__row[data-parked="true"][data-caret="true"] .agent-side__name,
+.agent-side__row[data-parked="true"]:hover .icon,
+.agent-side__row[data-parked="true"][data-caret="true"] .icon {
+    color: var(--zui-color-sidebar-foreground, var(--zui-color-foreground));
 }
 
 .agent-side__mark {
@@ -1392,20 +1403,35 @@
     background: var(--zdt-git-added, #6a9a6a);
 }
 
-/* The quick actions swap in place with the status on hover and keyboard visits. */
+/* The quick actions swap in place with the status on hover and keyboard visits.
+ *
+ * Both stay in the tree with their boxes: the one not showing is folded to no width. A box that
+ * came and went with the hover would be built and torn down on every crossing, and a fragment
+ * that did not exist before has no place in the painting order until the whole order is made
+ * again. */
+.agent-side__state,
 .agent-side__quick {
-    display: none;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.agent-side__quick {
     flex: 0 0 auto;
     align-items: center;
     gap: 2px;
+    width: 0;
+    pointer-events: none;
 }
 
 .agent-side__row:hover .agent-side__quick {
-    display: flex;
+    width: auto;
+    pointer-events: auto;
 }
 
 .agent-side__row:hover .agent-side__state {
-    display: none;
+    width: 0;
+    gap: 0;
+    pointer-events: none;
 }
 
 /* The same height as the status line it swaps with, so hovering never moves the row. */

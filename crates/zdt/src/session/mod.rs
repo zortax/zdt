@@ -281,6 +281,7 @@ impl Session {
                     settings,
                 )),
                 Box::new(crate::app::follow_filter(&inner.explorer, settings)),
+                Box::new(crate::app::follow_tree_width(&inner.explorer, settings)),
                 Box::new(crate::app::follow_status(&inner.explorer, &inner.status)),
                 Box::new(crate::app::follow_alphabet(&inner.vim, settings)),
                 // Where every editor was looking, put back as each one mounts.

@@ -220,7 +220,13 @@ struct Inner {
     filter: RwSignal<String, LocalStorage>,
     /// The search field's element, once the sidebar has built it.
     search_field: RwSignal<Option<zgui::view::NodeRef>, LocalStorage>,
+    /// How wide the sidebar is drawn, live while its edge is dragged.
+    side_width: zdt_view::PanelWidth,
 }
+
+/// How narrow and how wide the sidebar may be, matching what `agent.css` will honour.
+pub const SIDE_NARROWEST: u32 = 200;
+pub const SIDE_WIDEST: u32 = 480;
 
 impl AgentUi {
     /// A closed surface over `client`, inside `host`.
@@ -251,8 +257,15 @@ impl AgentUi {
                 workflow_open: RwSignal::new_local(None),
                 filter: RwSignal::new_local(String::new()),
                 search_field: RwSignal::new_local(None),
+                side_width: zdt_view::PanelWidth::new(280, SIDE_NARROWEST, SIDE_WIDEST),
             }),
         }
+    }
+
+    /// How wide the sidebar is drawn.
+    #[must_use]
+    pub fn side_width(&self) -> &zdt_view::PanelWidth {
+        &self.inner.side_width
     }
 
     /// The connection behind the surface.
@@ -321,6 +334,16 @@ impl AgentUi {
     #[must_use]
     pub fn visible(&self) -> Vec<ThreadShell> {
         Self::threads_of(self.rows())
+    }
+
+    /// The ids of the threads on screen, in row order, notifying only when the order moves.
+    ///
+    /// Made once by the sidebar in its own scope and read by every row: a row that derived the
+    /// order for itself would sort the whole list once per row on every change to any thread.
+    #[must_use]
+    pub fn visible_order(&self) -> RwSignal<Vec<ThreadId>, LocalStorage> {
+        let agent = self.clone();
+        zdt_view::settled(move || agent.visible().into_iter().map(|shell| shell.id).collect())
     }
 
     /// The same, without subscribing.

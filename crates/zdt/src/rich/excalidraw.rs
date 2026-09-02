@@ -270,10 +270,9 @@ pub fn ExcalidrawPreview(
     // Which surface it is drawn on. The setting decides, and when the setting leaves it to the
     // desktop the editor's own probe answers.
     {
-        let settings = crate::settings::use_settings();
+        let scheme = crate::settings::use_settings().select(|config| config.ui.scheme);
         let following = RenderEffect::new(move |_| {
-            let scheme = settings.with(|config| config.ui.scheme);
-            held.board.scheme.set(match scheme {
+            held.board.scheme.set(match scheme.get() {
                 zdt_core::config::Scheme::Light => zdt_excalidraw::state::Scheme::Light,
                 zdt_core::config::Scheme::Dark => zdt_excalidraw::state::Scheme::Dark,
                 zdt_core::config::Scheme::System => zdt_excalidraw::state::Scheme::System,

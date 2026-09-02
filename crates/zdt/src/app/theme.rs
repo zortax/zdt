@@ -90,8 +90,6 @@ pub fn settings_sheet(config: &zdt_core::Config) -> String {
            --zui-type-family-sans: var(--zdt-ui-font, \"Mononoki Nerd Font\"), monospace;\n  \
            --zui-type-size-sm: var(--zdt-ui-size-small);\n  \
            --zui-type-size-base: var(--zdt-ui-size);\n  \
-           --tree-width: {tree_width}px;\n  \
-           --agent-width: {agent_width}px;\n  \
            --terminal-float-width: {float_width}%;\n  \
            --terminal-float-height: {float_height}%;\n\
          }}\n\
@@ -108,8 +106,6 @@ pub fn settings_sheet(config: &zdt_core::Config) -> String {
         editor_size = config.editor.font_size,
         editor_weight = config.editor.font_weight.clamp(100, 900),
         tab = config.editor.tab_size,
-        tree_width = config.tree.width,
-        agent_width = config.agent.width,
         float_width = (config.terminal.float_width * 100.0).round() as u32,
         float_height = (config.terminal.float_height * 100.0).round() as u32,
     )

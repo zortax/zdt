@@ -211,6 +211,12 @@ impl AgentClient {
         self.inner.threads.get()
     }
 
+    /// Whether the daemon has said there is at least one thread. Tracked.
+    #[must_use]
+    pub fn has_threads(&self) -> bool {
+        self.inner.threads.with(|threads| !threads.is_empty())
+    }
+
     /// The same, without subscribing.
     #[must_use]
     pub fn threads_untracked(&self) -> Vec<ThreadShell> {
@@ -844,7 +850,11 @@ impl AgentClient {
                 }
             }
         });
-        self.inner.threads.set(threads);
+        // A list that says what the last one said wakes nobody: the daemon says its rows again
+        // on every change anywhere, and most of them change nothing here.
+        if self.inner.threads.with_untracked(|held| *held != threads) {
+            self.inner.threads.set(threads);
+        }
         if !self.inner.listed.get_untracked() {
             self.inner.listed.set(true);
         }

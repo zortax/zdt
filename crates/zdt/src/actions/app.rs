@@ -75,7 +75,7 @@ pub(super) fn toggle(workspace: &Workspace, leaf: &str, args: &zdt_vim::Args) {
     match setting {
         "scheme" => {
             settings.toggle_scheme();
-            let now = settings.with(|config| config.ui.scheme);
+            let now = settings.with_untracked(|config| config.ui.scheme);
             workspace.say(format!("{now:?} theme").to_lowercase());
         }
         "line_numbers" => settings.update(|config| {
